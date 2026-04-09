@@ -1,16 +1,18 @@
 import { Scene, STATUS_CONFIG, SceneStatus, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode, TIMELINE_MODES, getStatusOrder, getStatusConfig, resolveStatusCfg } from '../models/Scene';
-import { Modal, App, FuzzySuggestModal } from 'obsidian';
+import { Modal, App, FuzzySuggestModal, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { openConfirmModal } from './ConfirmModal';
 import { SplitSceneModal } from './SplitMergeModals';
 import { isMobile } from './MobileAdapter';
 import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
-import { resolveTagColor, getPlotlineHSL } from '../settings';
+import { resolveTagColor, getPlotlineHSL, contrastTextColor } from '../settings';
 import { LocationManager } from '../services/LocationManager';
 import type { SnapshotManager, SceneSnapshot } from '../services/SnapshotManager';
 import { LinkScanner, LinkScanResult } from '../services/LinkScanner';
 import { renderTagPillInput, renderAutocompleteInput } from './InlineSuggest';
+import { AddFieldModal } from './AddFieldModal';
+import { UniversalFieldTemplate } from '../services/FieldTemplateService';
 
 /**
  * Scene inspector sidebar component
@@ -162,6 +164,7 @@ export class InspectorComponent {
         titleInput.addEventListener('change', async () => {
             const val = titleInput.value.trim();
             if (val && val !== scene.title) {
+                const oldTitle = scene.title;
                 // Rename the file to match the new title
                 const oldPath = scene.filePath;
                 const dir = oldPath.substring(0, oldPath.lastIndexOf('/'));
@@ -173,6 +176,12 @@ export class InspectorComponent {
                 await this.sceneManager.updateScene(newPath, { title: val } as any);
                 scene.title = val;
                 scene.filePath = newPath;
+
+                // Cascade rename: update setup_scenes / payoff_scenes in other scenes
+                const updated = await this.plugin.cascadeRename.cascadeSceneTitleRename(oldTitle, val);
+                if (updated > 0) {
+                    new Notice(`Updated ${updated} setup/payoff link${updated !== 1 ? 's' : ''}`);
+                }
             }
         });
 
@@ -484,7 +493,7 @@ export class InspectorComponent {
                 chip.style.gap = '4px';
                 const chipColor = resolveTagColor(t, Math.max(0, allTagsSorted.indexOf(t)), scheme, tagColors, getPlotlineHSL(this.plugin.settings));
                 chip.style.background = chipColor;
-                chip.style.color = '#fff';
+                chip.style.color = contrastTextColor(chipColor);
                 const removeBtn = chip.createSpan({ text: '×', cls: 'inspector-chip-remove' });
                 removeBtn.style.cursor = 'pointer';
                 removeBtn.style.marginLeft = '2px';
@@ -611,6 +620,9 @@ export class InspectorComponent {
         valueLabel.className = 'inspector-intensity-value ' +
             (initVal > 0 ? 'intensity-positive' : initVal < 0 ? 'intensity-negative' : 'intensity-neutral');
 
+        // ── Custom (universal) fields for scenes ──
+        this.renderUniversalFields(scene);
+
         // Setup / Payoff tracking
         this.renderSetupPayoff(scene);
 
@@ -655,6 +667,170 @@ export class InspectorComponent {
                 },
             });
         });
+    }
+
+    /**
+     * Render custom (universal) fields for scenes.
+     */
+    private renderUniversalFields(scene: Scene): void {
+        const templates = this.plugin.fieldTemplates.getBySection('Scene', 'scene');
+        // Also gather templates from any section that targets scenes
+        const allTemplates = this.plugin.fieldTemplates.getAll().filter(t => (t.category || 'character') === 'scene');
+
+        if (allTemplates.length === 0 && !this.plugin.fieldTemplates) return;
+
+        const section = this.container.createDiv('inspector-section inspector-universal-fields');
+        const header = section.createDiv('inspector-universal-header');
+        header.createSpan({ cls: 'inspector-label', text: 'Custom Fields' });
+
+        const addBtn = header.createEl('button', {
+            cls: 'inspector-universal-add-btn clickable-icon',
+            attr: { title: 'Add custom field', 'aria-label': 'Add custom field' },
+        });
+        obsidian.setIcon(addBtn, 'plus');
+        addBtn.addEventListener('click', () => {
+            const modal = new AddFieldModal(
+                this.plugin.app,
+                'Scene',
+                null,
+                async (template) => {
+                    template.category = 'scene';
+                    await this.plugin.fieldTemplates.add(template);
+                    const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
+                    if (fresh) this.show(fresh);
+                },
+                undefined,
+                ['Scene'],
+            );
+            modal.open();
+        });
+
+        if (!scene.universalFields) scene.universalFields = {};
+
+        for (const tpl of allTemplates) {
+            this.renderSingleUniversalField(section, tpl, scene);
+        }
+    }
+
+    /**
+     * Render a single universal field input in the inspector.
+     */
+    private renderSingleUniversalField(
+        parent: HTMLElement,
+        tpl: UniversalFieldTemplate,
+        scene: Scene,
+    ): void {
+        if (!scene.universalFields) scene.universalFields = {};
+        const value = (scene.universalFields[tpl.id] ?? '') as string;
+
+        const row = parent.createDiv('inspector-universal-field-row');
+
+        const labelWrap = row.createDiv('inspector-universal-label-wrap');
+        labelWrap.createEl('label', { cls: 'inspector-label', text: tpl.label });
+
+        const editBtn = labelWrap.createEl('button', {
+            cls: 'inspector-universal-edit-btn clickable-icon',
+            attr: { title: 'Edit or remove this field', 'aria-label': 'Edit field' },
+        });
+        obsidian.setIcon(editBtn, 'pencil');
+        editBtn.addEventListener('click', () => {
+            const modal = new AddFieldModal(
+                this.plugin.app,
+                tpl.section,
+                tpl,
+                async (updated) => {
+                    await this.plugin.fieldTemplates.update(tpl.id, updated);
+                    const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
+                    if (fresh) this.show(fresh);
+                },
+                async () => {
+                    await this.plugin.fieldTemplates.remove(tpl.id);
+                    const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
+                    if (fresh) this.show(fresh);
+                },
+                ['Scene'],
+            );
+            modal.open();
+        });
+
+        if (tpl.type === 'textarea') {
+            const ta = row.createEl('textarea', {
+                cls: 'inspector-universal-textarea',
+                attr: { placeholder: tpl.placeholder || '', rows: '4' },
+            });
+            ta.value = String(value);
+            ta.addEventListener('change', async () => {
+                scene.universalFields![tpl.id] = ta.value.trim() || '';
+                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+            });
+        } else if (tpl.type === 'dropdown') {
+            const sel = row.createEl('select', { cls: 'inspector-universal-select' });
+            sel.createEl('option', { text: tpl.placeholder || '— Select —', value: '' });
+            for (const opt of tpl.options) {
+                const o = sel.createEl('option', { text: opt, value: opt });
+                if (value === opt) o.selected = true;
+            }
+            sel.addEventListener('change', async () => {
+                scene.universalFields![tpl.id] = sel.value;
+                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+            });
+        } else if (tpl.type === 'multi-select') {
+            const raw = scene.universalFields[tpl.id];
+            const selected: string[] = Array.isArray(raw) ? [...raw] : (typeof raw === 'string' && raw ? [raw] : []);
+            const allOptions = [...tpl.options].sort((a, b) => a.localeCompare(b));
+
+            const msContainer = row.createDiv('inspector-universal-multi');
+            const pillsEl = msContainer.createDiv('inspector-universal-pills');
+
+            const renderPills = () => {
+                pillsEl.empty();
+                for (const item of selected) {
+                    const pill = pillsEl.createSpan({ cls: 'story-line-chip' });
+                    pill.createSpan({ text: item });
+                    const x = pill.createSpan({ cls: 'inspector-sp-remove', text: '×' });
+                    x.addEventListener('click', async () => {
+                        const idx = selected.indexOf(item);
+                        if (idx >= 0) selected.splice(idx, 1);
+                        scene.universalFields![tpl.id] = [...selected];
+                        await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+                        renderPills();
+                    });
+                }
+            };
+            renderPills();
+
+            const inputRow = msContainer.createDiv('inspector-universal-input-row');
+            const msInput = inputRow.createEl('input', {
+                cls: 'inspector-universal-input',
+                type: 'text',
+                attr: { placeholder: tpl.placeholder || 'Type to add…' },
+            });
+            msInput.addEventListener('keydown', async (e: KeyboardEvent) => {
+                if (e.key === 'Enter' && msInput.value.trim()) {
+                    e.preventDefault();
+                    const val = msInput.value.trim();
+                    if (!selected.includes(val)) {
+                        selected.push(val);
+                        scene.universalFields![tpl.id] = [...selected];
+                        await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+                        renderPills();
+                    }
+                    msInput.value = '';
+                }
+            });
+        } else {
+            // Default: text input
+            const input = row.createEl('input', {
+                cls: 'inspector-universal-input',
+                type: 'text',
+                attr: { placeholder: tpl.placeholder || '' },
+            });
+            input.value = String(value);
+            input.addEventListener('change', async () => {
+                scene.universalFields![tpl.id] = input.value.trim();
+                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+            });
+        }
     }
 
     /**

@@ -341,17 +341,21 @@ export class Validator {
                 }
             }
 
-            // Setup comes AFTER payoff in sequence (wrong order)
-            if (scene.payoff_scenes?.length && scene.sequence !== undefined) {
+            // Setup comes AFTER payoff in reading order (wrong order)
+            if (scene.payoff_scenes?.length) {
                 for (const target of scene.payoff_scenes) {
                     const targetScene = titleMap.get(target);
-                    if (targetScene && targetScene.sequence !== undefined && targetScene.sequence < scene.sequence) {
-                        warnings.push({
-                            severity: 'warning',
-                            category: 'Setup/Payoff',
-                            message: `Setup "${scene.title}" (seq ${scene.sequence}) comes AFTER its payoff "${target}" (seq ${targetScene.sequence})`,
-                            scenePaths: [scene.filePath, targetScene.filePath],
-                        });
+                    if (targetScene) {
+                        const srcOrder = (scene.act ?? 0) * 1_000_000 + (scene.chapter ?? 0) * 1_000 + (scene.sequence ?? 0);
+                        const tgtOrder = (targetScene.act ?? 0) * 1_000_000 + (targetScene.chapter ?? 0) * 1_000 + (targetScene.sequence ?? 0);
+                        if (tgtOrder < srcOrder) {
+                            warnings.push({
+                                severity: 'warning',
+                                category: 'Setup/Payoff',
+                                message: `Setup "${scene.title}" (${scene.act ?? '?'}-${scene.chapter ?? '?'}-${scene.sequence ?? '?'}) comes AFTER its payoff "${target}" (${targetScene.act ?? '?'}-${targetScene.chapter ?? '?'}-${targetScene.sequence ?? '?'})`,
+                                scenePaths: [scene.filePath, targetScene.filePath],
+                            });
+                        }
                     }
                 }
             }

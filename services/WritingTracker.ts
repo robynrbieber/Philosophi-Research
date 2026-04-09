@@ -18,6 +18,16 @@ export interface WritingTrackerData {
     history: Record<string, number>;
     /** Daily revision counts (absolute word changes — adds + deletes) keyed by ISO date */
     revisionHistory?: Record<string, number>;
+    /** Persisted sprint log entries */
+    sprintLog?: SprintLogEntry[];
+}
+
+/** A completed sprint record */
+export interface SprintLogEntry {
+    date: string;       // ISO date
+    words: number;      // net words written
+    durationMs: number; // actual elapsed time
+    wpm: number;        // words per minute
 }
 
 export class WritingTracker {
@@ -31,6 +41,18 @@ export class WritingTracker {
     private revisionHistory: Record<string, number> = {};
     /** Last known total word count — used to measure revision deltas between flushes */
     private lastKnownTotal: number | null = null;
+
+    // ── Sprint state ───────────────────────────────────
+    /** Whether a timed sprint is currently running */
+    private _sprintRunning = false;
+    /** Sprint start timestamp (ms) */
+    private _sprintStart = 0;
+    /** Sprint baseline word count */
+    private _sprintBaseline = 0;
+    /** Configured sprint duration (ms) */
+    private _sprintDurationMs = 25 * 60_000; // default 25 min
+    /** Completed sprint log */
+    private _sprintLog: SprintLogEntry[] = [];
 
     /**
      * Start (or restart) a session, capturing the current total word count
@@ -176,6 +198,85 @@ export class WritingTracker {
         return { ...this.history };
     }
 
+    // ── Sprint controls ────────────────────────────────
+
+    /** Start a timed writing sprint */
+    startSprint(currentTotalWords: number): void {
+        this._sprintRunning = true;
+        this._sprintStart = Date.now();
+        this._sprintBaseline = currentTotalWords;
+    }
+
+    /** Stop the current sprint and record it */
+    stopSprint(currentTotalWords: number): SprintLogEntry | null {
+        if (!this._sprintRunning) return null;
+        this._sprintRunning = false;
+        const elapsed = Date.now() - this._sprintStart;
+        const words = Math.max(0, currentTotalWords - this._sprintBaseline);
+        const minutes = elapsed / 60_000;
+        const wpm = minutes >= 0.5 ? Math.round(words / minutes) : 0;
+        const entry: SprintLogEntry = {
+            date: this.todayKey(),
+            words,
+            durationMs: elapsed,
+            wpm,
+        };
+        this._sprintLog.push(entry);
+        return entry;
+    }
+
+    /** Reset sprint state without recording */
+    resetSprint(): void {
+        this._sprintRunning = false;
+        this._sprintStart = 0;
+        this._sprintBaseline = 0;
+    }
+
+    /** Is a sprint currently active? */
+    isSprintRunning(): boolean { return this._sprintRunning; }
+
+    /** Elapsed sprint time (ms) */
+    getSprintElapsed(): number {
+        if (!this._sprintRunning) return 0;
+        return Date.now() - this._sprintStart;
+    }
+
+    /** Remaining sprint time (ms). Returns 0 if overtime. */
+    getSprintRemaining(): number {
+        if (!this._sprintRunning) return this._sprintDurationMs;
+        return Math.max(0, this._sprintDurationMs - (Date.now() - this._sprintStart));
+    }
+
+    /** Words written during the current sprint */
+    getSprintWords(currentTotalWords: number): number {
+        if (!this._sprintRunning) return 0;
+        return Math.max(0, currentTotalWords - this._sprintBaseline);
+    }
+
+    /** WPM during the current sprint */
+    getSprintWpm(currentTotalWords: number): number {
+        const minutes = this.getSprintElapsed() / 60_000;
+        if (minutes < 0.5) return 0;
+        return Math.round(this.getSprintWords(currentTotalWords) / minutes);
+    }
+
+    /** Get/set sprint duration (ms) */
+    getSprintDuration(): number { return this._sprintDurationMs; }
+    setSprintDuration(ms: number): void { this._sprintDurationMs = Math.max(60_000, ms); }
+
+    /** Get completed sprint log */
+    getSprintLog(): SprintLogEntry[] { return [...this._sprintLog]; }
+
+    /** Sprint log summary: total sprints, total words, average wpm */
+    getSprintSummary(): { count: number; totalWords: number; avgWpm: number; totalDurationMs: number } {
+        const log = this._sprintLog;
+        if (log.length === 0) return { count: 0, totalWords: 0, avgWpm: 0, totalDurationMs: 0 };
+        const totalWords = log.reduce((s, e) => s + e.words, 0);
+        const totalMs = log.reduce((s, e) => s + e.durationMs, 0);
+        const avgWpm = totalMs > 30_000 ? Math.round(totalWords / (totalMs / 60_000)) : 0;
+        return { count: log.length, totalWords, avgWpm, totalDurationMs: totalMs };
+    }
+
     // ── Persistence ────────────────────────────────────
 
     /** Export data for saving */
@@ -183,6 +284,7 @@ export class WritingTracker {
         return {
             history: { ...this.history },
             revisionHistory: { ...this.revisionHistory },
+            sprintLog: [...this._sprintLog],
         };
     }
 
@@ -193,6 +295,9 @@ export class WritingTracker {
         }
         if (data?.revisionHistory) {
             this.revisionHistory = { ...data.revisionHistory };
+        }
+        if (data?.sprintLog) {
+            this._sprintLog = [...data.sprintLog];
         }
     }
 

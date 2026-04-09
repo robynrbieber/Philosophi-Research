@@ -2,6 +2,38 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.2
+
+### Bug Fixes
+
+- **Setup / Payoff links** — Fixed broken references in the Sample Project. Setup/payoff ordering warnings now use full reading order (act → chapter → sequence) instead of sequence alone, eliminating false warnings. Renaming a scene now automatically updates setup/payoff references in all other scenes.
+
+- **Plotgrid rename sync** — Renaming a scene no longer leaves orphaned rows in the Plot Grid. Merge mode auto-cleans orphaned rows while preserving manually added ones.
+
+- **Timeline & Board sorting** — Sorting by chapter now uses multi-key act → chapter → sequence order, fixing incorrect scene interleaving across acts.
+
+- **Navigator sorting** — Chronological order now uses the correct fields (`chronologicalOrder` → `storyDate` → `sequence`) and displays as a flat list. "Recently edited" sort uses actual file modification time.
+
+- **Manuscript backlinks** — Obsidian's native backlink panes are now hidden inside embedded manuscript editors, removing visual clutter and gaps.
+
+- **Tag text contrast** — Tag pills, chips, and color-coded badges now automatically use black or white text based on background brightness (WCAG contrast formula), fixing unreadable light-on-light combinations.
+
+### New Features
+
+- **Four new beat sheet templates** — Seven-Point Story Structure (Dan Wells), Story Circle (Dan Harmon), Romancing the Beat (Gwen Hayes), and 27 Chapter Method (Kat O'Keeffe). The template picker is redesigned as a compact list with expandable beat previews.
+
+- **Beat sheet YAML field** — When a beat sheet template is applied, the template name is stored on the project and auto-populated as a `beatsheet` field on every new scene.
+
+- **Custom scene fields** — Define your own fields for scenes (text, textarea, dropdown, or multi-select) via Settings → Field Templates. Custom fields appear in the Inspector under "Custom Fields" and are stored in YAML as `universalFields`.
+
+- **Save as Template** — Right-click any scene card in the Board view and choose "Save as Template" to capture its fields and body as a reusable scene template.
+
+- **Quick Add chapter dropdown** — The Quick Add modal now shows a dropdown of existing chapters with scene counts, defaulting to the latest chapter. Includes a "+ New chapter" option.
+
+- **Writing Sprint timer** — Fully functional sprint timer in Stats View with start/stop/reset, editable duration, live word count and WPM during the sprint, and a persistent sprint history log.
+
+---
+
 ## Version 1.9.1
 
 ### Bug Fixes

@@ -283,8 +283,8 @@ export class NavigatorView extends ItemView {
             return;
         }
 
-        // Group by act if sorting by reading or chronological order
-        if (this.sortMode === 'reading' || this.sortMode === 'chronological') {
+        // Group by act only for reading order
+        if (this.sortMode === 'reading') {
             this.renderGroupedByAct(scenes);
         } else {
             for (const scene of scenes) {
@@ -462,15 +462,33 @@ export class NavigatorView extends ItemView {
             switch (this.sortMode) {
                 case 'reading':
                     return (a.chapter ?? a.sequence ?? 9999) - (b.chapter ?? b.sequence ?? 9999);
-                case 'chronological':
+                case 'chronological': {
+                    // Prefer chronologicalOrder, then storyDate+storyTime, then sequence
+                    if (a.chronologicalOrder != null || b.chronologicalOrder != null) {
+                        return (a.chronologicalOrder ?? 9999) - (b.chronologicalOrder ?? 9999);
+                    }
+                    if (a.storyDate || b.storyDate) {
+                        const aKey = (a.storyDate || '') + ' ' + (a.storyTime || '');
+                        const bKey = (b.storyDate || '') + ' ' + (b.storyTime || '');
+                        const cmp = aKey.localeCompare(bKey);
+                        if (cmp !== 0) return cmp;
+                    }
                     return (a.sequence ?? 9999) - (b.sequence ?? 9999);
+                }
                 case 'status': {
                     const order = getStatusOrder();
                     return order.indexOf(a.status || 'idea') - order.indexOf(b.status || 'idea');
                 }
                 case 'recent': {
-                    const aTime = a.modified ? new Date(a.modified).getTime() : 0;
-                    const bTime = b.modified ? new Date(b.modified).getTime() : 0;
+                    // Use file system mtime (more accurate for content edits)
+                    // than YAML 'modified' which only updates on metadata changes
+                    const aFile = this.app.vault.getAbstractFileByPath(a.filePath);
+                    const bFile = this.app.vault.getAbstractFileByPath(b.filePath);
+                    const aMtime = (aFile instanceof TFile) ? aFile.stat.mtime : 0;
+                    const bMtime = (bFile instanceof TFile) ? bFile.stat.mtime : 0;
+                    // Fallback to YAML modified if file lookup fails
+                    const aTime = aMtime || (a.modified ? new Date(a.modified).getTime() : 0);
+                    const bTime = bMtime || (b.modified ? new Date(b.modified).getTime() : 0);
                     return bTime - aTime; // newest first
                 }
                 case 'words':

@@ -463,6 +463,20 @@ export function adjustHSL(hex: string, hueShift: number, satShift: number, light
 }
 
 /**
+ * Return '#fff' or '#000' depending on which has better contrast against the
+ * given background colour (WCAG relative-luminance formula).
+ */
+export function contrastTextColor(bgHex: string): string {
+    const h = bgHex.replace('#', '');
+    const r = Number.parseInt(h.slice(0, 2), 16) / 255;
+    const g = Number.parseInt(h.slice(2, 4), 16) / 255;
+    const b = Number.parseInt(h.slice(4, 6), 16) / 255;
+    const toLinear = (c: number) => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+    return luminance > 0.4 ? '#000' : '#fff';
+}
+
+/**
  * Resolve the final 14 sticky-note colours, applying:
  *  1. Theme base → 2. Per-index override → 3. Global HSL adjustments
  */
@@ -1557,7 +1571,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 chip.style.borderRadius = '10px';
                 chip.style.fontSize = '11px';
                 chip.style.background = color;
-                chip.style.color = '#fff';
+                chip.style.color = contrastTextColor(color);
                 chip.style.cursor = 'pointer';
                 chip.textContent = tag;
                 chip.setAttribute('title', `${tag}: ${color} — click to remove`);

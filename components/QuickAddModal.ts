@@ -87,17 +87,41 @@ export class QuickAddModal extends Modal {
 
         const chapterGroup = actChapterRow.createDiv({ cls: 'story-line-field-group' });
         chapterGroup.createEl('label', { text: 'Chapter', cls: 'story-line-field-label' });
-        const chapterInput = chapterGroup.createEl('input', {
-            type: 'text',
-            cls: 'story-line-field-input',
-            placeholder: 'Chapter #'
-        });
-        if (this.result.chapter != null) {
-            chapterInput.value = String(this.result.chapter);
+
+        // Build list of existing chapters from scenes
+        const allScenes = this.sceneManager.getAllScenes();
+        const chapterSet = new Set<number>();
+        for (const s of allScenes) {
+            if (s.chapter != null && !isNaN(Number(s.chapter))) chapterSet.add(Number(s.chapter));
         }
-        chapterInput.addEventListener('input', () => {
-            const val = chapterInput.value;
-            this.result.chapter = val ? (Number(val) || val) : undefined;
+        const existingChapters = Array.from(chapterSet).sort((a, b) => a - b);
+        const nextChapter = existingChapters.length > 0 ? Math.max(...existingChapters) + 1 : 1;
+
+        const chapterSelect = chapterGroup.createEl('select', {
+            cls: 'dropdown story-line-field-input',
+        });
+        chapterSelect.createEl('option', { text: 'None', value: '' });
+        for (const ch of existingChapters) {
+            const label = this.sceneManager.getChapterLabel(ch);
+            const scenesInCh = allScenes.filter(s => Number(s.chapter) === ch).length;
+            const display = label
+                ? `Ch ${ch} — ${label.replace(/^Ch(?:apter)?\s*\d+\s*[—:]\s*/i, '')} (${scenesInCh})`
+                : `Chapter ${ch} (${scenesInCh} scene${scenesInCh !== 1 ? 's' : ''})`;
+            chapterSelect.createEl('option', { text: display, value: String(ch) });
+        }
+        chapterSelect.createEl('option', { text: `+ New chapter (${nextChapter})`, value: String(nextChapter) });
+
+        if (this.result.chapter != null) {
+            chapterSelect.value = String(this.result.chapter);
+        } else if (existingChapters.length > 0) {
+            // Default to the latest (highest) chapter so new scenes are added there
+            const latestCh = existingChapters[existingChapters.length - 1];
+            chapterSelect.value = String(latestCh);
+            this.result.chapter = latestCh;
+        }
+        chapterSelect.addEventListener('change', () => {
+            const val = chapterSelect.value;
+            this.result.chapter = val ? Number(val) : undefined;
         });
 
         // POV (autocomplete input)

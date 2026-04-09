@@ -1863,6 +1863,22 @@ body.theme-dark {
     font-size: 0.85em;
 }
 
+/* Custom (universal) scene fields in Inspector */
+.inspector-universal-fields { margin-top: 10px; }
+.inspector-universal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.inspector-universal-add-btn { border: none; background: none; cursor: pointer; color: var(--sc-text-muted); padding: 2px; }
+.inspector-universal-add-btn:hover { color: var(--interactive-accent); }
+.inspector-universal-field-row { margin-bottom: 8px; }
+.inspector-universal-label-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+.inspector-universal-edit-btn { border: none; background: none; cursor: pointer; color: var(--sc-text-muted); padding: 0 2px; font-size: 0.75em; }
+.inspector-universal-edit-btn:hover { color: var(--interactive-accent); }
+.inspector-universal-textarea { width: 100%; resize: vertical; font-size: 0.85em; min-height: 60px; }
+.inspector-universal-select { width: 100%; font-size: 0.85em; }
+.inspector-universal-input { width: 100%; font-size: 0.85em; }
+.inspector-universal-multi { display: flex; flex-direction: column; gap: 4px; }
+.inspector-universal-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.inspector-universal-input-row { display: flex; gap: 4px; }
+
 /* Setup / Payoff tracking */
 .inspector-setup-payoff { margin-top: 8px; }
 .inspector-sp-row { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 0.85em; font-weight: 600; }
@@ -3319,10 +3335,7 @@ body.theme-dark {
     gap: 12px;
 }
 
-.character-back-btn,
-.character-back-btn:hover {
-    /* Legacy — replaced by .codex-nav-back-link */
-}
+/* .character-back-btn — Legacy, replaced by .codex-nav-back-link */
 
 .character-detail-header-right {
     display: flex;
@@ -4548,10 +4561,7 @@ body.theme-dark {
     margin-bottom: 8px;
 }
 
-.location-back-btn,
-.location-back-btn:hover {
-    /* Legacy — replaced by .codex-nav-back-link */
-}
+/* .location-back-btn — Legacy, replaced by .codex-nav-back-link */
 
 .location-detail-header-right {
     display: flex;
@@ -5029,6 +5039,111 @@ body.theme-dark {
 }
 
 /* Writing Sprint / Velocity Tracking */
+
+/* Sprint timer controls */
+.stats-sprint-controls {
+    padding: 12px;
+    background: var(--sc-card-bg);
+    border: 1px solid var(--sc-card-border);
+    border-radius: var(--sc-radius);
+    margin-bottom: 16px;
+}
+.stats-sprint-duration-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.stats-sprint-duration-label {
+    font-size: 0.85em;
+    color: var(--sc-text-muted);
+}
+.stats-sprint-duration-input {
+    width: 52px;
+    padding: 3px 6px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 0.9em;
+    text-align: center;
+}
+.stats-sprint-duration-input:disabled {
+    opacity: 0.5;
+}
+.stats-sprint-duration-unit {
+    font-size: 0.85em;
+    color: var(--sc-text-muted);
+}
+.stats-sprint-timer {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.stats-sprint-timer-display {
+    font-size: 2em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--sc-text);
+    letter-spacing: 0.02em;
+}
+.stats-sprint-timer-display.stats-sprint-timer-overtime {
+    color: var(--text-error, #e74c3c);
+}
+.stats-sprint-timer-words,
+.stats-sprint-timer-wpm {
+    font-size: 0.9em;
+    color: var(--sc-text-muted);
+}
+.stats-sprint-btn-row {
+    display: flex;
+    gap: 8px;
+}
+.stats-sprint-btn {
+    padding: 4px 16px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    transition: background 0.15s;
+}
+.stats-sprint-btn:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+}
+.stats-sprint-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.stats-sprint-btn-start {
+    background: var(--sl-success, #4CAF50);
+    color: #fff;
+    border-color: var(--sl-success, #4CAF50);
+}
+.stats-sprint-btn-start:hover:not(:disabled) {
+    opacity: 0.9;
+}
+.stats-sprint-btn-stop {
+    background: var(--text-error, #e74c3c);
+    color: #fff;
+    border-color: var(--text-error, #e74c3c);
+}
+.stats-sprint-btn-stop:hover:not(:disabled) {
+    opacity: 0.9;
+}
+.stats-sprint-log-list {
+    font-size: 0.85em;
+    color: var(--sc-text-muted);
+    margin: 6px 0 0 18px;
+    padding: 0;
+}
+.stats-sprint-log-list li {
+    margin-bottom: 2px;
+}
+
 .stats-sprint-row {
     display: flex;
     gap: 12px;
@@ -5961,57 +6076,94 @@ body.theme-dark {
    Beat Sheet Template Cards
    ============================================ */
 
-.beat-sheet-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 16px;
-}
-
-.beat-sheet-card {
-    flex: 1 1 200px;
-    min-width: 180px;
-    max-width: 280px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    padding: 12px;
+/* ── Beat Sheet List (compact rows) ── */
+.beat-sheet-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    transition: border-color 0.15s ease;
+    gap: 0;
+    margin-bottom: 16px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    overflow: hidden;
 }
 
-.beat-sheet-card:hover {
-    border-color: var(--interactive-accent);
+.beat-sheet-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    flex-wrap: wrap;
+    transition: background 0.12s ease;
+}
+.beat-sheet-row:last-child {
+    border-bottom: none;
+}
+.beat-sheet-row:hover {
+    background: var(--background-secondary);
 }
 
-.beat-sheet-card-name {
+.beat-sheet-row-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.beat-sheet-row-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.beat-sheet-row-name {
     font-weight: 600;
-    font-size: 1em;
+    font-size: 0.95em;
     color: var(--text-normal);
 }
 
-.beat-sheet-card-summary {
-    font-size: 0.82em;
-    color: var(--text-muted);
-    line-height: 1.3;
-}
-
-.beat-sheet-card-info {
+.beat-sheet-row-info {
     font-size: 0.75em;
     color: var(--text-faint);
-    margin-top: 2px;
+    white-space: nowrap;
 }
 
-.beat-sheet-beats-preview {
+.beat-sheet-row-summary {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    line-height: 1.3;
+    margin-top: 1px;
+}
+
+.beat-sheet-expand-btn {
+    font-size: 0.9em;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+}
+.beat-sheet-expand-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.beat-sheet-row .beat-sheet-beats-preview {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.25s ease;
-    margin-top: 4px;
+    flex-basis: 100%;
+    margin-top: 0;
 }
 
-.beat-sheet-card:hover .beat-sheet-beats-preview {
-    max-height: 400px;
+.beat-sheet-row.is-expanded .beat-sheet-beats-preview {
+    max-height: 600px;
+    margin-top: 6px;
 }
 
 .beat-sheet-beat-item {
@@ -6044,10 +6196,9 @@ body.theme-dark {
 }
 
 .beat-sheet-apply-btn {
-    margin-top: 6px;
-    align-self: flex-start;
-    font-size: 0.82em;
-    padding: 4px 12px;
+    flex-shrink: 0;
+    font-size: 0.8em;
+    padding: 3px 10px;
 }
 
 .structure-close-row {
@@ -10091,4 +10242,14 @@ body.theme-dark .location-field-input.dropdown {
     display: flex;
     gap: 6px;
     justify-content: flex-end;
+}
+
+/* ── Manuscript: hide backlinks & outgoing links to avoid gaps ── */
+.sl-manuscript-embedded-split .backlink-pane,
+.sl-manuscript-embedded-split .outgoing-link-pane,
+.sl-manuscript-embedded-split .tree-item-self.search-result-file-title,
+.sl-manuscript-embedded-split .search-result-container,
+.sl-manuscript-embedded-split .embedded-backlinks,
+.sl-manuscript-embedded-split .markdown-preview-sizer > .embedded-backlinks {
+    display: none !important;
 }

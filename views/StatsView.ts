@@ -19,6 +19,7 @@ export class StatsView extends ItemView {
     private rootContainer: HTMLElement | null = null;
     private proseCache: { readability: ReadabilityResult; wordFreq: [string, number][] } | null = null;
     private echoCache: { echoes: EchoCluster[]; perScene: SceneEchoReport[] } | null = null;
+    private sprintTimerId: ReturnType<typeof setInterval> | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -51,7 +52,9 @@ export class StatsView extends ItemView {
         this.renderView(container);
     }
 
-    async onClose(): Promise<void> {}
+    async onClose(): Promise<void> {
+        if (this.sprintTimerId) { clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
+    }
 
     // ════════════════════════════════════════════════════
     //  Main render
@@ -198,11 +201,110 @@ export class StatsView extends ItemView {
         const section = parent.createDiv('stats-section');
         section.createEl('h4', { text: 'Writing Sprint' });
 
+        // ── Sprint Timer Controls ──────────────────────
+        const sprintPanel = section.createDiv('stats-sprint-controls');
+
+        // Duration selector
+        const durationRow = sprintPanel.createDiv('stats-sprint-duration-row');
+        durationRow.createSpan({ cls: 'stats-sprint-duration-label', text: 'Duration:' });
+        const durationInput = durationRow.createEl('input', {
+            cls: 'stats-sprint-duration-input',
+            attr: { type: 'number', min: '1', max: '120', step: '1' },
+        });
+        durationInput.value = String(Math.round(tracker.getSprintDuration() / 60_000));
+        durationInput.addEventListener('change', () => {
+            const mins = Math.max(1, Math.min(120, Number(durationInput.value) || 25));
+            durationInput.value = String(mins);
+            tracker.setSprintDuration(mins * 60_000);
+        });
+        durationRow.createSpan({ cls: 'stats-sprint-duration-unit', text: 'min' });
+
+        // Timer display
+        const timerEl = sprintPanel.createDiv('stats-sprint-timer');
+        const timerDisplay = timerEl.createSpan({ cls: 'stats-sprint-timer-display' });
+        const sprintWordsEl = timerEl.createSpan({ cls: 'stats-sprint-timer-words' });
+        const sprintWpmEl = timerEl.createSpan({ cls: 'stats-sprint-timer-wpm' });
+
+        // Buttons
+        const btnRow = sprintPanel.createDiv('stats-sprint-btn-row');
+        const startBtn = btnRow.createEl('button', { cls: 'stats-sprint-btn stats-sprint-btn-start', text: 'Start' });
+        const stopBtn = btnRow.createEl('button', { cls: 'stats-sprint-btn stats-sprint-btn-stop', text: 'Stop' });
+        const resetBtn = btnRow.createEl('button', { cls: 'stats-sprint-btn stats-sprint-btn-reset', text: 'Reset' });
+
+        const updateTimerDisplay = () => {
+            const stats = this.sceneManager.getStatistics();
+            const totalNow = stats.totalWords;
+            if (tracker.isSprintRunning()) {
+                const remaining = tracker.getSprintRemaining();
+                const mins = Math.floor(remaining / 60_000);
+                const secs = Math.floor((remaining % 60_000) / 1000);
+                timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                timerDisplay.classList.toggle('stats-sprint-timer-overtime', remaining === 0);
+                if (remaining === 0) {
+                    const overtime = tracker.getSprintElapsed() - tracker.getSprintDuration();
+                    const oMins = Math.floor(overtime / 60_000);
+                    const oSecs = Math.floor((overtime % 60_000) / 1000);
+                    timerDisplay.textContent = `+${String(oMins).padStart(2, '0')}:${String(oSecs).padStart(2, '0')}`;
+                }
+                sprintWordsEl.textContent = `${tracker.getSprintWords(totalNow).toLocaleString()} words`;
+                sprintWpmEl.textContent = `${tracker.getSprintWpm(totalNow)} wpm`;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                durationInput.disabled = true;
+            } else {
+                const dur = tracker.getSprintDuration();
+                const mins = Math.floor(dur / 60_000);
+                const secs = Math.floor((dur % 60_000) / 1000);
+                timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                timerDisplay.classList.remove('stats-sprint-timer-overtime');
+                sprintWordsEl.textContent = '';
+                sprintWpmEl.textContent = '';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                durationInput.disabled = false;
+            }
+        };
+
+        startBtn.addEventListener('click', () => {
+            const stats = this.sceneManager.getStatistics();
+            tracker.startSprint(stats.totalWords);
+            if (this.sprintTimerId) clearInterval(this.sprintTimerId);
+            this.sprintTimerId = setInterval(updateTimerDisplay, 1000);
+            updateTimerDisplay();
+        });
+
+        stopBtn.addEventListener('click', () => {
+            const stats = this.sceneManager.getStatistics();
+            const entry = tracker.stopSprint(stats.totalWords);
+            if (this.sprintTimerId) { clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
+            updateTimerDisplay();
+            // Persist and re-render to show updated log
+            this.plugin.saveProjectSystemData();
+            this.renderSprintLog(logSection, tracker);
+            if (entry) {
+                new obsidian.Notice(`Sprint complete: ${entry.words} words in ${Math.round(entry.durationMs / 60_000)} min (${entry.wpm} wpm)`);
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            tracker.resetSprint();
+            if (this.sprintTimerId) { clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
+            updateTimerDisplay();
+        });
+
+        // Restore timer tick if sprint is still running (view re-opened)
+        if (tracker.isSprintRunning()) {
+            if (this.sprintTimerId) clearInterval(this.sprintTimerId);
+            this.sprintTimerId = setInterval(updateTimerDisplay, 1000);
+        }
+        updateTimerDisplay();
+
+        // ── Overall Session Stats ──────────────────────
+        section.createEl('h5', { cls: 'stats-subsection-title', text: 'Session (since project opened)' });
+
         const sessionWords = tracker.getSessionWords(currentTotalWords);
         const wpm = tracker.getWordsPerMinute(currentTotalWords);
         const minutes = Math.floor(tracker.getSessionDuration() / 60_000);
-        const dailyGoal = this.plugin.settings.dailyWordGoal || 1000;
-        const todayWords = tracker.getTodayWords();
         const streak = tracker.getStreak();
 
         const sessionRow = section.createDiv('stats-sprint-row');
@@ -219,7 +321,13 @@ export class StatsView extends ItemView {
             this.createStatCard(sessionRow, 'rotate-cw', 'Revisions', `${todayRevisions.toLocaleString()} words`);
         }
 
-        // Daily goal
+        // ── Sprint Log Summary ─────────────────────────
+        const logSection = section.createDiv('stats-sprint-log');
+        this.renderSprintLog(logSection, tracker);
+
+        // ── Daily goal ─────────────────────────────────
+        const dailyGoal = this.plugin.settings.dailyWordGoal || 1000;
+        const todayWords = tracker.getTodayWords();
         const goalPct = Math.min(100, Math.round((todayWords / dailyGoal) * 100));
         const goalRow = section.createDiv('stats-sprint-goal');
         goalRow.createSpan({ text: `Today: ${todayWords.toLocaleString()} / ${dailyGoal.toLocaleString()} words (${goalPct}%)` });
@@ -258,6 +366,34 @@ export class StatsView extends ItemView {
                 b.style.height = `${Math.max(2, hPct)}%`;
                 b.setAttribute('title', `${day.date}: ${day.words} words revised`);
                 col.createDiv({ cls: 'stats-sprint-spark-label', text: day.date.slice(5) });
+            }
+        }
+    }
+
+    /** Render the sprint log summary and recent entries */
+    private renderSprintLog(container: HTMLElement, tracker: WritingTracker): void {
+        container.empty();
+        const summary = tracker.getSprintSummary();
+        if (summary.count === 0) return;
+
+        container.createEl('h5', { cls: 'stats-subsection-title', text: 'Sprint History' });
+        const summaryRow = container.createDiv('stats-sprint-row');
+        this.createStatCard(summaryRow, 'timer', 'Sprints', String(summary.count));
+        this.createStatCard(summaryRow, 'pencil', 'Sprint Words', summary.totalWords.toLocaleString());
+        this.createStatCard(summaryRow, 'zap', 'Avg WPM', String(summary.avgWpm));
+        const totalMins = Math.round(summary.totalDurationMs / 60_000);
+        this.createStatCard(summaryRow, 'clock', 'Sprint Time', `${totalMins} min`);
+
+        // Show last 5 sprints
+        const log = tracker.getSprintLog();
+        const recent = log.slice(-5).reverse();
+        if (recent.length > 0) {
+            const list = container.createEl('ul', { cls: 'stats-sprint-log-list' });
+            for (const entry of recent) {
+                const mins = Math.round(entry.durationMs / 60_000);
+                list.createEl('li', {
+                    text: `${entry.date} — ${entry.words} words in ${mins} min (${entry.wpm} wpm)`,
+                });
             }
         }
     }

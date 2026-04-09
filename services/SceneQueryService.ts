@@ -307,7 +307,10 @@ export class SceneQueryService {
                     cmp = Number(a.act ?? 0) - Number(b.act ?? 0);
                     break;
                 case 'chapter':
-                    cmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+                    // Multi-key sort: act → chapter → sequence (reading order)
+                    cmp = Number(a.act ?? 0) - Number(b.act ?? 0);
+                    if (cmp === 0) cmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+                    if (cmp === 0) cmp = (a.sequence ?? 9999) - (b.sequence ?? 9999);
                     break;
                 case 'wordcount':
                     cmp = (a.wordcount ?? 0) - (b.wordcount ?? 0);

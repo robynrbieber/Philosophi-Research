@@ -1,18 +1,10 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.8.5** · By Jan Sandström
+ By Jan Sandström
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
-
-### New in 1.8.5
-
-- **Show in StoryLine** — Right-click any character, location, or codex entry file and choose "Show in StoryLine" to jump straight to its detail panel. Also available via the command palette.
-
-- **Formatting toolbar toggle** — The Manuscript view now respects the toolbar setting, letting you hide the formatting bar if you prefer a cleaner editor.
-
-- **Corkboard fix** — Scene cards in Corkboard view now display properly after being filled out.
 
 ---
 
@@ -175,7 +167,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Corkboard Mode** — Freeform spatial canvas with text and image sticky notes for brainstorming. Drag images from vault or desktop, add captions with wikilinks, open lightbox previews. Convert notes into scenes when ready.
 - **DOCX / PDF / HTML Export** — Export manuscripts and outlines to Word, PDF, and standalone HTML. DOCX includes configurable page size, margins, and font settings.
 - **Timeline Modes** — Ten non-linear narrative modes: flashback, flash-forward, parallel, frame, simultaneous, time skip, dream, mythic, circular, and linear.
-- **Beat Sheet Templates** — Save the Cat, Three-Act, Hero's Journey — scaffold your acts with named beats.
+- **Beat Sheet Templates** — Save the Cat, Three-Act, Hero's Journey, Seven-Point, Story Circle, Romancing the Beat, 27 Chapter Method — scaffold your acts with named beats. The template name is stored as a `beatsheet` YAML field on each scene.
 - **Relationship Map** — Interactive force-directed graph with six color-coded relationship types.
 - **Story Graph** — Visualize how scenes connect to characters, locations, and props via `#tags` and `[[wikilinks]]`.
 - **Link Scanner** — Auto-detects `[[wikilinks]]`, `#tags`, and plain-text name mentions in scene text and entity fields, classifies them as characters, locations, codex entries, or other.
@@ -183,7 +175,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Hide / Show Fields** — Hide built-in fields you don't use (per entity type) to declutter editors. Hover any field label → click the eye icon. Data is never deleted.
 - **Tag Type Overrides** — Right-click any tag to reclassify it (prop, location, character, other).
 - **Filtering & Presets** — Filter by status, character, location, tag, or free text. Save presets for quick reuse.
-- **Setup / Payoff Tracking** — Link foreshadowing and resolution scenes. Warns about unresolved setups.
+- **Setup / Payoff Tracking** — Link foreshadowing and resolution scenes. Warns about unresolved setups. Renaming a scene automatically updates all setup/payoff references.
 - **Plot Hole Detection** — Automated validation across six categories.
 - **Pacing Analysis** — Bar charts and histograms for scene length and distribution.
 - **Writing Sprint** — Built-in countdown timer for focused writing sessions.
@@ -197,7 +189,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Sticky Note Themes** — Six built-in sticky note color themes (Classic, Pastel, Earth, Jewel, Neon, Mono) with per-note overrides and HSL sliders.
 - **Plotline Subway Map** — Transit-style SVG visualization with gradient connectors, act dividers, scene labels, and drag-to-pan.
 - **Image Galleries** — Add up to 10 images per character or location with captions, carousel browsing, and a floating lightbox viewer.
-- **Custom Field Templates** — Define your own reusable fields for character and location profiles. Supports text, textarea, dropdown, and **multi-select (tags)** input types. Multi-select fields can pull options from a vault folder.
+- **Custom Field Templates** — Define your own reusable fields for characters, locations, and scenes. Supports text, textarea, dropdown, and **multi-select (tags)** input types. Multi-select fields can pull options from a vault folder.
 - **Autocomplete Inputs** — Character, location, and tag fields use smart autocomplete with tag-pill styling.
 - **Chapter Descriptions** — Add descriptions to acts and chapters via the Board view's right-click menu.
 - **Undo / Redo** — `Ctrl+Z` / `Ctrl+Shift+Z` with a 50-action stack.

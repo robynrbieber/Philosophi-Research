@@ -238,6 +238,40 @@ export class CascadeRenameService {
     }
 
     // ────────────────────────────────────
+    //  Scene title rename (setup/payoff links)
+    // ────────────────────────────────────
+
+    /**
+     * Update setup_scenes / payoff_scenes references in all scenes
+     * when a scene title changes.
+     */
+    async cascadeSceneTitleRename(oldTitle: string, newTitle: string): Promise<number> {
+        let totalUpdated = 0;
+
+        for (const scene of this.sceneManager.getAllScenes()) {
+            const updates: Partial<Scene> = {};
+            let dirty = false;
+
+            if (scene.setup_scenes?.includes(oldTitle)) {
+                updates.setup_scenes = scene.setup_scenes.map(s => s === oldTitle ? newTitle : s);
+                dirty = true;
+            }
+
+            if (scene.payoff_scenes?.includes(oldTitle)) {
+                updates.payoff_scenes = scene.payoff_scenes.map(s => s === oldTitle ? newTitle : s);
+                dirty = true;
+            }
+
+            if (dirty) {
+                await this.sceneManager.updateScene(scene.filePath, updates as any);
+                totalUpdated++;
+            }
+        }
+
+        return totalUpdated;
+    }
+
+    // ────────────────────────────────────
     //  Utility: build a human-readable summary
     // ────────────────────────────────────
 

@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.8.5** · By Jan Sandström
+**Version 1.9.2** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -121,7 +121,7 @@ The main workspace — a Kanban-style board that displays your scenes as cards.
 - **Add acts/chapters** using the Structure and Chapters buttons in the toolbar.
 - **Resequence** — click the resequence button to auto-number all scenes based on their current board order.
 - **Search** — type in the search bar to filter scenes by title, content, characters, or tags.
-- **Beat Sheet Templates** — apply a beat sheet template (Save the Cat, 3-Act, Hero's Journey) from the Structure modal.
+- **Beat Sheet Templates** — apply a beat sheet template (Save the Cat, 3-Act, Hero's Journey, Seven-Point, Story Circle, Romancing the Beat, 27 Chapter Method) from the Structure modal.
 - **Act labels** — custom labels on act dividers (e.g., beat names); inline-editable.
 
 ### Corkboard Mode
@@ -644,6 +644,10 @@ Apply proven story structure templates to quickly scaffold your acts:
 | **Save the Cat!** | 15 beats | Blake Snyder's popular screenplay structure (Opening Image, Theme Stated, Set-Up, Catalyst, Debate, Break into Two, B Story, Fun & Games, Midpoint, Bad Guys Close In, All Is Lost, Dark Night of the Soul, Break into Three, Finale, Final Image) |
 | **Three-Act Structure** | 10 beats | Classic three-act framework (Hook, Inciting Incident, First Plot Point, Rising Action, Midpoint, Complications, Crisis, Climax, Falling Action, Resolution) |
 | **Hero's Journey** | 12 stages | Joseph Campbell's monomyth (Ordinary World, Call to Adventure, Refusal of the Call, Meeting the Mentor, Crossing the Threshold, Tests Allies Enemies, Approach to the Inmost Cave, The Ordeal, Reward, The Road Back, Resurrection, Return with the Elixir) |
+| **Seven-Point Story Structure** | 7 beats | Dan Wells' structure (Hook, Plot Turn 1, Pinch Point 1, Midpoint, Pinch Point 2, Plot Turn 2, Resolution) |
+| **Story Circle** | 8 beats | Dan Harmon's story circle (You, Need, Go, Search, Find, Take, Return, Change) |
+| **Romancing the Beat** | 16 beats | Gwen Hayes' romance structure (Setup, Meet Cute, No Way, Pulling Focus, First Barrier, Deepening Desire, Inkling of Connection, Midpoint, Retreat, Grand Gesture, Dark Moment Setup, Dark Moment, Wake-Up Call, Recommitment, Climax, HEA/Resolution) |
+| **27 Chapter Method** | 27 beats | Kat O'Keeffe's fractal 3×3×3 structure — 3 Acts → 9 Parts → 27 Chapters, each following a setup–conflict–resolution pattern |
 
 ### How to Use
 
@@ -722,8 +726,9 @@ Create reusable templates for common scene types:
 
 ### Custom Templates
 1. Set up a scene with your desired default values (status, act, tags, conflict patterns, etc.).
-2. Save it as a template from the scene context menu.
-3. When creating new scenes, choose a template to pre-fill fields.
+2. Right-click the scene card and select **Save as Template** from the context menu.
+3. Alternatively, create templates manually in **Settings → Scene Templates → Add Template**.
+4. When creating new scenes, choose a template to pre-fill fields.
 
 Templates are stored in settings and available across all projects.
 
@@ -939,12 +944,13 @@ The **Stats View** includes a Pacing Analysis panel with two visualizations:
 
 StoryLine includes a built-in writing sprint timer in the **Stats View**:
 
-1. Set your desired sprint duration.
+1. Set your desired sprint duration (click the time to edit).
 2. Click **Start** to begin the countdown.
-3. Write in your scene files — the timer runs in the Stats panel.
-4. When the timer ends, your sprint session is recorded.
+3. Write in your scene files — the timer shows remaining time, live word count, and words-per-minute.
+4. Click **Stop** to end the sprint early, or let the timer run out. Your sprint is recorded with word count, duration, and WPM.
+5. Click **Reset** to cancel without recording.
 
-Use sprints to stay focused and build a consistent writing habit.
+Completed sprints are saved in a persistent log. The Stats panel shows your sprint history with total sprints, total words, and average WPM.
 
 ---
 
@@ -1297,15 +1303,15 @@ Import an existing Scrivener project (.scriv) as a new StoryLine project. Deskto
 
 ## Custom Field Templates
 
-Define your own reusable fields for character and location profiles. If the built-in fields don't cover everything you need, custom field templates let you add any fields you want — and they'll appear automatically in every character or location editor.
+Define your own reusable fields for characters, locations, and scenes. If the built-in fields don't cover everything you need, custom field templates let you add any fields you want — and they'll appear automatically in every character, location, or scene editor.
 
 ### How to Use
 
 1. Open **Settings → Field Templates**.
 2. Click **Add Field** and give it a name (e.g., "Blood Type", "Languages Spoken", "Theme Song").
-3. Choose whether the field applies to **Characters**, **Locations**, or both.
-4. The new field appears in every character or location detail editor under the **Custom Fields** section.
-5. Fill in values per character/location as needed — empty fields are hidden from exports.
+3. Choose whether the field applies to **Characters**, **Locations**, **Scenes**, or a combination.
+4. The new field appears in every matching editor under the **Custom Fields** section.
+5. Fill in values as needed — empty fields are hidden from exports.
 
 ### Field Types
 
@@ -1325,7 +1331,7 @@ The multi-select type is ideal for traits, themes, categories, or any field wher
 - **Free entry** — Type a custom value and press Enter to add it even if it's not in the predefined list.
 - **Storage** — Values are saved as a YAML list in frontmatter (`universalFields`), making them queryable from Obsidian Bases and Dataview.
 
-Custom field data is stored in the character or location's frontmatter under the `universalFields` key.
+Custom field data is stored in the entity's frontmatter under the `universalFields` key. For scenes, custom fields appear in the Inspector between the intensity slider and setup/payoff sections.
 
 ---
 

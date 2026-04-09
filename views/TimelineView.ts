@@ -1225,23 +1225,21 @@ export class TimelineView extends ItemView {
             text: 'Apply a template to pre-populate your act/chapter structure with named beats.'
         });
 
-        const templateGrid = contentEl.createDiv('beat-sheet-grid');
+        const templateGrid = contentEl.createDiv('beat-sheet-list');
         for (const template of BUILTIN_BEAT_SHEETS) {
-            const card = templateGrid.createDiv('beat-sheet-card');
-            card.createDiv({ cls: 'beat-sheet-card-name', text: template.name });
-            card.createDiv({ cls: 'beat-sheet-card-summary', text: template.summary });
+            const row = templateGrid.createDiv('beat-sheet-row');
 
-            const info = card.createDiv('beat-sheet-card-info');
-            info.createSpan({ text: `${template.acts.length} acts` });
-            info.createSpan({ text: ' · ' });
-            info.createSpan({ text: `${template.beats.length} beats` });
-            if (template.chapters.length > 0) {
-                info.createSpan({ text: ' · ' });
-                info.createSpan({ text: `${template.chapters.length} chapters` });
-            }
+            const textWrap = row.createDiv('beat-sheet-row-text');
+            const headerLine = textWrap.createDiv('beat-sheet-row-header');
+            headerLine.createSpan({ cls: 'beat-sheet-row-name', text: template.name });
+            const info = headerLine.createSpan({ cls: 'beat-sheet-row-info' });
+            const parts = [`${template.beats.length} beats`, `${template.acts.length} acts`];
+            if (template.chapters.length > 0) parts.push(`${template.chapters.length} chapters`);
+            info.textContent = parts.join(' · ');
+            textWrap.createDiv({ cls: 'beat-sheet-row-summary', text: template.summary });
 
-            // Preview beats on hover / expandable
-            const beatList = card.createDiv('beat-sheet-beats-preview');
+            // Expandable beat preview
+            const beatList = row.createDiv('beat-sheet-beats-preview');
             for (const beat of template.beats) {
                 const beatItem = beatList.createDiv('beat-sheet-beat-item');
                 beatItem.createSpan({ cls: 'beat-sheet-beat-act', text: `A${beat.act}` });
@@ -1249,7 +1247,23 @@ export class TimelineView extends ItemView {
                 beatItem.createSpan({ cls: 'beat-sheet-beat-desc', text: beat.description });
             }
 
-            const applyBtn = card.createEl('button', { text: 'Apply', cls: 'mod-cta beat-sheet-apply-btn' });
+            const expandBtn = row.createEl('button', { cls: 'beat-sheet-expand-btn clickable-icon', attr: { 'aria-label': 'Show beats' } });
+            expandBtn.textContent = '▸';
+            expandBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = row.hasClass('is-expanded');
+                // Close all others
+                templateGrid.querySelectorAll('.beat-sheet-row.is-expanded').forEach(r => {
+                    r.removeClass('is-expanded');
+                    (r.querySelector('.beat-sheet-expand-btn') as HTMLElement).textContent = '▸';
+                });
+                if (!isOpen) {
+                    row.addClass('is-expanded');
+                    expandBtn.textContent = '▾';
+                }
+            });
+
+            const applyBtn = row.createEl('button', { text: 'Apply', cls: 'mod-cta beat-sheet-apply-btn' });
             applyBtn.addEventListener('click', async () => {
                 await this.sceneManager.applyBeatSheet(template);
                 renderActsList();

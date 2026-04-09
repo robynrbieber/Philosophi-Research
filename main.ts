@@ -552,6 +552,10 @@ export default class SceneCardsPlugin extends Plugin {
         // Flush writing session into daily history and persist to System/stats.json
         try {
             const stats = this.sceneManager.getStatistics();
+            // Stop any active sprint so it gets recorded
+            if (this.writingTracker.isSprintRunning()) {
+                this.writingTracker.stopSprint(stats.totalWords);
+            }
             this.writingTracker.flushSession(stats.totalWords);
             this.saveProjectSystemData();
         } catch { /* best effort */ }

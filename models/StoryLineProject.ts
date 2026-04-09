@@ -61,6 +61,8 @@ export interface StoryLineProject {
     seriesId?: string;
     /** Vault-relative path to a cover image for the project */
     coverImage?: string;
+    /** Name of the last applied beat sheet template */
+    activeBeatSheet?: string;
 }
 
 // ── Series metadata ────────────────────────────────

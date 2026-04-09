@@ -62,6 +62,8 @@ export class MetadataParser {
             subtitle: frontmatter.subtitle,
             color: frontmatter.color,
             codexLinks: this.parseCodexLinks(frontmatter.codexLinks),
+            universalFields: frontmatter.universalFields && typeof frontmatter.universalFields === 'object' ? frontmatter.universalFields : undefined,
+            beatsheet: frontmatter.beatsheet,
         };
     }
 
@@ -110,8 +112,17 @@ export class MetadataParser {
             if (key === 'plotgridOrigin' && !value) { delete frontmatter[key]; continue; }
             if (key === 'subtitle' && !value) { delete frontmatter[key]; continue; }
             if (key === 'color' && !value) { delete frontmatter[key]; continue; }
+            if (key === 'beatsheet' && !value) { delete frontmatter[key]; continue; }
             if (key === 'codexLinks') {
                 if (value && typeof value === 'object' && Object.keys(value).some(k => Array.isArray((value as any)[k]) && (value as any)[k].length > 0)) {
+                    frontmatter[key] = value;
+                } else {
+                    delete frontmatter[key];
+                }
+                continue;
+            }
+            if (key === 'universalFields') {
+                if (value && typeof value === 'object' && Object.keys(value).length > 0) {
                     frontmatter[key] = value;
                 } else {
                     delete frontmatter[key];
@@ -171,8 +182,12 @@ export class MetadataParser {
         if (scene.timeline_strand) fm.timeline_strand = scene.timeline_strand;
         if (scene.subtitle) fm.subtitle = scene.subtitle;
         if (scene.color) fm.color = scene.color;
+        if (scene.beatsheet) fm.beatsheet = scene.beatsheet;
         if (scene.codexLinks && Object.keys(scene.codexLinks).some(k => scene.codexLinks![k]?.length)) {
             fm.codexLinks = scene.codexLinks;
+        }
+        if (scene.universalFields && Object.keys(scene.universalFields).length > 0) {
+            fm.universalFields = scene.universalFields;
         }
         fm.wordcount = scene.body ? this.countWords(scene.body) : 0;
         fm.created = new Date().toISOString().split('T')[0];

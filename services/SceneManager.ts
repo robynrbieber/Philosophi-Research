@@ -544,6 +544,7 @@ export class SceneManager implements ISceneStore {
                 corkboardPositions: {},
                 seriesId: fm.seriesId || undefined,
                 coverImage: fm.coverImage || undefined,
+                activeBeatSheet: fm.activeBeatSheet || undefined,
             };
         } catch {
             return null;
@@ -696,6 +697,11 @@ export class SceneManager implements ISceneStore {
             .substring(0, 60);
         const fileName = `${actStr}-${seqStr} ${safeTitle}.md`;
         const filePath = normalizePath(`${targetFolder}/${fileName}`);
+
+        // Auto-populate beatsheet from project's active beat sheet template
+        if (!isNote && !sceneData.beatsheet && this._activeProject?.activeBeatSheet) {
+            sceneData.beatsheet = this._activeProject.activeBeatSheet;
+        }
 
         // Generate content
         const content = MetadataParser.generateSceneContent(sceneData);
@@ -1292,6 +1298,7 @@ export class SceneManager implements ISceneStore {
                 this._activeProject.chapterLabels[Number(ch)] = label;
             }
         }
+        this._activeProject.activeBeatSheet = template.name;
         await this.saveProjectFrontmatter(this._activeProject);
     }
 
@@ -1480,6 +1487,13 @@ export class SceneManager implements ISceneStore {
             existingFm.coverImage = project.coverImage;
         } else {
             delete existingFm.coverImage;
+        }
+
+        // Active beat sheet template
+        if (project.activeBeatSheet) {
+            existingFm.activeBeatSheet = project.activeBeatSheet;
+        } else {
+            delete existingFm.activeBeatSheet;
         }
 
         const newContent = `---\n${stringifyYaml(existingFm)}---${body}`;

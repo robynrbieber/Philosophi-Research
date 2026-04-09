@@ -17,7 +17,7 @@ import { FiltersComponent } from '../components/Filters';
 import { enableDragToPan } from '../components/DragToPan';
 import { isMobile } from '../components/MobileAdapter';
 import { PLOTGRID_VIEW_TYPE } from '../constants';
-import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
+import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors, contrastTextColor } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import type SceneCardsPlugin from '../main';
 
@@ -87,13 +87,19 @@ export class PlotgridView extends ItemView {
         this.renderToolbar();
         // keep main scroll area untouched (no forced scrolling)
         this.renderGrid();
-        // Watch for file renames to update linkedSceneId paths
+        // Watch for file renames to update linkedSceneId paths AND row sourceIds
         this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
             if (file instanceof TFile) {
                 let changed = false;
                 for (const key of Object.keys(this.data.cells)) {
                     const c = this.data.cells[key];
                     if (c && c.linkedSceneId === oldPath) { c.linkedSceneId = file.path; changed = true; }
+                }
+                for (const row of this.data.rows) {
+                    if (row.sourceType === 'auto' && row.sourceId === oldPath) {
+                        row.sourceId = file.path;
+                        changed = true;
+                    }
                 }
                 if (changed) { this.scheduleSave(); this.renderGrid(); }
             }
@@ -698,6 +704,7 @@ export class PlotgridView extends ItemView {
             el.style.userSelect = 'none';
             el.textContent = col.label;
             if (col.textColor) el.style.color = col.textColor;
+            else { const _bg = col.headerBgColor || col.bgColor; if (_bg && _bg.startsWith('#')) el.style.color = contrastTextColor(_bg); }
             if (col.bold) el.style.fontWeight = '600';
             if (col.italic) el.style.fontStyle = 'italic';
 
@@ -839,6 +846,7 @@ export class PlotgridView extends ItemView {
             rowEl.style.userSelect = 'none';
             rowEl.textContent = row.label;
             if (row.textColor) rowEl.style.color = row.textColor;
+            else { const _bg = row.headerBgColor || row.bgColor; if (_bg && _bg.startsWith('#')) rowEl.style.color = contrastTextColor(_bg); }
             if (row.bold) rowEl.style.fontWeight = '600';
             if (row.italic) rowEl.style.fontStyle = 'italic';
 
@@ -2515,6 +2523,28 @@ export class PlotgridView extends ItemView {
             }
         }
 
+        // ── Remove orphaned auto rows (sourceId no longer matches any scene) ──
+        const scenePathSet = new Set(scenes.map(s => s.filePath));
+        const orphanRowIds = new Set<string>();
+        this.data.rows = this.data.rows.filter(r => {
+            if (r.sourceType === 'auto' && r.sourceId && !scenePathSet.has(r.sourceId)) {
+                orphanRowIds.add(r.id);
+                return false; // remove orphaned auto row
+            }
+            return true; // keep manual rows and valid auto rows
+        });
+        // Clean up cells belonging to removed orphan rows
+        if (orphanRowIds.size > 0) {
+            for (const key of Object.keys(this.data.cells)) {
+                for (const orphanId of orphanRowIds) {
+                    if (key.startsWith(orphanId + '-')) {
+                        delete this.data.cells[key];
+                        break;
+                    }
+                }
+            }
+        }
+
         // ── Create / update columns ────────────────────────────────
         const colIds: Map<string, string> = new Map(); // colValue → column id
         for (const val of colValues) {
@@ -3012,7 +3042,7 @@ export class PlotgridView extends ItemView {
                 chip.style.fontSize = '12px';
                 const chipColor = resolveTagColor(tag, allTagsSorted.indexOf(tag), scheme, tagColors, getPlotlineHSL(this.plugin.settings));
                 chip.style.background = chipColor;
-                chip.style.color = '#fff';
+                chip.style.color = contrastTextColor(chipColor);
             }
         }
     }
