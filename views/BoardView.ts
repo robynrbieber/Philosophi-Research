@@ -334,21 +334,26 @@ export class BoardView extends ItemView {
                     undefined,
                     { field: 'sequence', direction: 'asc' }
                 );
-                // Sort by act → current sequence for stable ordering, then assign
-                // globally continuous sequence numbers (1..N across all acts).
-                // Also update chapter to match sequence for consistency.
+                const parseNum = (v: any) => typeof v === 'number' ? v : (v ? parseInt(String(v), 10) || 0 : 0);
+                // Sort by act → chapter → current sequence for stable ordering
                 const sorted = [...scenes].sort((a, b) => {
-                    const actA = typeof a.act === 'number' ? a.act : (a.act ? parseInt(String(a.act), 10) || 0 : 0);
-                    const actB = typeof b.act === 'number' ? b.act : (b.act ? parseInt(String(b.act), 10) || 0 : 0);
-                    if (actA !== actB) return actA - actB;
+                    const actCmp = parseNum(a.act) - parseNum(b.act);
+                    if (actCmp !== 0) return actCmp;
+                    const chCmp = parseNum(a.chapter) - parseNum(b.chapter);
+                    if (chCmp !== 0) return chCmp;
                     return (a.sequence ?? 0) - (b.sequence ?? 0);
                 });
-                for (let i = 0; i < sorted.length; i++) {
-                    const upd: Record<string, any> = { sequence: i + 1 };
-                    if (this.groupBy === 'chapter') {
-                        upd.chapter = i + 1;
+                // Renumber sequence within each (act, chapter) group.
+                // Never overwrite chapter — preserve existing chapter assignments.
+                let prevAct = -1, prevCh = -1, seqInGroup = 0;
+                for (const scene of sorted) {
+                    const act = parseNum(scene.act);
+                    const ch = parseNum(scene.chapter);
+                    if (act !== prevAct || ch !== prevCh) {
+                        seqInGroup = 0; prevAct = act; prevCh = ch;
                     }
-                    await this.sceneManager.updateScene(sorted[i].filePath, upd);
+                    seqInGroup++;
+                    await this.sceneManager.updateScene(scene.filePath, { sequence: seqInGroup });
                 }
                 await this.sceneManager.initialize();
                 this.refreshBoard();

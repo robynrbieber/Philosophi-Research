@@ -18,6 +18,8 @@
 
 - **Tag text contrast** — Tag pills, chips, and color-coded badges now automatically use black or white text based on background brightness (WCAG contrast formula), fixing unreadable light-on-light combinations.
 
+- **Resequence preserves chapters** — The Resequence button no longer assigns every scene its own chapter. It now sorts by act → chapter → sequence and renumbers scenes within each chapter, keeping your existing chapter structure intact.
+
 ### New Features
 
 - **Four new beat sheet templates** — Seven-Point Story Structure (Dan Wells), Story Circle (Dan Harmon), Romancing the Beat (Gwen Hayes), and 27 Chapter Method (Kat O'Keeffe). The template picker is redesigned as a compact list with expandable beat previews.
