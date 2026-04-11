@@ -276,13 +276,15 @@ export class BoardView extends ItemView {
             });
         }
 
-        // Add scene button
+        // Add scene button — capture mode at creation time so the handler
+        // always routes correctly even if boardMode changes between renders.
+        const isCorkboardMode = this.boardMode === 'corkboard';
         const addBtn = controls.createEl('button', {
             cls: 'mod-cta story-line-add-btn',
-            text: this.boardMode === 'corkboard' ? '+ New Note' : '+ New Scene'
+            text: isCorkboardMode ? '+ New Note' : '+ New Scene'
         });
         addBtn.addEventListener('click', () => {
-            if (this.boardMode === 'corkboard') {
+            if (isCorkboardMode) {
                 void this.openQuickAddIdea();
             } else {
                 this.openQuickAdd();

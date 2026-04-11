@@ -130,9 +130,45 @@ export class PlotgridView extends ItemView {
             } else {
                 this.data = { rows: [], columns: [], cells: {}, zoom: 1 };
             }
+            // Auto-repair broken linkedSceneId paths (e.g. after project migration)
+            this.repairLinkedScenePaths();
         } catch (e) {
             this.data = { rows: [], columns: [], cells: {}, zoom: 1 };
         }
+    }
+
+    /**
+     * Repair linkedSceneId references that point to non-existent files.
+     * Tries to find the correct file by matching the filename portion.
+     */
+    private repairLinkedScenePaths(): void {
+        const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
+        if (!scMgr) return;
+
+        let dirty = false;
+        for (const key of Object.keys(this.data.cells)) {
+            const cell = this.data.cells[key];
+            if (!cell.linkedSceneId) continue;
+
+            // If the scene exists at the stored path, nothing to fix
+            if (scMgr.getScene(cell.linkedSceneId)) continue;
+
+            // Try to find by filename
+            const fileName = cell.linkedSceneId.split('/').pop();
+            if (!fileName) { cell.linkedSceneId = undefined; dirty = true; continue; }
+
+            const allScenes = scMgr.getAllScenes();
+            const match = allScenes.find(s => s.filePath.endsWith('/' + fileName) || s.filePath === fileName);
+            if (match) {
+                cell.linkedSceneId = match.filePath;
+                dirty = true;
+            } else {
+                // Scene no longer exists — clear stale link
+                cell.linkedSceneId = undefined;
+                dirty = true;
+            }
+        }
+        if (dirty) this.scheduleSave();
     }
 
     private scheduleSave() {
@@ -140,15 +176,17 @@ export class PlotgridView extends ItemView {
         if (!plugin) return;
         if (this.saveDebounce) window.clearTimeout(this.saveDebounce);
         // debounce and call plugin-level save API if available
-        this.saveDebounce = window.setTimeout(async () => {
+        const timerId = window.setTimeout(async () => {
             try {
                 if (typeof plugin.savePlotGrid === 'function') await plugin.savePlotGrid(this.data);
                 plugin.viewSnapshotService.scheduleAutoSave();
             } catch (e) {
                 // ignore save errors
             }
-            this.saveDebounce = null;
+            // Only clear if no newer timer was set during the async save
+            if (this.saveDebounce === timerId) this.saveDebounce = null;
         }, 500);
+        this.saveDebounce = timerId;
     }
 
     private buildLayout(container: HTMLElement) {
@@ -776,10 +814,15 @@ export class PlotgridView extends ItemView {
                     const inp = modal.contentEl.createEl('input', { type: 'text', cls: 'plot-grid-rename-input' });
                     inp.style.width = '100%';
                     inp.value = col.label;
-                    inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') { col.label = inp.value || col.label; this.scheduleSave(); this.renderGrid(); modal.close(); } });
+                    const commitRename = () => {
+                        const liveCol = this.data.columns[ci];
+                        if (liveCol) liveCol.label = inp.value || liveCol.label;
+                        this.scheduleSave(); this.renderGrid(); modal.close();
+                    };
+                    inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') commitRename(); });
                     const btn = modal.contentEl.createEl('button', { text: 'OK', cls: 'mod-cta' });
                     btn.style.marginTop = '8px';
-                    btn.addEventListener('click', () => { col.label = inp.value || col.label; this.scheduleSave(); this.renderGrid(); modal.close(); });
+                    btn.addEventListener('click', () => commitRename());
                     modal.open();
                     inp.focus();
                     inp.select();
@@ -939,10 +982,15 @@ export class PlotgridView extends ItemView {
                     const inp = modal.contentEl.createEl('input', { type: 'text', cls: 'plot-grid-rename-input' });
                     inp.style.width = '100%';
                     inp.value = row.label;
-                    inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') { row.label = inp.value || row.label; this.scheduleSave(); this.renderGrid(); modal.close(); } });
+                    const commitRename = () => {
+                        const liveRow = this.data.rows[ri];
+                        if (liveRow) liveRow.label = inp.value || liveRow.label;
+                        this.scheduleSave(); this.renderGrid(); modal.close();
+                    };
+                    inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') commitRename(); });
                     const btn = modal.contentEl.createEl('button', { text: 'OK', cls: 'mod-cta' });
                     btn.style.marginTop = '8px';
-                    btn.addEventListener('click', () => { row.label = inp.value || row.label; this.scheduleSave(); this.renderGrid(); modal.close(); });
+                    btn.addEventListener('click', () => commitRename());
                     modal.open();
                     inp.focus();
                     inp.select();
@@ -1012,7 +1060,13 @@ export class PlotgridView extends ItemView {
                 cellEl.style.justifyContent = 'center';
 
                 const bg = cell.bgColor || row.bgColor || col.bgColor || '';
-                if (bg) cellEl.style.background = bg;
+                if (bg) {
+                    cellEl.style.background = bg;
+                    // Auto-contrast text when no explicit textColor is set
+                    if (!cell.textColor && bg.startsWith('#')) {
+                        cellEl.style.color = contrastTextColor(bg);
+                    }
+                }
                 if (cell.textColor) cellEl.style.color = cell.textColor;
                 if (cell.bold) cellEl.style.fontWeight = '600';
                 if (cell.italic) cellEl.style.fontStyle = 'italic';
@@ -2158,12 +2212,13 @@ export class PlotgridView extends ItemView {
             cell.content = ta.value;
             // Mark as manually edited so sync won't overwrite
             cell.manualContent = true;
-            this.scheduleSave();
             // Auto-Note: if toggled on and new non-empty text entered into an unlinked cell
             const hasNewContent = !!(ta.value && ta.value.trim());
             if (this.plugin?.settings.plotgridAutoNote && hasNewContent && !hadLinkedScene && !hadContentBefore) {
+                // Let autoCreateNoteFromCell handle save + render to avoid race
                 void this.autoCreateNoteFromCell(cell);
             } else {
+                this.scheduleSave();
                 this.renderGrid();
             }
         };
@@ -2252,8 +2307,10 @@ export class PlotgridView extends ItemView {
         const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
         if (!scMgr || !cell.content?.trim()) return;
 
+        // Guard: if the cell already has a linked scene, skip (prevents double-fire)
+        if (cell.linkedSceneId) return;
+
         // Resolve row/column labels for context
-        const parts = cell.id.split('-');
         // cell.id format: "rowId-colId" but IDs may contain hyphens from makeId,
         // so find the matching row/col by checking all combinations
         let rowLabel = '';
@@ -2282,8 +2339,13 @@ export class PlotgridView extends ItemView {
             plotgridOrigin: originLabel,
         });
 
-        // Link the note back to the cell
-        cell.linkedSceneId = file.path;
+        // Link the note back ONLY to this specific cell via its key
+        const liveCell = this.data.cells[cell.id];
+        if (liveCell) {
+            liveCell.linkedSceneId = file.path;
+        } else {
+            cell.linkedSceneId = file.path;
+        }
         this.scheduleSave();
         this.renderGrid();
         new Notice('Auto-Note created from cell');
@@ -2919,12 +2981,14 @@ export class PlotgridView extends ItemView {
             liveCell.manualContent = true;
             cell.content = textArea.value;
             cell.manualContent = true;
-            this.scheduleSave();
             this.updateCellInspectorScan(scanContainer, liveCell);
             // Auto-Note from inspector: if toggled on and new text on a previously empty, unlinked cell
             const hasNewContent = !!(textArea.value && textArea.value.trim());
             if (this.plugin?.settings.plotgridAutoNote && hasNewContent && !inspectorHadLinkedScene && !inspectorHadContent && !liveCell.linkedSceneId) {
+                // Let autoCreateNoteFromCell handle save + render to avoid race
                 void this.autoCreateNoteFromCell(liveCell);
+            } else {
+                this.scheduleSave();
             }
         });
 

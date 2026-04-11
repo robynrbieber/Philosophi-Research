@@ -75,7 +75,11 @@ export class QuickAddModal extends Modal {
         actGroup.createEl('label', { text: 'Act', cls: 'story-line-field-label' });
         const actSelect = actGroup.createEl('select', { cls: 'dropdown story-line-field-input' });
         actSelect.createEl('option', { text: 'None', value: '' });
-        for (let i = 1; i <= 5; i++) {
+        // Dynamic act count: offer at least 5, or up to max existing act + 2
+        const maxExistingAct = this.sceneManager.getAllScenes()
+            .reduce((mx, s) => Math.max(mx, Number(s.act) || 0), 0);
+        const actCount = Math.max(5, maxExistingAct + 2);
+        for (let i = 1; i <= actCount; i++) {
             actSelect.createEl('option', { text: `Act ${i}`, value: String(i) });
         }
         if (this.result.act != null) {

@@ -211,7 +211,11 @@ export class InspectorComponent {
         const actSelect = actGroup.createEl('select');
         styleSelect(actSelect);
         actSelect.createEl('option', { text: '—', value: '' });
-        for (let i = 1; i <= 5; i++) {
+        // Dynamic act count: offer at least 5, or up to max existing act + 2
+        const maxExistingAct = this.sceneManager.getAllScenes()
+            .reduce((mx, s) => Math.max(mx, Number(s.act) || 0), 0);
+        const actCount = Math.max(5, maxExistingAct + 2);
+        for (let i = 1; i <= actCount; i++) {
             const opt = actSelect.createEl('option', { text: String(i), value: String(i) });
             if (scene.act !== undefined && Number(scene.act) === i) opt.selected = true;
         }

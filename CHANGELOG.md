@@ -2,6 +2,37 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.3
+
+### Bug Fixes
+
+- **Daily stats not updating** — Writing sprint words now correctly flow into the Today / Last 7 Days stats and Writing History.
+
+- **Timezone date key** — Daily stats use local date instead of UTC, fixing off-by-one day boundaries.
+
+- **Corkboard note creation** — All "+New Note" clicks now create sticky notes in the Notes/ folder, not just the first one.
+
+- **Board view sorting** — Board columns now sort scenes by act → chapter → sequence consistently.
+
+- **Plotgrid right-click rename** — Rename via right-click modal now applies correctly. Fixed stale closure reference by re-resolving row/column from live data at commit time.
+
+- **Plotgrid cell text contrast** — Cells with custom hex backgrounds now auto-apply WCAG contrast text color.
+
+- **Plotlines pill contrast** — Subway map pills and list-view tag badges use WCAG contrast instead of hardcoded white text.
+
+- **Manuscript title sort** — Sorting by "Title" now preserves YAML title order instead of always overriding to act→chapter→sequence.
+
+- **Plotgrid auto-note corruption** — Fixed save race condition where creating an auto-note could cause all cells in a row to show the same content. Eliminated premature `scheduleSave()` before `linkedSceneId` is set and added double-fire guard.
+
+- **Plotgrid broken scene links** — Added auto-repair on load: broken `linkedSceneId` paths are resolved by filename matching, fixing sample project links after version migrations.
+
+### New Features
+
+- **Act 6+ in dropdowns** — Act dropdown in Quick Add and Inspector now dynamically scales based on existing scenes instead of being hardcoded to 5.
+
+- **Sprint end sound** — Optional chime when the writing sprint timer reaches zero (Settings → Writing Goals). Uses a two-tone Web Audio chime.
+
+---
 ## Version 1.9.2
 
 ### Bug Fixes

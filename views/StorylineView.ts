@@ -8,7 +8,7 @@ import type SceneCardsPlugin from '../main';
 import { STORYLINE_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
 import { enableDragToPan } from '../components/DragToPan';
-import { resolveTagColor, getPlotlineHSL } from '../settings';
+import { resolveTagColor, getPlotlineHSL, contrastTextColor } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 
 type SortMode = 'alpha' | 'scenes-desc' | 'scenes-asc' | 'reading-order';
@@ -640,7 +640,7 @@ export class StorylineView extends ItemView {
                         text.setAttribute('y', String(pillY + 3));
                         text.setAttribute('text-anchor', 'middle');
                         text.setAttribute('font-size', '9');
-                        text.setAttribute('fill', '#fff');
+                        text.setAttribute('fill', contrastTextColor(pillColor));
                         text.textContent = tag;
                         svg.appendChild(text);
 
@@ -869,6 +869,7 @@ export class StorylineView extends ItemView {
                 const badge = tagsEl.createSpan({ cls: 'storyline-tag-badge', text: tag });
                 const badgeColor = resolveTagColor(tag, Math.max(0, allTagsSorted.indexOf(tag)), scheme, tagColors, getPlotlineHSL(this.plugin.settings));
                 badge.style.backgroundColor = badgeColor;
+                badge.style.color = contrastTextColor(badgeColor);
             });
         }
 

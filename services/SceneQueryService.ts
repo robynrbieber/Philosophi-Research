@@ -290,7 +290,10 @@ export class SceneQueryService {
             let cmp = 0;
             switch (sort.field) {
                 case 'sequence':
-                    cmp = (a.sequence ?? 9999) - (b.sequence ?? 9999);
+                    // Multi-key sort: act → chapter → sequence (reading order)
+                    cmp = Number(a.act ?? 0) - Number(b.act ?? 0);
+                    if (cmp === 0) cmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+                    if (cmp === 0) cmp = (a.sequence ?? 9999) - (b.sequence ?? 9999);
                     break;
                 case 'chronologicalOrder':
                     cmp = (a.chronologicalOrder ?? a.sequence ?? 9999) - (b.chronologicalOrder ?? b.sequence ?? 9999);

@@ -284,21 +284,23 @@ export class ManuscriptView extends ItemView {
             scenes = this.sceneManager.getFilteredScenes(this.currentFilter, this.currentSort)
                 .filter(s => !s.corkboardNote);
 
-            // For manuscript view, always sort by act → chapter → sequence
-            // so scenes are grouped properly under their act/chapter dividers.
-            // Only compare act/chapter when both scenes have the field defined;
-            // if one or both are missing, fall through to sequence.
-            scenes.sort((a, b) => {
-                if (a.act != null && b.act != null) {
-                    const actCmp = Number(a.act) - Number(b.act);
-                    if (actCmp !== 0) return actCmp;
-                }
-                if (a.chapter != null && b.chapter != null) {
-                    const chCmp = Number(a.chapter) - Number(b.chapter);
-                    if (chCmp !== 0) return chCmp;
-                }
-                return (a.sequence ?? 9999) - (b.sequence ?? 9999);
-            });
+            // When user picks a non-structural sort (e.g. "title"), respect it
+            // directly from getFilteredScenes. Otherwise default to act → chapter
+            // → sequence so scenes are grouped properly under act/chapter dividers.
+            const sortField = this.currentSort?.field;
+            if (!sortField || sortField === 'sequence' || sortField === 'status') {
+                scenes.sort((a, b) => {
+                    if (a.act != null && b.act != null) {
+                        const actCmp = Number(a.act) - Number(b.act);
+                        if (actCmp !== 0) return actCmp;
+                    }
+                    if (a.chapter != null && b.chapter != null) {
+                        const chCmp = Number(a.chapter) - Number(b.chapter);
+                        if (chCmp !== 0) return chCmp;
+                    }
+                    return (a.sequence ?? 9999) - (b.sequence ?? 9999);
+                });
+            }
 
             this._lastScenes = scenes;
             this._lastFilterKey = filterKey;

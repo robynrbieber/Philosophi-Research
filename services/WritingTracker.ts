@@ -41,6 +41,8 @@ export class WritingTracker {
     private revisionHistory: Record<string, number> = {};
     /** Last known total word count — used to measure revision deltas between flushes */
     private lastKnownTotal: number | null = null;
+    /** Session words already flushed to daily history — avoids double-counting */
+    private _flushedSessionWords = 0;
 
     // ── Sprint state ───────────────────────────────────
     /** Whether a timed sprint is currently running */
@@ -108,12 +110,18 @@ export class WritingTracker {
         this.history[today] = (this.history[today] || 0) + sessionWords;
     }
 
-    /** Flush session words into today's daily total and reset baseline */
+    /**
+     * Flush session words into today's daily total.
+     * Safe to call multiple times — only the incremental difference since the
+     * last flush is recorded, so daily history is never double-counted.
+     */
     flushSession(currentTotalWords: number): void {
         if (this.baselineWords === null) return;   // session never started
-        const sw = this.getSessionWords(currentTotalWords);
-        if (sw > 0) {
-            this.recordToday(sw);
+        const totalSessionWords = this.getSessionWords(currentTotalWords);
+        const increment = totalSessionWords - this._flushedSessionWords;
+        if (increment > 0) {
+            this.recordToday(increment);
+            this._flushedSessionWords = totalSessionWords;
         }
 
         // Track revision volume (absolute change since last flush)
@@ -124,8 +132,6 @@ export class WritingTracker {
             }
         }
         this.lastKnownTotal = currentTotalWords;
-
-        this.baselineWords = currentTotalWords;
     }
 
     /** Record today's revision volume */
@@ -308,6 +314,9 @@ export class WritingTracker {
     }
 
     private dateKey(d: Date): string {
-        return d.toISOString().split('T')[0];
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     }
 }

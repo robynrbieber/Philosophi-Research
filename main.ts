@@ -56,22 +56,22 @@ import { buildFormattingToolbar } from './components/FormattingToolbar';
  */
 export default class SceneCardsPlugin extends Plugin {
     settings: SceneCardsSettings = DEFAULT_SETTINGS;
-    sceneManager: SceneManager;
+    sceneManager!: SceneManager;
     /** Set to true once System/ migration is confirmed — guards saveSettings stripping */
     private _systemMigrationDone = false;
     /** Snapshot of colour settings from data.json (global defaults) */
     private _globalColorDefaults: Record<string, any> = {};
-    locationManager: LocationManager;
-    characterManager: CharacterManager;
-    codexManager: CodexManager;
+    locationManager!: LocationManager;
+    characterManager!: CharacterManager;
+    codexManager!: CodexManager;
     writingTracker: WritingTracker = new WritingTracker();
-    snapshotManager: SnapshotManager;
-    viewSnapshotService: ViewSnapshotService;
-    linkScanner: LinkScanner;
-    cascadeRename: CascadeRenameService;
-    fieldTemplates: FieldTemplateService;
-    seriesManager: SeriesManager;
-    researchManager: ResearchManager;
+    snapshotManager!: SnapshotManager;
+    viewSnapshotService!: ViewSnapshotService;
+    linkScanner!: LinkScanner;
+    cascadeRename!: CascadeRenameService;
+    fieldTemplates!: FieldTemplateService;
+    seriesManager!: SeriesManager;
+    researchManager!: ResearchManager;
     /** The leaf currently hosting a StoryLine view */
     storyLeaf: WorkspaceLeaf | null = null;
     /** Removes native browser tooltips (`title`) inside StoryLine UI */
@@ -1451,6 +1451,12 @@ export default class SceneCardsPlugin extends Plugin {
         // Update codex digests (baseline new entries, prune deleted ones)
         void this.refreshCodexDigests();
 
+        // Flush writing tracker so daily stats update in real-time
+        try {
+            const stats = this.sceneManager.getStatistics();
+            this.writingTracker.flushSession(stats.totalWords);
+        } catch { /* project may not be set yet */ }
+
         const viewTypes = [
             BOARD_VIEW_TYPE,
             PLOTGRID_VIEW_TYPE,
@@ -1525,7 +1531,7 @@ export default class SceneCardsPlugin extends Plugin {
         func: T,
         wait: number
     ): T {
-        let timeout: NodeJS.Timeout | null = null;
+        let timeout: ReturnType<typeof setTimeout> | null = null;
         return ((...args: any[]) => {
             if (timeout) clearTimeout(timeout);
             timeout = setTimeout(() => func(...args), wait);

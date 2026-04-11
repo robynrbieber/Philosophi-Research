@@ -231,6 +231,9 @@ export class StatsView extends ItemView {
         const stopBtn = btnRow.createEl('button', { cls: 'stats-sprint-btn stats-sprint-btn-stop', text: 'Stop' });
         const resetBtn = btnRow.createEl('button', { cls: 'stats-sprint-btn stats-sprint-btn-reset', text: 'Reset' });
 
+        // Track whether the sprint-end chime has fired for this sprint
+        let sprintEndChimePlayed = false;
+
         const updateTimerDisplay = () => {
             const stats = this.sceneManager.getStatistics();
             const totalNow = stats.totalWords;
@@ -241,6 +244,11 @@ export class StatsView extends ItemView {
                 timerDisplay.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
                 timerDisplay.classList.toggle('stats-sprint-timer-overtime', remaining === 0);
                 if (remaining === 0) {
+                    // Play chime once when sprint reaches zero
+                    if (!sprintEndChimePlayed && this.plugin.settings.sprintEndSound) {
+                        sprintEndChimePlayed = true;
+                        this.playSprintEndChime();
+                    }
                     const overtime = tracker.getSprintElapsed() - tracker.getSprintDuration();
                     const oMins = Math.floor(overtime / 60_000);
                     const oSecs = Math.floor((overtime % 60_000) / 1000);
@@ -266,6 +274,7 @@ export class StatsView extends ItemView {
         };
 
         startBtn.addEventListener('click', () => {
+            sprintEndChimePlayed = false;
             const stats = this.sceneManager.getStatistics();
             tracker.startSprint(stats.totalWords);
             if (this.sprintTimerId) clearInterval(this.sprintTimerId);
@@ -367,6 +376,31 @@ export class StatsView extends ItemView {
                 b.setAttribute('title', `${day.date}: ${day.words} words revised`);
                 col.createDiv({ cls: 'stats-sprint-spark-label', text: day.date.slice(5) });
             }
+        }
+    }
+
+    /** Play a short chime using Web Audio API when the sprint timer ends */
+    private playSprintEndChime(): void {
+        try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const playTone = (freq: number, startTime: number, duration: number) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.3, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(startTime);
+                osc.stop(startTime + duration);
+            };
+            const now = ctx.currentTime;
+            playTone(880, now, 0.15);        // A5
+            playTone(1108.73, now + 0.15, 0.15); // C#6
+            playTone(1318.51, now + 0.3, 0.3);  // E6
+        } catch {
+            // Web Audio not available — silent fallback
         }
     }
 

@@ -651,6 +651,9 @@ export interface SceneCardsSettings {
     timelineDragScrollSpeed: number;
     /** Timeline drag-scroll: pixel zone from viewport edge that triggers scrolling (20–200) */
     timelineDragScrollZone: number;
+
+    /** Play a sound when the writing sprint timer ends */
+    sprintEndSound: boolean;
 }
 
 /**
@@ -737,6 +740,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     timelineDragScrollSpeed: 8,
     timelineDragScrollZone: 60,
+    sprintEndSound: true,
 };
 
 /**
@@ -1164,6 +1168,16 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .setValue(String(this.plugin.settings.projectWordGoal))
                 .onChange(async (value) => {
                     this.plugin.settings.projectWordGoal = Number(value) || 80000;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Sprint end sound')
+            .setDesc('Play a chime when the writing sprint timer reaches zero')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.sprintEndSound)
+                .onChange(async (value) => {
+                    this.plugin.settings.sprintEndSound = value;
                     await this.plugin.saveSettings();
                 }));
 
