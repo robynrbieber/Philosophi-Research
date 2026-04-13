@@ -2,6 +2,17 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.4
+
+### Bug Fixes
+
+- **Board view drag-and-drop** — Dragging cards in the Kanban board now places them where you drop them. Previously the internal sort used only the sequence field (instead of act → chapter → sequence), causing cards to land at unexpected positions. Drag-and-drop also now correctly updates the chapter field and renumbers sequences within each (act, chapter) group. *(reported by @stootz)*
+
+- **Navigator reading-order sort** — The Navigator's "Reading order" mode now sorts by act → chapter → sequence. Previously it sorted by chapter/sequence only, which could interleave scenes from different acts. *(reported by @stootz)*
+
+- **Navigator scene count** — The footer scene count now excludes corkboard sticky notes, showing only actual scenes. *(reported by @stootz)*
+
+---
 ## Version 1.9.3
 
 ### Bug Fixes

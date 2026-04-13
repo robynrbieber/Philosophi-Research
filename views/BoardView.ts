@@ -1675,6 +1675,10 @@ export class BoardView extends ItemView {
 
     /**
      * Handle dropping a card onto another card for precise reordering.
+     *
+     * Uses the same approach as TimelineView: splice the dragged scene into the
+     * new visual position, then renumber sequences within each (act, chapter)
+     * group so the displayed order matches.
      */
     private async handleDropOnCard(
         draggedPath: string,
@@ -1708,47 +1712,60 @@ export class BoardView extends ItemView {
                 break;
         }
 
-        // Build sorted list of siblings (column scenes excluding the dragged card)
-        const siblings = columnScenes
-            .filter(s => s.filePath !== draggedPath)
-            .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+        // Build the visual order (same multi-key sort the display uses)
+        const ordered = [...columnScenes].sort((a, b) => {
+            const actCmp = Number(a.act ?? 0) - Number(b.act ?? 0);
+            if (actCmp !== 0) return actCmp;
+            const chCmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+            if (chCmp !== 0) return chCmp;
+            return (a.sequence ?? 0) - (b.sequence ?? 0);
+        });
 
-        const targetIdx = siblings.findIndex(s => s.filePath === targetScene.filePath);
+        // Remove dragged scene from list
+        const dragIdx = ordered.findIndex(s => s.filePath === draggedPath);
+        if (dragIdx >= 0) ordered.splice(dragIdx, 1);
+
+        // Find target position and insert
+        const targetIdx = ordered.findIndex(s => s.filePath === targetScene.filePath);
         const insertIdx = targetIdx === -1
-            ? siblings.length
+            ? ordered.length
             : insertBefore ? targetIdx : targetIdx + 1;
 
-        // Compute a new sequence for the dragged card by inserting between neighbors.
-        // This avoids changing any other card's sequence number.
-        let newSeq: number;
-        const prevSeq = insertIdx > 0 ? (siblings[insertIdx - 1].sequence ?? 0) : 0;
-        const nextSeq = insertIdx < siblings.length ? (siblings[insertIdx].sequence ?? 0) : null;
+        const draggedScene = columnScenes.find(s => s.filePath === draggedPath);
+        if (draggedScene) ordered.splice(insertIdx, 0, draggedScene);
 
-        if (nextSeq !== null && nextSeq > prevSeq + 1) {
-            // There's a gap — pick the midpoint (integer)
-            newSeq = Math.floor((prevSeq + nextSeq) / 2);
-            if (newSeq <= prevSeq) newSeq = prevSeq + 1; // safety: ensure it's actually between
-        } else if (nextSeq !== null && nextSeq === prevSeq + 1) {
-            // No integer gap — need to shift subsequent siblings up by 1 to make room
-            newSeq = nextSeq;
-            for (let i = siblings.length - 1; i >= insertIdx; i--) {
-                await this.sceneManager.updateScene(siblings[i].filePath, {
-                    sequence: (siblings[i].sequence ?? 0) + 1,
-                });
+        // When grouped by act, adopt the chapter from the nearest neighbor
+        // so the card actually lands where the user dropped it.
+        if (this.groupBy === 'act' && draggedScene) {
+            const newIdx = ordered.indexOf(draggedScene);
+            let neighborChapter: number | string | undefined;
+            if (newIdx > 0) {
+                neighborChapter = ordered[newIdx - 1].chapter;
+            } else if (newIdx < ordered.length - 1) {
+                neighborChapter = ordered[newIdx + 1].chapter;
             }
-        } else {
-            // Inserting at the end
-            newSeq = prevSeq + 1;
+            if (neighborChapter !== undefined) {
+                updates.chapter = Number(neighborChapter);
+            }
         }
 
-        updates.sequence = newSeq;
-        if (this.groupBy === 'chapter') {
-            updates.chapter = newSeq;
+        // Renumber sequences within each (act, chapter) group
+        let prevAct = -1, prevCh = -1, seqInGroup = 0;
+        for (const scene of ordered) {
+            const act = Number(scene.act ?? 0);
+            const ch = Number(scene.chapter ?? 0);
+            if (act !== prevAct || ch !== prevCh) {
+                seqInGroup = 0; prevAct = act; prevCh = ch;
+            }
+            seqInGroup++;
+            const sceneUpdates: Partial<Scene> = { sequence: seqInGroup };
+            if (scene.filePath === draggedPath) {
+                Object.assign(sceneUpdates, updates);
+            }
+            await this.sceneManager.updateScene(scene.filePath, sceneUpdates);
         }
 
-        await this.sceneManager.updateScene(draggedPath, updates);
         this.plugin.viewSnapshotService.scheduleAutoSave();
-
         this.refreshBoard();
     }
 
@@ -1782,16 +1799,27 @@ export class BoardView extends ItemView {
             }
         }
 
-        // Update sequence to be at end of column
+        // Build visual order and append dragged scene at the end
+        const ordered = [...columnScenes].sort((a, b) => {
+            const actCmp = Number(a.act ?? 0) - Number(b.act ?? 0);
+            if (actCmp !== 0) return actCmp;
+            const chCmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+            if (chCmp !== 0) return chCmp;
+            return (a.sequence ?? 0) - (b.sequence ?? 0);
+        });
+
+        // When grouped by act, adopt chapter from last scene in column
+        if (this.groupBy === 'act' && ordered.length > 0) {
+            const last = ordered[ordered.length - 1];
+            if (last.chapter !== undefined) updates.chapter = Number(last.chapter);
+        }
+
+        // Compute sequence at end of the last (act, chapter) group
         const maxSeq = columnScenes.reduce(
             (max, s) => Math.max(max, s.sequence ?? 0),
             0
         );
         updates.sequence = maxSeq + 1;
-        // Only sync chapter when grouping by chapter
-        if (this.groupBy === 'chapter') {
-            updates.chapter = maxSeq + 1;
-        }
 
         await this.sceneManager.updateScene(filePath, updates);
         this.plugin.viewSnapshotService.scheduleAutoSave();
