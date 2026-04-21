@@ -18,6 +18,7 @@ import { resolveStickyNoteColors } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import { resolveImagePath } from '../components/ImagePicker';
 import type SceneCardsPlugin from '../main';
+import { compareActChapter, parseActChapterInput, isPureNumericActChapter } from '../utils/actChapter';
 
 type BoardMode = 'kanban' | 'corkboard';
 
@@ -160,6 +161,15 @@ export class BoardView extends ItemView {
                     { value: 'status', label: 'Status' },
                     { value: 'pov', label: 'POV' },
                 ];
+                // Append user-defined scene custom fields (dropdown / multi-select only)
+                if (this.plugin.fieldTemplates) {
+                    const sceneTpls = this.plugin.fieldTemplates.getAll()
+                        .filter(t => (t.category || 'character') === 'scene')
+                        .filter(t => t.type === 'dropdown' || t.type === 'multi-select');
+                    for (const tpl of sceneTpls) {
+                        groupOptions.push({ value: `cf:${tpl.id}`, label: tpl.label });
+                    }
+                }
                 groupOptions.forEach(opt => {
                     const option = groupSelect.createEl('option', { text: opt.label, value: opt.value });
                     if (opt.value === this.groupBy) option.selected = true;
@@ -336,23 +346,27 @@ export class BoardView extends ItemView {
                     undefined,
                     { field: 'sequence', direction: 'asc' }
                 );
-                const parseNum = (v: any) => typeof v === 'number' ? v : (v ? parseInt(String(v), 10) || 0 : 0);
-                // Sort by act → chapter → current sequence for stable ordering
+                // Sort by act → chapter → current sequence for stable ordering.
+                // compareActChapter handles non-numeric acts ("1.1", "Prologue")
+                // by falling back to a numeric-aware locale compare.
                 const sorted = [...scenes].sort((a, b) => {
-                    const actCmp = parseNum(a.act) - parseNum(b.act);
+                    const actCmp = compareActChapter(a.act, b.act);
                     if (actCmp !== 0) return actCmp;
-                    const chCmp = parseNum(a.chapter) - parseNum(b.chapter);
+                    const chCmp = compareActChapter(a.chapter, b.chapter);
                     if (chCmp !== 0) return chCmp;
                     return (a.sequence ?? 0) - (b.sequence ?? 0);
                 });
                 // Renumber sequence within each (act, chapter) group.
                 // Never overwrite chapter — preserve existing chapter assignments.
-                let prevAct = -1, prevCh = -1, seqInGroup = 0;
+                // Group key uses String() so non-numeric acts/chapters
+                // (e.g. "1.1", "Prologue") group cleanly instead of all
+                // collapsing onto the same numeric fallback.
+                let prevKey = '\0';
+                let seqInGroup = 0;
                 for (const scene of sorted) {
-                    const act = parseNum(scene.act);
-                    const ch = parseNum(scene.chapter);
-                    if (act !== prevAct || ch !== prevCh) {
-                        seqInGroup = 0; prevAct = act; prevCh = ch;
+                    const key = `${String(scene.act ?? '')}\u0001${String(scene.chapter ?? '')}`;
+                    if (key !== prevKey) {
+                        seqInGroup = 0; prevKey = key;
                     }
                     seqInGroup++;
                     await this.sceneManager.updateScene(scene.filePath, { sequence: seqInGroup });
@@ -1692,13 +1706,16 @@ export class BoardView extends ItemView {
         // Assign group value (act/chapter/status/pov) based on column
         switch (this.groupBy) {
             case 'act': {
-                const match = columnTitle.match(/Act (\d+)/);
-                if (match) updates.act = Number(match[1]);
+                // Allow non-numeric acts like "1.1" or "Prologue" through
+                // parseActChapterInput, which keeps integers as numbers and
+                // anything else as a trimmed string.
+                const match = columnTitle.match(/^Act\s+(.+)$/);
+                if (match) updates.act = parseActChapterInput(match[1]);
                 break;
             }
             case 'chapter': {
-                const match = columnTitle.match(/Chapter (\d+)/);
-                if (match) updates.chapter = Number(match[1]);
+                const match = columnTitle.match(/^Chapter\s+(.+)$/);
+                if (match) updates.chapter = parseActChapterInput(match[1]);
                 break;
             }
             case 'status': {
@@ -1714,9 +1731,9 @@ export class BoardView extends ItemView {
 
         // Build the visual order (same multi-key sort the display uses)
         const ordered = [...columnScenes].sort((a, b) => {
-            const actCmp = Number(a.act ?? 0) - Number(b.act ?? 0);
+            const actCmp = compareActChapter(a.act, b.act);
             if (actCmp !== 0) return actCmp;
-            const chCmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+            const chCmp = compareActChapter(a.chapter, b.chapter);
             if (chCmp !== 0) return chCmp;
             return (a.sequence ?? 0) - (b.sequence ?? 0);
         });
@@ -1745,17 +1762,21 @@ export class BoardView extends ItemView {
                 neighborChapter = ordered[newIdx + 1].chapter;
             }
             if (neighborChapter !== undefined) {
-                updates.chapter = Number(neighborChapter);
+                // Preserve the neighbor's chapter type — keeping a string
+                // value like "1.1" intact instead of forcing it through Number().
+                updates.chapter = neighborChapter;
             }
         }
 
-        // Renumber sequences within each (act, chapter) group
-        let prevAct = -1, prevCh = -1, seqInGroup = 0;
+        // Renumber sequences within each (act, chapter) group.
+        // Group key uses String() so non-numeric values ("1.1", "Prologue")
+        // still group cleanly and don't all collapse onto NaN.
+        let prevKey = '\0';
+        let seqInGroup = 0;
         for (const scene of ordered) {
-            const act = Number(scene.act ?? 0);
-            const ch = Number(scene.chapter ?? 0);
-            if (act !== prevAct || ch !== prevCh) {
-                seqInGroup = 0; prevAct = act; prevCh = ch;
+            const key = `${String(scene.act ?? '')}\u0001${String(scene.chapter ?? '')}`;
+            if (key !== prevKey) {
+                seqInGroup = 0; prevKey = key;
             }
             seqInGroup++;
             const sceneUpdates: Partial<Scene> = { sequence: seqInGroup };
@@ -1778,13 +1799,13 @@ export class BoardView extends ItemView {
         // Parse column title to extract value
         switch (this.groupBy) {
             case 'act': {
-                const match = columnTitle.match(/Act (\d+)/);
-                if (match) updates.act = Number(match[1]);
+                const match = columnTitle.match(/^Act\s+(.+)$/);
+                if (match) updates.act = parseActChapterInput(match[1]);
                 break;
             }
             case 'chapter': {
-                const match = columnTitle.match(/Chapter (\d+)/);
-                if (match) updates.chapter = Number(match[1]);
+                const match = columnTitle.match(/^Chapter\s+(.+)$/);
+                if (match) updates.chapter = parseActChapterInput(match[1]);
                 break;
             }
             case 'status': {
@@ -1801,9 +1822,9 @@ export class BoardView extends ItemView {
 
         // Build visual order and append dragged scene at the end
         const ordered = [...columnScenes].sort((a, b) => {
-            const actCmp = Number(a.act ?? 0) - Number(b.act ?? 0);
+            const actCmp = compareActChapter(a.act, b.act);
             if (actCmp !== 0) return actCmp;
-            const chCmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+            const chCmp = compareActChapter(a.chapter, b.chapter);
             if (chCmp !== 0) return chCmp;
             return (a.sequence ?? 0) - (b.sequence ?? 0);
         });
@@ -1811,7 +1832,8 @@ export class BoardView extends ItemView {
         // When grouped by act, adopt chapter from last scene in column
         if (this.groupBy === 'act' && ordered.length > 0) {
             const last = ordered[ordered.length - 1];
-            if (last.chapter !== undefined) updates.chapter = Number(last.chapter);
+            // Preserve the chapter's original type (don't coerce "1.1" to a float).
+            if (last.chapter !== undefined) updates.chapter = last.chapter;
         }
 
         // Compute sequence at end of the last (act, chapter) group
@@ -2925,11 +2947,14 @@ export class BoardView extends ItemView {
         const defaults: Partial<Scene> = {};
         if (presetColumn) {
             if (this.groupBy === 'act') {
-                const match = presetColumn.match(/Act (\d+)/);
-                if (match) defaults.act = Number(match[1]);
+                // Accept any value after "Act " (numeric, decimal, or string)
+                // and let parseActChapterInput decide whether to store it as
+                // a number ("7" → 7) or a string ("1.1", "Prologue").
+                const match = presetColumn.match(/^Act\s+(.+)$/);
+                if (match) defaults.act = parseActChapterInput(match[1]);
             } else if (this.groupBy === 'chapter') {
-                const match = presetColumn.match(/Chapter (.+)/);
-                if (match) defaults.chapter = Number(match[1]) || match[1];
+                const match = presetColumn.match(/^Chapter\s+(.+)$/);
+                if (match) defaults.chapter = parseActChapterInput(match[1]);
             } else if (this.groupBy === 'status') {
                 // Build a label→id mapping from the dynamic status config
                 const cfg = getStatusConfig();
@@ -3459,14 +3484,25 @@ export class BoardView extends ItemView {
      */
     private sortGroupKeys(keys: string[]): string[] {
         return keys.sort((a, b) => {
-            // Try numeric sort first
-            const numA = parseInt(a.replace(/\D/g, ''));
-            const numB = parseInt(b.replace(/\D/g, ''));
-            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-            // "No X" groups go last
-            if (a.startsWith('No ')) return 1;
-            if (b.startsWith('No ')) return -1;
-            return a.localeCompare(b);
+            // "No X" / "No Act" / "No Chapter" groups always go last.
+            const aNo = a.startsWith('No ');
+            const bNo = b.startsWith('No ');
+            if (aNo !== bNo) return aNo ? 1 : -1;
+
+            // For "Act ..." or "Chapter ..." columns, compare the suffix using
+            // the numeric-aware act/chapter comparator so "Act 2" sorts before
+            // "Act 10" and hierarchical names like "Act 1.1" / "Act 1.10" /
+            // "Act 2.1" stay in order.
+            const actA = a.match(/^Act\s+(.+)$/);
+            const actB = b.match(/^Act\s+(.+)$/);
+            if (actA && actB) return compareActChapter(actA[1], actB[1]);
+
+            const chA = a.match(/^Chapter\s+(.+)$/);
+            const chB = b.match(/^Chapter\s+(.+)$/);
+            if (chA && chB) return compareActChapter(chA[1], chB[1]);
+
+            // Status / POV / mixed: locale string compare with numeric awareness.
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
         });
     }
 }

@@ -274,6 +274,59 @@ export class FiltersComponent {
             });
         }
 
+        // Custom (universal) scene field filters — one chip group per dropdown / multi-select template
+        if (this.plugin?.fieldTemplates) {
+            const sceneTpls = this.plugin.fieldTemplates.getAll()
+                .filter(t => (t.category || 'character') === 'scene')
+                .filter(t => t.type === 'dropdown' || t.type === 'multi-select');
+
+            for (const tpl of sceneTpls) {
+                // Collect all values actually used for this field across scenes,
+                // unioned with template-defined options.
+                const used = new Set<string>();
+                for (const scene of this.sceneManager.getAllScenes()) {
+                    const raw = scene.universalFields?.[tpl.id];
+                    if (Array.isArray(raw)) raw.forEach(v => v && used.add(String(v)));
+                    else if (typeof raw === 'string' && raw.trim()) used.add(raw);
+                }
+                for (const opt of tpl.options) used.add(opt);
+
+                if (used.size === 0) continue;
+
+                new Setting(panel).setName(tpl.label);
+                const cfContainer = panel.createDiv('story-line-filter-chips');
+                const sorted = Array.from(used).sort((a, b) => a.localeCompare(b));
+                sorted.forEach(val => {
+                    const chip = cfContainer.createEl('button', {
+                        cls: 'story-line-chip',
+                        text: val,
+                    });
+                    if (this.currentFilter.customFields?.[tpl.id]?.includes(val)) chip.addClass('active');
+                    chip.addEventListener('click', () => {
+                        if (!this.currentFilter.customFields) this.currentFilter.customFields = {};
+                        const arr = this.currentFilter.customFields[tpl.id] ?? [];
+                        const idx = arr.indexOf(val);
+                        if (idx >= 0) {
+                            arr.splice(idx, 1);
+                            chip.removeClass('active');
+                        } else {
+                            arr.push(val);
+                            chip.addClass('active');
+                        }
+                        if (arr.length === 0) {
+                            delete this.currentFilter.customFields[tpl.id];
+                        } else {
+                            this.currentFilter.customFields[tpl.id] = arr;
+                        }
+                        if (Object.keys(this.currentFilter.customFields).length === 0) {
+                            delete this.currentFilter.customFields;
+                        }
+                        this.emitChange();
+                    });
+                });
+            }
+        }
+
         // --- Filter Presets ---
         if (this.plugin) {
             const presetSection = panel.createDiv('story-line-preset-section');

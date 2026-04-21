@@ -88,6 +88,7 @@ export class LocationManager {
                 beliefs: fm.beliefs,
                 economy: fm.economy,
                 history: fm.history,
+                books: this.parseStringList(fm.books),
                 custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
                 universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
                 created: fm.created,
@@ -111,6 +112,7 @@ export class LocationManager {
                 inhabitants: fm.inhabitants,
                 connectedLocations: fm.connectedLocations,
                 mapNotes: fm.mapNotes,
+                books: this.parseStringList(fm.books),
                 custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
                 universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
                 created: fm.created,
@@ -272,7 +274,7 @@ export class LocationManager {
         for (const key of fieldKeys) {
             if (key === 'name') continue;
             const val = (item as any)[key];
-            if (val !== undefined && val !== null && val !== '') {
+            if (val !== undefined && val !== null && val !== '' && !(Array.isArray(val) && val.length === 0)) {
                 fm[key] = val;
             } else {
                 delete fm[key];
@@ -307,7 +309,40 @@ export class LocationManager {
         this.worlds.delete(normalizedFilePath);
         this.locations.delete(normalizedFilePath);
     }
+    // ── Move ───────────────────────────────
 
+    /**
+     * Move a world or location file to a different folder. Used by the
+     * Promote / Demote actions to shuttle entries between the per-project
+     * Codex/Locations folder and the series-level shared folder.
+     *
+     * Wikilinks in scenes / characters reference locations by NAME (not
+     * file path), so no link cascade is needed — only the file location
+     * changes.
+     */
+    async moveItem(item: WorldOrLocation, targetFolderPath: string): Promise<WorldOrLocation> {
+        const oldPath = normalizePath(item.filePath);
+        await this.ensureFolder(targetFolderPath);
+        const basename = oldPath.split('/').pop() ?? `${item.name}.md`;
+        const newPath = normalizePath(`${targetFolderPath}/${basename}`);
+        if (newPath === oldPath) return item;
+
+        if (this.app.vault.getAbstractFileByPath(newPath)) {
+            throw new Error(`A file already exists at: ${newPath}`);
+        }
+
+        const file = this.app.vault.getAbstractFileByPath(oldPath);
+        if (file instanceof TFile) {
+            await this.app.fileManager.renameFile(file, newPath);
+        }
+
+        this.worlds.delete(oldPath);
+        this.locations.delete(oldPath);
+        const updated = { ...item, filePath: newPath } as WorldOrLocation;
+        if (updated.type === 'world') this.worlds.set(newPath, updated);
+        else this.locations.set(newPath, updated);
+        return updated;
+    }
     // ── Helpers ────────────────────────────────────────
 
     private extractFrontmatter(content: string): Record<string, any> | null {
@@ -336,6 +371,16 @@ export class LocationManager {
             if (!path) continue;
             parsed.push({ path, caption });
         }
+        return parsed.length ? parsed : undefined;
+    }
+
+    private parseStringList(value: any): string[] | undefined {
+        if (Array.isArray(value)) {
+            const parsed = value.map(v => String(v).trim()).filter(Boolean);
+            return parsed.length ? parsed : undefined;
+        }
+        if (value == null || value === '') return undefined;
+        const parsed = String(value).split(',').map(s => s.trim()).filter(Boolean);
         return parsed.length ? parsed : undefined;
     }
 

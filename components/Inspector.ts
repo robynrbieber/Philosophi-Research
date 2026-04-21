@@ -13,6 +13,7 @@ import { LinkScanner, LinkScanResult } from '../services/LinkScanner';
 import { renderTagPillInput, renderAutocompleteInput } from './InlineSuggest';
 import { AddFieldModal } from './AddFieldModal';
 import { UniversalFieldTemplate } from '../services/FieldTemplateService';
+import { parseActChapterInput, actChapterHasIllegalPathChars } from '../utils/actChapter';
 
 /**
  * Scene inspector sidebar component
@@ -208,19 +209,21 @@ export class InspectorComponent {
         // Act
         const actGroup = acRow.createDiv();
         actGroup.createSpan({ cls: 'inspector-label', text: 'Act' });
-        const actSelect = actGroup.createEl('select');
-        styleSelect(actSelect);
-        actSelect.createEl('option', { text: '—', value: '' });
-        // Dynamic act count: offer at least 5, or up to max existing act + 2
-        const maxExistingAct = this.sceneManager.getAllScenes()
-            .reduce((mx, s) => Math.max(mx, Number(s.act) || 0), 0);
-        const actCount = Math.max(5, maxExistingAct + 2);
-        for (let i = 1; i <= actCount; i++) {
-            const opt = actSelect.createEl('option', { text: String(i), value: String(i) });
-            if (scene.act !== undefined && Number(scene.act) === i) opt.selected = true;
-        }
-        actSelect.addEventListener('change', async () => {
-            const val = actSelect.value ? Number(actSelect.value) : undefined;
+        // Use a free-text input (not a dropdown) so users can name acts
+        // however they like — "1", "1.1", "Prologue", etc.  parseActChapterInput
+        // keeps integers as numbers and anything else as a trimmed string.
+        const actInput = actGroup.createEl('input', { attr: { type: 'text', placeholder: '#' } });
+        styleInput(actInput);
+        actInput.value = scene.act !== undefined ? String(scene.act) : '';
+        actInput.addEventListener('change', async () => {
+            const val = parseActChapterInput(actInput.value);
+            // Warn (don't block) if the value would create a folder name with
+            // characters that are illegal on Windows. SceneManager sanitizes
+            // the folder name itself, but the user should know the on-disk
+            // name will differ from what they typed.
+            if (typeof val === 'string' && actChapterHasIllegalPathChars(val)) {
+                new Notice(`Act name contains characters that aren't allowed in folder names; they'll be replaced with "-".`);
+            }
             await this.sceneManager.updateScene(scene.filePath, { act: val } as any);
             scene.act = val;
         });
@@ -232,8 +235,10 @@ export class InspectorComponent {
         styleInput(chInput);
         chInput.value = scene.chapter !== undefined ? String(scene.chapter) : '';
         chInput.addEventListener('change', async () => {
-            const raw = chInput.value.trim();
-            const val: number | string | undefined = raw ? (Number(raw) || raw) : undefined;
+            const val = parseActChapterInput(chInput.value);
+            if (typeof val === 'string' && actChapterHasIllegalPathChars(val)) {
+                new Notice(`Chapter name contains characters that aren't allowed in folder names; they'll be replaced with "-".`);
+            }
             await this.sceneManager.updateScene(scene.filePath, { chapter: val } as any);
             scene.chapter = val;
         });

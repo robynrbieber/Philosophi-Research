@@ -2,6 +2,35 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.5
+
+### Bug Fixes
+
+- **Act / chapter sort order with 10+ entries** — Filter dropdowns, board columns, manuscript order, exports, navigator, plotgrid and stats no longer sort acts/chapters lexically (`1, 10, 11, 2, 3, …`). They now sort numerically (`1, 2, 3, …, 10, 11`). Also fixes scene order in exports when a project has more than 9 acts or 9 chapters.
+
+### New Features
+
+- **Custom scene fields** *(requested by @rk-kontur, [#67](https://github.com/PixeroJan/obsidian-storyline/issues/67))* — Define your own metadata fields on scenes (Story Grid functions, Truby aspects, beat-sheet labels, genre conventions, anything you need) without overloading the title or subtitle. Manage templates from **Settings → Custom Scene Fields** or inline from the Inspector. Supports text, textarea, dropdown and multi-select types.
+  - **Inspector** — every scene now has a "Custom Fields" section to edit values.
+  - **Board → Group by** — dropdown and multi-select fields appear as grouping options in the Kanban board (multi-select scenes show in every matching column).
+  - **Filters** — dropdown and multi-select fields each get a chip group in the filter panel.
+  - **Scene cards** — up to three populated values appear as small badges on cards, and hovering any card shows a full summary of every custom value.
+  - Values are stored under `universalFields:` in scene frontmatter; templates live in `<project>/System/field-templates.json` and sync with the rest of the project.
+- **Free-form act and chapter labels** — Acts and chapters are no longer restricted to plain integers. You can now use:
+  - Hierarchical decimals: `1.1`, `1.2`, `1.10`, `2.1` (sort stays correct).
+  - Text labels: `Prologue`, `Epilogue`, `Interlude A` (sort numerically first, then text).
+  - Plain integers: still work exactly as before.
+- **Inspector — Act is now a free-text field** — The Act control in the Scene Inspector is a text input instead of a 1..N dropdown, so you can type any of the values above. Illegal Windows path characters (`< > : " / \ | ? *`) are flagged with a warning.
+- **Folder and filename safety** — Scene folders (`Act 1.1/`) and filename prefixes (`1.1-02 Title.md`) are sanitized for non-numeric act/chapter values. Pure integers continue to be zero-padded as before for sortable filenames.
+- **Safer next-act numbering** — The auto-suggested next act number now ignores non-numeric values, so projects containing a `Prologue` no longer break the increment.
+- **Series-shared characters and locations — per-book scoping** — Series Mode now lets you mark which books a character or location appears in instead of always sharing every entity with every book. Right-click any character card or location/world row in the Codex views to:
+  - **Promote to series** — move a book-local entity into the shared series Codex so sibling books can use it.
+  - **Demote to project** — move a series-shared entity back into the current book's local Codex.
+  - **Restrict to “<book>” only / Add to / Remove from “<book>” / Share across all books** — toggle the new optional `books:` frontmatter list. Empty / missing means “appears in every book” (the historical behavior, fully backwards compatible).
+  - A new **All books / Showing: <book>** filter chip in the Characters and Locations views hides entries that don't appear in the current book.
+  - Series projects can now keep both a per-project `Codex/Characters` and `Codex/Locations` folder for book-only entities, alongside the shared series-level Codex.
+
+---
 ## Version 1.9.4
 
 ### Bug Fixes

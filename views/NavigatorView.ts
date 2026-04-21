@@ -7,6 +7,7 @@ import { ManuscriptView } from './ManuscriptView';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import { SceneCardComponent } from '../components/SceneCard';
+import { compareActChapter } from '../utils/actChapter';
 
 /**
  * Sort modes available in the navigator.
@@ -461,10 +462,12 @@ export class NavigatorView extends ItemView {
         const sortFn = (a: Scene, b: Scene): number => {
             switch (this.sortMode) {
                 case 'reading': {
-                    // Reading order: act → chapter → sequence
-                    const actCmp = Number(a.act ?? 9999) - Number(b.act ?? 9999);
+                    // Reading order: act → chapter → sequence.
+                    // compareActChapter handles numeric vs string acts ("1.1", "Prologue")
+                    // and sorts missing values last.
+                    const actCmp = compareActChapter(a.act, b.act);
                     if (actCmp !== 0) return actCmp;
-                    const chapterCmp = Number(a.chapter ?? 9999) - Number(b.chapter ?? 9999);
+                    const chapterCmp = compareActChapter(a.chapter, b.chapter);
                     if (chapterCmp !== 0) return chapterCmp;
                     return (a.sequence ?? 9999) - (b.sequence ?? 9999);
                 }

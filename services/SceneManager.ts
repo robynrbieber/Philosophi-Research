@@ -4,6 +4,7 @@ import { StoryLineProject, deriveProjectFolders, deriveProjectFoldersFromFilePat
 import { MetadataParser } from './MetadataParser';
 import { UndoManager } from './UndoManager';
 import { SceneQueryService, ISceneStore } from './SceneQueryService';
+import { formatActChapterPrefix, sanitizeActChapterForPath } from '../utils/actChapter';
 import type SceneCardsPlugin from '../main';
 
 /**
@@ -170,6 +171,35 @@ export class SceneManager implements ISceneStore {
             return base.substring(0, base.lastIndexOf('/'));
         }
         return null;
+    }
+
+    /**
+     * Return the per-project Characters folder, regardless of series
+     * redirection. Used by the Promote / Demote actions and by the
+     * series-aware multi-folder scan so book-only characters can live
+     * alongside series-shared ones.
+     */
+    getProjectLocalCharacterFolder(): string | null {
+        if (!this._activeProject) return null;
+        return normalizePath(this._activeProject.characterFolder);
+    }
+
+    /**
+     * Return the per-project Locations folder, regardless of series
+     * redirection. See {@link getProjectLocalCharacterFolder}.
+     */
+    getProjectLocalLocationFolder(): string | null {
+        if (!this._activeProject) return null;
+        return normalizePath(this._activeProject.locationFolder);
+    }
+
+    /**
+     * Title of the active project — used as the "book name" for the
+     * `books?: string[]` membership field on series-shared characters
+     * and locations. Returns null when no project is active.
+     */
+    getCurrentBookTitle(): string | null {
+        return this._activeProject?.title ?? null;
     }
 
     /**
@@ -655,7 +685,7 @@ export class SceneManager implements ISceneStore {
      * @deprecated Use queryService.getScenesGroupedBy() directly
      */
     getScenesGroupedBy(
-        field: 'act' | 'chapter' | 'status' | 'pov',
+        field: string,
         filter?: SceneFilter,
         sort?: SortConfig
     ): Map<string, Scene[]> {
@@ -673,11 +703,17 @@ export class SceneManager implements ISceneStore {
         // Ensure folder exists
         await this.ensureFolder(baseFolder);
 
-        // Determine subfolder based on act (only for scenes, not notes)
+        // Determine subfolder based on act (only for scenes, not notes).
+        // Sanitize the act value so non-numeric acts like "1.1" or "Prologue"
+        // produce a valid Windows/macOS folder name (illegal characters are
+        // replaced with "-" by sanitizeActChapterForPath).
         let targetFolder = baseFolder;
         if (!isNote && sceneData.act !== undefined) {
-            targetFolder = normalizePath(`${baseFolder}/Act ${sceneData.act}`);
-            await this.ensureFolder(targetFolder);
+            const actFolderSegment = sanitizeActChapterForPath(String(sceneData.act));
+            if (actFolderSegment) {
+                targetFolder = normalizePath(`${baseFolder}/Act ${actFolderSegment}`);
+                await this.ensureFolder(targetFolder);
+            }
         }
 
         // Auto-generate sequence if enabled (skip when caller already set one)
@@ -685,13 +721,13 @@ export class SceneManager implements ISceneStore {
             sceneData.sequence = this.getNextSequence(afterScene);
         }
 
-        // Generate filename
+        // Generate filename. formatActChapterPrefix zero-pads pure-numeric
+        // acts ("1" → "01") and emits string acts verbatim with illegal
+        // characters replaced ("1.1" → "1.1", "Prologue" → "Prologue").
         const seqStr = sceneData.sequence !== undefined
             ? String(sceneData.sequence).padStart(2, '0')
             : '00';
-        const actStr = sceneData.act !== undefined
-            ? String(sceneData.act).padStart(2, '0')
-            : '00';
+        const actStr = formatActChapterPrefix(sceneData.act, '00');
         const safeTitle = (sceneData.title || 'Untitled')
             .replace(/[\\/:*?"<>|]/g, '-')
             .substring(0, 60);
@@ -766,24 +802,34 @@ export class SceneManager implements ISceneStore {
 
         const sceneFolder = this.getSceneFolder();
 
-        // Determine target folder
+        // Determine target folder. Same sanitization as createScene so a
+        // string act like "1.1" or "Prologue" produces a valid folder name.
         let targetFolder = sceneFolder;
         if (newAct !== undefined) {
-            targetFolder = normalizePath(`${sceneFolder}/Act ${newAct}`);
+            const actFolderSegment = sanitizeActChapterForPath(String(newAct));
+            if (actFolderSegment) {
+                targetFolder = normalizePath(`${sceneFolder}/Act ${actFolderSegment}`);
+            }
         }
         await this.ensureFolder(targetFolder);
 
-        // Update act (and optionally sequence) prefix in filename
+        // Update act (and optionally sequence) prefix in filename.
+        // The prefix may be either two digits ("01-05") for numeric acts or
+        // a freeform string ("1.1-05", "Prologue-05") for string acts —
+        // recognise both shapes so we can rewrite them in place.
         let newName = file.name;
-        const actStr = newAct !== undefined ? String(newAct).padStart(2, '0') : '00';
-        const prefixMatch = file.name.match(/^(\d{2})-(\d{2})\s/);
+        const actStr = formatActChapterPrefix(newAct, '00');
+        // Match either NN-NN<space>... (legacy numeric) or <anything>-NN<space>...
+        // where the act portion may contain dots or letters but no whitespace
+        // and no second dash before the sequence.
+        const prefixMatch = file.name.match(/^([^\s/-]+)-(\d{2})\s/);
         if (prefixMatch) {
             // Read the updated sequence from the freshly-written YAML
             const updatedScene = this.scenes.get(filePath);
             const seqStr = updatedScene?.sequence !== undefined
                 ? String(updatedScene.sequence).padStart(2, '0')
                 : prefixMatch[2];  // keep existing if unknown
-            newName = file.name.replace(/^\d{2}-\d{2}(\s)/, `${actStr}-${seqStr}$1`);
+            newName = file.name.replace(/^[^\s/-]+-\d{2}(\s)/, `${actStr}-${seqStr}$1`);
         }
 
         const newPath = normalizePath(`${targetFolder}/${newName}`);
@@ -1508,7 +1554,7 @@ export class SceneManager implements ISceneStore {
      * @deprecated Use queryService.getScenesGroupedByWithEmpty() directly
      */
     getScenesGroupedByWithEmpty(
-        field: 'act' | 'chapter' | 'status' | 'pov',
+        field: string,
         filter?: SceneFilter,
         sort?: SortConfig
     ): Map<string, Scene[]> {

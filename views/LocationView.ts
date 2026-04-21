@@ -13,6 +13,7 @@ import { UndoManager } from '../services/UndoManager';
 import { pickImage as pickImageModal, resolveImagePath } from '../components/ImagePicker';
 import { AddFieldModal } from '../components/AddFieldModal';
 import type { UniversalFieldTemplate } from '../services/FieldTemplateService';
+import { formatActChapterPrefix } from '../utils/actChapter';
 
 import type SceneCardsPlugin from '../main';
 import { CharacterManager } from '../services/CharacterManager';
@@ -52,6 +53,11 @@ export class LocationView extends ItemView {
     private searchText: string = '';
     /** Current sort mode for the overview tree */
     private sortBy: 'name' | 'modified' | 'created' | 'type' = 'name';
+    /**
+     * When true and the active project belongs to a series, the tree hides
+     * worlds and locations whose `books[]` field excludes the current book.
+     */
+    private bookFilterActive: boolean = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -167,6 +173,23 @@ export class LocationView extends ItemView {
             this.renderOverview(container);
         });
 
+        // Series book filter
+        const currentBook = this.plugin.sceneManager.getCurrentBookTitle();
+        const inSeries = !!this.plugin.sceneManager.getSeriesFolder();
+        if (inSeries && currentBook) {
+            const filterToggle = searchRow.createEl('button', {
+                cls: `codex-book-filter${this.bookFilterActive ? ' active' : ''}`,
+                text: this.bookFilterActive ? `Showing: ${currentBook}` : 'All books',
+            });
+            attachTooltip(filterToggle, this.bookFilterActive
+                ? `Click to show all series locations`
+                : `Click to hide entries not in “${currentBook}”`);
+            filterToggle.addEventListener('click', () => {
+                this.bookFilterActive = !this.bookFilterActive;
+                this.renderOverview(container);
+            });
+        }
+
         const q = this.searchText.toLowerCase();
 
         const allWorlds = this.locationManager.getAllWorlds();
@@ -183,6 +206,21 @@ export class LocationView extends ItemView {
         let orphanLocations = q
             ? allOrphans.filter(l => l.name.toLowerCase().includes(q))
             : [...allOrphans];
+
+        // Book-membership filter (series mode only).
+        if (this.bookFilterActive && currentBook) {
+            const lower = currentBook.toLowerCase();
+            const inBook = (item: WorldOrLocation) => {
+                if (!item.books || item.books.length === 0) return true;
+                return item.books.some(b => b.toLowerCase() === lower);
+            };
+            worlds = worlds.filter(w => {
+                if (inBook(w)) return true;
+                // Keep the world if any of its child locations are in the book.
+                return this.locationManager.getLocationsForWorld(w.name).some(inBook);
+            });
+            orphanLocations = orphanLocations.filter(inBook);
+        }
 
         // Apply sort
         const sortItems = (arr: any[]) => {
@@ -303,6 +341,11 @@ export class LocationView extends ItemView {
             this.renderView(this.rootContainer!);
         });
 
+        header.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showItemContextMenu(world, e);
+        });
+
         // Children
         if (!isCollapsed && worldLocations.length > 0) {
             const children = node.createDiv('location-tree-children');
@@ -377,6 +420,11 @@ export class LocationView extends ItemView {
             this.renderView(this.rootContainer!);
         });
 
+        header.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showItemContextMenu(loc, e);
+        });
+
         // Child locations
         if (!isCollapsed && childLocations.length > 0) {
             const children = node.createDiv('location-tree-children');
@@ -406,6 +454,95 @@ export class LocationView extends ItemView {
             e.stopPropagation();
             await this.createLocationFromName(name);
         });
+    }
+
+    // ── Tree node context menu (promote/demote, book membership) ───────
+
+    private showItemContextMenu(item: WorldOrLocation, e: MouseEvent): void {
+        const menu = new obsidian.Menu();
+        const sm = this.plugin.sceneManager;
+        const seriesFolder = sm.getSeriesFolder();
+        const seriesLocFolder = seriesFolder
+            ? `${seriesFolder}/Codex/Locations`
+            : null;
+        const projectLocFolder = sm.getProjectLocalLocationFolder();
+        const currentBook = sm.getCurrentBookTitle();
+
+        menu.addItem(it => it.setTitle(item.name).setDisabled(true));
+        menu.addSeparator();
+
+        if (seriesFolder && seriesLocFolder && projectLocFolder) {
+            const inSeries = item.filePath.startsWith(seriesLocFolder + '/');
+            if (inSeries) {
+                menu.addItem(it =>
+                    it.setTitle('Demote to project (book-only)')
+                        .setIcon('arrow-down-from-line')
+                        .onClick(() => this.moveItemTo(item, projectLocFolder, 'demoted')));
+            } else {
+                menu.addItem(it =>
+                    it.setTitle('Promote to series (shared)')
+                        .setIcon('arrow-up-from-line')
+                        .onClick(() => this.moveItemTo(item, seriesLocFolder, 'promoted')));
+            }
+            menu.addSeparator();
+        }
+
+        if (seriesFolder && currentBook) {
+            const lower = currentBook.toLowerCase();
+            const allBooks = !item.books || item.books.length === 0;
+            const inBook = allBooks
+                || (item.books?.some(b => b.toLowerCase() === lower) ?? false);
+
+            if (allBooks) {
+                menu.addItem(it =>
+                    it.setTitle(`Restrict to "${currentBook}" only`)
+                        .setIcon('book-marked')
+                        .onClick(() => this.setItemBooks(item, [currentBook])));
+            } else if (inBook) {
+                menu.addItem(it =>
+                    it.setTitle(`Remove from "${currentBook}"`)
+                        .setIcon('book-x')
+                        .onClick(() => this.setItemBooks(item,
+                            (item.books || []).filter(b => b.toLowerCase() !== lower))));
+            } else {
+                menu.addItem(it =>
+                    it.setTitle(`Add to "${currentBook}"`)
+                        .setIcon('book-plus')
+                        .onClick(() => this.setItemBooks(item,
+                            [...(item.books || []), currentBook])));
+            }
+            menu.addItem(it =>
+                it.setTitle('Share across all books')
+                    .setIcon('books')
+                    .setDisabled(allBooks)
+                    .onClick(() => this.setItemBooks(item, [])));
+        }
+
+        menu.showAtMouseEvent(e);
+    }
+
+    private async moveItemTo(item: WorldOrLocation, target: string, verb: 'promoted' | 'demoted'): Promise<void> {
+        try {
+            await this.locationManager.moveItem(item, target);
+            new Notice(`"${item.name}" ${verb}`);
+            await this.plugin.refreshOpenViews();
+        } catch (err) {
+            new Notice(`Could not move: ${(err as Error).message}`);
+        }
+    }
+
+    private async setItemBooks(item: WorldOrLocation, books: string[]): Promise<void> {
+        try {
+            const updated = { ...item, books: books.length ? books : undefined } as WorldOrLocation;
+            if (updated.type === 'world') {
+                await this.locationManager.saveWorld(updated);
+            } else {
+                await this.locationManager.saveLocation(updated);
+            }
+            await this.plugin.refreshOpenViews();
+        } catch (err) {
+            new Notice(`Could not update book membership: ${(err as Error).message}`);
+        }
     }
 
     // ── Detail view ────────────────────────────────────
@@ -1082,7 +1219,9 @@ export class LocationView extends ItemView {
             listSection.createEl('h4', { text: 'Scenes here' });
             for (const scene of locScenes) {
                 const item = listSection.createDiv('location-side-scene-item');
-                const act = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
+                // Shared formatter handles string acts ("1.1", "Prologue")
+                // and zero-pads pure-numeric values.
+                const act = formatActChapterPrefix(scene.act, '??');
                 const seq = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
 
                 item.createSpan({ cls: 'scene-id', text: `[${act}-${seq}]` });

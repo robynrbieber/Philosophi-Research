@@ -34,6 +34,13 @@ interface LocationBase {
     custom?: Record<string, string>;
     /** Universal field values (keyed by template id) */
     universalFields?: Record<string, string | string[]>;
+    /**
+     * Which books (project titles) this entity appears in. Empty / missing
+     * means the entity is shared by every book in the series. Used by the
+     * "Current book only" filter in LocationView when the active project
+     * belongs to a series.
+     */
+    books?: string[];
 }
 
 // ── World ──────────────────────────────────────────
@@ -255,10 +262,12 @@ export const LOCATION_TYPES: string[] = [
 export const WORLD_FIELD_KEYS: (keyof StoryWorld)[] = [
     'name', 'image', 'gallery', 'description', 'geography', 'culture', 'politics',
     'magicTechnology', 'beliefs', 'economy', 'history',
+    'books',
 ];
 
 /** Frontmatter keys for Location */
 export const LOCATION_FIELD_KEYS: (keyof StoryLocation)[] = [
     'name', 'image', 'gallery', 'locationType', 'world', 'parent', 'description',
     'atmosphere', 'significance', 'inhabitants', 'connectedLocations', 'mapNotes',
+    'books',
 ];

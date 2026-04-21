@@ -18,6 +18,7 @@ import { enableDragToPan } from '../components/DragToPan';
 import { isMobile } from '../components/MobileAdapter';
 import { PLOTGRID_VIEW_TYPE } from '../constants';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors, contrastTextColor } from '../settings';
+import { compareActChapter } from '../utils/actChapter';
 import { attachTooltip } from '../components/Tooltip';
 import type SceneCardsPlugin from '../main';
 
@@ -2491,16 +2492,13 @@ export class PlotgridView extends ItemView {
         if (!scMgr) return;
 
         const scenes = scMgr.getAllScenes().slice().sort((a, b) => {
-            // Sort by act → chapter → sequence
-            const actA = typeof a.act === 'number' ? a.act : (a.act ? parseInt(String(a.act), 10) || 0 : 0);
-            const actB = typeof b.act === 'number' ? b.act : (b.act ? parseInt(String(b.act), 10) || 0 : 0);
-            if (actA !== actB) return actA - actB;
-            const chA = typeof a.chapter === 'number' ? a.chapter : (a.chapter ? parseInt(String(a.chapter), 10) || 0 : 0);
-            const chB = typeof b.chapter === 'number' ? b.chapter : (b.chapter ? parseInt(String(b.chapter), 10) || 0 : 0);
-            if (chA !== chB) return chA - chB;
-            const seqA = a.sequence ?? 0;
-            const seqB = b.sequence ?? 0;
-            return seqA - seqB;
+            // Sort by act → chapter → sequence using the shared numeric-aware
+            // comparator (handles string acts like "1.1" / "Prologue").
+            const actCmp = compareActChapter(a.act, b.act);
+            if (actCmp !== 0) return actCmp;
+            const chCmp = compareActChapter(a.chapter, b.chapter);
+            if (chCmp !== 0) return chCmp;
+            return (a.sequence ?? 0) - (b.sequence ?? 0);
         });
 
         // Collect unique column values from scenes

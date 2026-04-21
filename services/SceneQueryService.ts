@@ -1,4 +1,5 @@
 import { Scene, SceneFilter, SortConfig, SortField, STATUS_ORDER, getStatusOrder } from '../models/Scene';
+import { compareActChapter } from '../utils/actChapter';
 
 /**
  * Read-only interface for accessing the scene store.
@@ -61,17 +62,41 @@ export class SceneQueryService {
     }
 
     /**
-     * Get scenes grouped by a field (for board view columns)
+     * Get scenes grouped by a field (for board view columns).
+     *
+     * `field` may be one of the built-in keys (`act`, `chapter`, `status`, `pov`)
+     * or a custom-field reference `cf:<templateId>`. Custom-field values that are
+     * arrays (multi-select) place the scene in every matching group.
      */
     getScenesGroupedBy(
-        field: 'act' | 'chapter' | 'status' | 'pov',
+        field: string,
         filter?: SceneFilter,
         sort?: SortConfig
     ): Map<string, Scene[]> {
         const scenes = this.getFilteredScenes(filter, sort);
         const groups = new Map<string, Scene[]>();
 
+        const isCustom = field.startsWith('cf:');
+        const customId = isCustom ? field.slice(3) : '';
+
+        const push = (key: string, scene: Scene) => {
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(scene);
+        };
+
         for (const scene of scenes) {
+            if (isCustom) {
+                const raw = scene.universalFields?.[customId];
+                if (Array.isArray(raw) && raw.length > 0) {
+                    for (const v of raw) push(String(v), scene);
+                } else if (typeof raw === 'string' && raw.trim()) {
+                    push(raw, scene);
+                } else {
+                    push('(empty)', scene);
+                }
+                continue;
+            }
+
             let key: string;
             switch (field) {
                 case 'act':
@@ -89,11 +114,7 @@ export class SceneQueryService {
                 default:
                     key = 'Unknown';
             }
-
-            if (!groups.has(key)) {
-                groups.set(key, []);
-            }
-            groups.get(key)!.push(scene);
+            push(key, scene);
         }
 
         return groups;
@@ -106,7 +127,7 @@ export class SceneQueryService {
      * @param definedChapters — chapters defined on the project
      */
     getScenesGroupedByWithEmpty(
-        field: 'act' | 'chapter' | 'status' | 'pov',
+        field: string,
         filter?: SceneFilter,
         sort?: SortConfig,
         definedActs?: number[],
@@ -145,7 +166,16 @@ export class SceneQueryService {
                 values.add(String(val));
             }
         }
-        return Array.from(values).sort();
+        const arr = Array.from(values);
+        // Act and chapter are numeric-or-string and need a numeric-aware
+        // sort so "10" sorts after "2" (lexical sort gets it wrong) and
+        // hierarchical names like "1.1" / "1.10" / "2.1" stay in order.
+        // Other fields (pov, status, emotion, location) use locale string
+        // sort.
+        if (field === 'act' || field === 'chapter') {
+            return arr.sort(compareActChapter);
+        }
+        return arr.sort((a, b) => a.localeCompare(b));
     }
 
     /**
@@ -266,6 +296,16 @@ export class SceneQueryService {
         if (filter.tags?.length) {
             if (!scene.tags || !filter.tags.some(t => scene.tags!.includes(t))) {
                 return false;
+            }
+        }
+        if (filter.customFields) {
+            for (const [tplId, accepted] of Object.entries(filter.customFields)) {
+                if (!accepted || accepted.length === 0) continue;
+                const raw = scene.universalFields?.[tplId];
+                const sceneVals: string[] = Array.isArray(raw)
+                    ? raw.map(String)
+                    : (typeof raw === 'string' && raw.trim() ? [raw] : []);
+                if (!sceneVals.some(v => accepted.includes(v))) return false;
             }
         }
         if (filter.searchText) {

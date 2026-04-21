@@ -168,6 +168,15 @@ export interface Character {
     /** Universal field values keyed by template ID (from field-templates.json) */
     universalFields?: Record<string, string | string[]>;
 
+    // ── Series sharing ─────────────────────────────
+    /**
+     * Which books (project titles) this character appears in. Empty / missing
+     * means the character is shared by every book in the series. Used by the
+     * "Current book only" filter in CharacterView when the active project
+     * belongs to a series.
+     */
+    books?: string[];
+
     // ── Meta ───────────────────────────────────────────
     /** Created date */
     created?: string;
@@ -477,6 +486,7 @@ export const CHARACTER_FIELD_KEYS: (keyof Character)[] = [
     'formativeMemories', 'accomplishments', 'secrets',
     'startingPoint', 'goal', 'expectedChange',
     'habits', 'props',
+    'books',
 ];
 
 export const CHARACTER_RELATION_ARRAY_FIELDS: (keyof Character)[] = [

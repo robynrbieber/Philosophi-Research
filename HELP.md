@@ -39,6 +39,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Scene Snapshots](#scene-snapshots)
 - [View Snapshots](#view-snapshots)
 - [Scene Templates](#scene-templates)
+- [Custom Scene Fields](#custom-scene-fields)
 - [Color Coding & Tag Colors](#color-coding--tag-colors)
 - [Scene Colors](#scene-colors)
 - [Plotline HSL Sliders](#plotline-hsl-sliders)
@@ -494,11 +495,12 @@ Archived scenes stay as regular `.md` files and can be reviewed or edited at any
 
 Click any scene card to open the **Inspector Panel** on the right side. It provides:
 
-- **Metadata editing** — title, act, chapter, sequence, status, POV, location, conflict, emotion, intensity.
+- **Metadata editing** — title, act, chapter, sequence, status, POV, location, conflict, emotion, intensity. Act and chapter are free-text fields: use plain numbers (`1`, `2`, `10`), hierarchical decimals (`1.1`, `1.2`, `2.1`), or text labels (`Prologue`, `Interlude A`). Sorting throughout the plugin is numeric-aware. Avoid Windows-illegal characters (`< > : " / \ | ? *`) — the Inspector will warn you if you type one.
 - **Characters** — add/remove characters with autocomplete and tag-pill inputs.
 - **Codex sections** — any Codex category enabled for the Inspector (via Codex → Manage Categories) appears as a tag-pill input below the Location field. Add or remove linked Codex entries with autocomplete from your category’s entries.
 - **Tags** — manage plotline tags with autocomplete, color-coded tag badges when tag colors are configured.
 - **Notes** — editorial notes field for author comments and reminders.
+- **Custom Fields** — values for any [Custom Scene Fields](#custom-scene-fields) you've defined for the project. Click the **+** button on the section header to create a new field on the fly, or the pencil button next to a field to edit / delete it.
 - **Snapshots** — save and restore point-in-time versions of the scene.
 - **Word count** — current vs. target with progress indicator.
 - **Setup/Payoff links** — see and manage which scenes set up or pay off this scene.
@@ -515,6 +517,7 @@ All views support filtering by:
 - **Characters** — filter by character presence
 - **Locations** — filter by location
 - **Tags** — filter by plotline/theme tags
+- **Custom Scene Fields** — every dropdown / multi-select [custom field](#custom-scene-fields) automatically gets its own chip group in the filter panel.
 - **Search text** — free-text search across titles and content
 
 ### Filter Chips
@@ -731,6 +734,46 @@ Create reusable templates for common scene types:
 4. When creating new scenes, choose a template to pre-fill fields.
 
 Templates are stored in settings and available across all projects.
+
+---
+
+## Custom Scene Fields
+
+Define your own metadata fields on every scene — Story Grid functions, John Truby aspects, beat-sheet labels, genre conventions, "Five Commandments" tags, anything your method needs. This avoids overloading the title or subtitle with structural information.
+
+### Creating a field
+
+Two ways:
+
+1. **Settings → Custom Scene Fields → Add Scene Field.**
+2. **Inspector → Custom Fields section → click the + button** (creates the field and immediately lets you fill in a value).
+
+You'll be prompted for:
+
+- **Label** — what shows in the Inspector and on cards (e.g. `SG Function`, `JT Aspect`, `Obligatory Scene`).
+- **Type** — `text`, `textarea`, `dropdown`, or `multi-select`.
+- **Options** — for dropdown / multi-select: the choices the user can pick (e.g. `Inciting Incident, Turning Point, Crisis, Climax, Resolution`).
+- **Placeholder / hint text** (optional).
+
+Fields can be edited or deleted anytime from either location (pencil / trash icons).
+
+### Where the values appear
+
+- **Inspector** — every scene gets a "Custom Fields" section listing all defined scene fields, with the appropriate input control (text box, textarea, dropdown, multi-select pills).
+- **Board → Group by** — `dropdown` and `multi-select` fields appear as grouping options in the Kanban board. Multi-select scenes appear in every matching column. Empty values land in `(empty)`.
+- **Filter panel** — `dropdown` and `multi-select` fields each get their own chip group; toggling chips filters scenes by value.
+- **Scene cards** — up to three populated dropdown / multi-select values appear as small badges below the card. Hovering any scene card shows a full summary of every populated custom field, regardless of type.
+
+### Where it's stored
+
+- **Values** live in the scene's frontmatter under `universalFields:`, keyed by template id. Safe to read or edit by hand.
+- **Templates** live in `<project>/System/field-templates.json` along with character custom fields, so they sync with the rest of the project.
+
+### Tips
+
+- Combine with a dedicated plotline tag (e.g. `love-genre`) to also get colour-coded visibility for genre conventions on the timeline / Kanban.
+- Keep dropdown options short — long values are ellipsised on the card badges (the full value is still visible in the hover tooltip and Inspector).
+- Multi-select is the right choice for fields where a single scene can play multiple structural roles (e.g. a scene that is both a *Turning Point* and an *Obligatory Scene*).
 
 ---
 
@@ -1518,6 +1561,36 @@ Open the **Series Management Modal** from **Settings → Project Management → 
 - The project selector toolbar shows a **series badge** (library icon + series name) when the active project belongs to a series.
 - **Settings → Project Management** provides buttons for Rename book, Create series, and Manage series — everything is accessible without the command palette.
 
+### Mixing Book-Only and Series-Shared Entities
+
+By default every character, world, and location in a series Codex is visible to every book. From v1.9.5 you can fine-tune this per entity:
+
+- **Right-click a character card** in the Characters view, or a world / location row in the Locations view, to open the context menu.
+- **Promote to series (shared)** — moves the file from the book's local `Codex/Characters` (or `Codex/Locations`) folder into the shared series-level folder.
+- **Demote to project (book-only)** — moves a series-shared entity back into the current book's local Codex folder. Other books in the series no longer see it.
+- **Restrict to “<book>” only** — keeps the file in the shared Codex but adds a `books:` frontmatter list so the entity is treated as appearing only in the listed book.
+- **Add to / Remove from “<book>”** — toggle membership for the active book.
+- **Share across all books** — clears the `books:` list, restoring “appears everywhere” behavior.
+
+The **All books / Showing: <book>** chip in the Characters and Locations search rows hides entries that aren't in the current book. Worlds remain visible if any of their child locations are in the current book, so you can still drill in.
+
+Wikilinks reference characters and locations **by name** (not by file path), so promoting / demoting never breaks references in scenes.
+
+#### `books:` frontmatter format
+
+```yaml
+---
+type: character
+name: Aria Vance
+books:
+  - The Sunken City
+  - The Iron Crown
+---
+```
+
+- Missing or empty `books:` → entity appears in every book in the series (default).
+- Non-empty `books:` → entity appears only in the listed books.
+
 ### Pre-flight Checks
 Before any migration, StoryLine verifies that Obsidian's **"Automatically update internal links"** setting is enabled. This ensures all `[[wikilinks]]` remain valid when files move between folders. If the setting is off, the migration is blocked with a notice.
 
@@ -1540,7 +1613,7 @@ StoryLine/
       System/
 ```
 
-> **Rule:** A solo book has a local Codex. A series book uses the series Codex. A book never has both.
+> **Rule:** A solo book has a local Codex. A series book uses the series Codex by default. From v1.9.5, series books may additionally keep book-only entities in their per-project `Codex/Characters` and `Codex/Locations` folders — use the right-click **Promote / Demote** actions to move entities between scopes.
 
 ---
 

@@ -5,6 +5,7 @@ import type SceneCardsPlugin from '../main';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
 import type { LinkScanResult } from '../services/LinkScanner';
 import type { SceneManager } from '../services/SceneManager';
+import { formatActChapterPrefix } from '../utils/actChapter';
 
 /**
  * Renders a single scene card element
@@ -166,6 +167,9 @@ export class SceneCardComponent {
                     badge.setAttribute('title', `${novelCount} link${novelCount > 1 ? 's' : ''} detected in text`);
                 }
             }
+
+            // Custom (universal) scene field badges + hover summary
+            this.renderCustomFieldBadges(scene, card);
         }
 
         // Intercept internal-link clicks before card-level handlers
@@ -213,6 +217,46 @@ export class SceneCardComponent {
         }
 
         return card;
+    }
+
+    /**
+     * Render badges for scene custom (universal) field values and a hover
+     * tooltip summarizing all of them. Quietly does nothing if no values exist.
+     */
+    private renderCustomFieldBadges(scene: Scene, card: HTMLElement): void {
+        if (!scene.universalFields) return;
+        const tpls = this.plugin.fieldTemplates?.getAll()
+            .filter(t => (t.category || 'character') === 'scene') ?? [];
+        if (tpls.length === 0) return;
+
+        const summary: string[] = [];
+        let badgesEl: HTMLElement | null = null;
+        let shown = 0;
+        const MAX_BADGES = 3;
+
+        for (const tpl of tpls) {
+            const raw = scene.universalFields[tpl.id];
+            if (raw === undefined || raw === null) continue;
+            const display = Array.isArray(raw) ? raw.join(', ') : String(raw);
+            if (!display.trim()) continue;
+            summary.push(`${tpl.label}: ${display}`);
+
+            if (shown < MAX_BADGES && (tpl.type === 'dropdown' || tpl.type === 'multi-select')) {
+                if (!badgesEl) badgesEl = card.createDiv('scene-card-custom-fields');
+                const text = display.length > 24 ? display.slice(0, 23) + '…' : display;
+                const badge = badgesEl.createSpan({ cls: 'scene-card-custom-badge' });
+                badge.createSpan({ cls: 'scene-card-custom-badge-label', text: `${tpl.label}: ` });
+                badge.createSpan({ text });
+                badge.setAttribute('title', `${tpl.label}: ${display}`);
+                shown++;
+            }
+        }
+
+        if (summary.length > 0) {
+            const existing = card.getAttribute('title') || '';
+            const merged = existing ? `${existing}\n\n${summary.join('\n')}` : summary.join('\n');
+            card.setAttribute('title', merged);
+        }
     }
 
     /**
@@ -384,8 +428,13 @@ export class SceneCardComponent {
     }
 
     private formatSequence(scene: Scene): string {
-        const act = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
-        const chapter = scene.chapter !== undefined ? String(scene.chapter).padStart(2, '0') : null;
+        // formatActChapterPrefix pads pure-numeric values to 2 digits and
+        // emits string values verbatim (e.g. "1.1", "Prologue"), so the
+        // sequence badge stays meaningful for hierarchical / named acts.
+        const act = formatActChapterPrefix(scene.act, '??');
+        const chapter = scene.chapter !== undefined
+            ? formatActChapterPrefix(scene.chapter, '??')
+            : null;
         const seq = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
         return chapter ? `${act}-${chapter}-${seq}` : `${act}-${seq}`;
     }

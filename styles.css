@@ -6899,6 +6899,38 @@ body.theme-dark {
 }
 
 /* ═══════════════════════════════════════════════════════
+   Scene Card — Custom (universal) field badges
+   ═══════════════════════════════════════════════════════ */
+
+.scene-card-custom-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.scene-card-custom-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 0.72em;
+    color: var(--text-normal);
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.scene-card-custom-badge-label {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════
    Story Graph
    ═══════════════════════════════════════════════════════ */
 
@@ -8411,6 +8443,23 @@ body.theme-dark {
     background: var(--background-primary);
     color: var(--text-normal);
     cursor: pointer;
+}
+
+/* Series book filter toggle (CharacterView, LocationView) */
+.codex-book-filter {
+    font-size: 12px;
+    padding: 3px 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 999px;
+    background: var(--background-primary);
+    color: var(--text-muted);
+    cursor: pointer;
+    margin-left: auto;
+}
+.codex-book-filter.active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
 }
 
 .codex-entry-list {

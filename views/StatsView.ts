@@ -563,7 +563,11 @@ export class StatsView extends ItemView {
         }
 
         // ── Act balance ──
-        const actEntries = Object.entries(stats.actCounts).sort(([a], [b]) => a.localeCompare(b));
+        // Numeric-aware compare so "Act 2" sorts before "Act 10" and
+        // hierarchical labels like "Act 1.1" / "Act 1.10" stay in order.
+        const actEntries = Object.entries(stats.actCounts).sort(([a], [b]) =>
+            a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+        );
         if (actEntries.length > 0) {
             const actSec = parent.createDiv('stats-subsection');
             actSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Act Balance' });
@@ -692,11 +696,10 @@ export class StatsView extends ItemView {
         for (const s of allScenes) {
             if (s.chapter !== undefined) chapterSet.add(String(s.chapter));
         }
-        const chapters = Array.from(chapterSet).sort((a, b) => {
-            const na = parseInt(a), nb = parseInt(b);
-            if (!isNaN(na) && !isNaN(nb)) return na - nb;
-            return a.localeCompare(b);
-        });
+        const chapters = Array.from(chapterSet).sort((a, b) =>
+            // Numeric-aware string compare handles "2" vs "10" and "1.1" vs "1.10".
+            a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+        );
         if (chapters.length < 2) return;
 
         // Build character × chapter matrix (includes LinkScanner detections)
@@ -924,7 +927,9 @@ export class StatsView extends ItemView {
             actWordMap[k].total += s.wordcount || 0;
             actWordMap[k].count += 1;
         }
-        const actEntries = Object.entries(actWordMap).sort(([a], [b]) => a.localeCompare(b));
+        const actEntries = Object.entries(actWordMap).sort(([a], [b]) =>
+            a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+        );
         const maxAvg = Math.max(...actEntries.map(([, v]) => v.count > 0 ? v.total / v.count : 0), 1);
 
         const avgTbl = avgSec.createDiv('pacing-avg-table');
@@ -1039,7 +1044,9 @@ export class StatsView extends ItemView {
         sec.createEl('h5', { cls: 'stats-subsection-title', text: 'Dialogue vs Narrative' });
         sec.createEl('p', { text: `Overall: ${overallPct}% dialogue, ${100 - overallPct}% narrative` });
 
-        for (const [act, data] of Object.entries(actDlg).sort(([a], [b]) => a.localeCompare(b))) {
+        for (const [act, data] of Object.entries(actDlg).sort(([a], [b]) =>
+            a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }),
+        )) {
             const pct = data.total > 0 ? Math.round((data.dialogue / data.total) * 100) : 0;
             const row = sec.createDiv('stats-row');
             row.createSpan({ text: `${act}: ${pct}% dialogue` });

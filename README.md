@@ -157,6 +157,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 ## Key Features
 
 - **Scrivener Import** — Import a .scriv project (Scrivener 2 & 3) as a new StoryLine project. Attempts to convert scenes, characters, locations, and research. Results may vary — review imported data carefully. Access via Settings → Import or the command palette.
+- **Custom Scene Fields** — Define your own metadata fields on every scene (Story Grid functions, Truby aspects, beat-sheet labels, genre conventions, anything your method needs). Edit values in the Inspector, group the Kanban board by them, filter scenes by them, and see them as badges on scene cards. Managed under Settings → Custom Scene Fields.
 - **Codex Hub** — A unified hub for Characters, Locations, and your own custom categories (Props, Factions, Magic Systems — whatever you need). Each category gets its own folder, search, and detail pages. Two-way change detection flags scenes that reference modified codex entries.
 - **Codex Linking** — Associate Codex entries with scenes via tag-pill inputs in the Inspector and right-click assignment from detected links. Codex categories also appear as column sources in Plot Grid sync.
 - **Scene Colors** — Assign a custom background tint to any scene card from the right-click menu in Board, Timeline, or Navigator views.
@@ -182,7 +183,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Story Navigator** — Compact sidebar panel with search, sort, plotline filter, act grouping, pinned scenes, progress bar, and a **Scene Details** button. Auto-opens on project load.
 - **Scene Details Sidebar** — Standalone Inspector panel that follows the active editor file. Edit scene metadata side-by-side with your writing.
 - **Research Sidebar** — Right-sidebar panel for storing research notes, web clips, images, and open questions. Search, tag filter, type filter, and auto-suggest mode that surfaces relevant posts based on the active scene's metadata.
-- **Series Mode** — Group multiple books into a series with a shared Codex. Characters, locations, and custom categories are stored once and shared across all books.
+- **Series Mode** — Group multiple books into a series with a shared Codex. Characters, locations, and custom categories are stored once and shared across all books. From v1.9.5 you can also mark individual entities as **book-only** (right-click → Demote / Restrict to <book>) so each book can have its own minor characters and locations on top of the shared cast.
 - **Additional Source Folders** *(Experimental)* — Point StoryLine at any vault folder and it will scan all `.md` files, routing each to the correct manager by its frontmatter `type:` field. Supports any folder structure.
 - **Color Coding** — Color by status, POV, emotion, act, or tag. **16 built-in color schemes** (4 Catppuccin + 12 mood-based palettes) or custom. Per-tag overrides from Plotlines view or Settings. HSL fine-tuning sliders for plotline and sticky note palettes. Dark/light mode aware.
 - **Per-Project Colors** — Optionally save color scheme, HSL adjustments, and sticky note theme per project so each book can have its own look.

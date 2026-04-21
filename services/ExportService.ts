@@ -2,6 +2,7 @@ import { App, Notice, TFile } from 'obsidian';
 import { Scene, STATUS_CONFIG, SceneStatus, resolveStatusCfg } from '../models/Scene';
 import { StoryLineProject } from '../models/StoryLineProject';
 import { SceneManager } from './SceneManager';
+import { compareActChapter } from '../utils/actChapter';
 import { CharacterManager } from './CharacterManager';
 import { LocationManager } from './LocationManager';
 import { Character, relationDisplayLabel } from '../models/Character';
@@ -86,23 +87,14 @@ export class ExportService {
             { field: 'sequence', direction: 'asc' }
         )];
         scenes.sort((a, b) => {
-            // Primary: act (scenes without act sort after those with one)
-            const aAct = a.act != null ? Number(a.act) : NaN;
-            const bAct = b.act != null ? Number(b.act) : NaN;
-            const aHasAct = !isNaN(aAct);
-            const bHasAct = !isNaN(bAct);
-            if (aHasAct !== bHasAct) return aHasAct ? -1 : 1;
-            if (aHasAct && bHasAct && aAct !== bAct) return aAct - bAct;
-
-            // Secondary: chapter
-            const aCh = a.chapter != null ? Number(a.chapter) : NaN;
-            const bCh = b.chapter != null ? Number(b.chapter) : NaN;
-            const aHasCh = !isNaN(aCh);
-            const bHasCh = !isNaN(bCh);
-            if (aHasCh !== bHasCh) return aHasCh ? -1 : 1;
-            if (aHasCh && bHasCh && aCh !== bCh) return aCh - bCh;
-
-            // Tertiary: sequence
+            // Primary: act, then chapter, then sequence.
+            // compareActChapter handles missing values (sort last), pure-numeric
+            // values (compare numerically so 2 < 10), and mixed/string values
+            // (e.g. "1.1", "Prologue") with a numeric-aware locale compare.
+            const actCmp = compareActChapter(a.act, b.act);
+            if (actCmp !== 0) return actCmp;
+            const chCmp = compareActChapter(a.chapter, b.chapter);
+            if (chCmp !== 0) return chCmp;
             return (a.sequence ?? 9999) - (b.sequence ?? 9999);
         });
         return scenes;

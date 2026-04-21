@@ -10,6 +10,7 @@ import type SceneCardsPlugin from '../main';
 import { MANUSCRIPT_VIEW_TYPE, NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE } from '../constants';
 import { applyMobileClass, isMobile, isPhone, isTablet } from '../components/MobileAdapter';
 import { buildFormattingToolbar } from '../components/FormattingToolbar';
+import { compareActChapter } from '../utils/actChapter';
 
 /**
  * Manuscript View — Scrivenings-style continuous document view.
@@ -290,14 +291,12 @@ export class ManuscriptView extends ItemView {
             const sortField = this.currentSort?.field;
             if (!sortField || sortField === 'sequence' || sortField === 'status') {
                 scenes.sort((a, b) => {
-                    if (a.act != null && b.act != null) {
-                        const actCmp = Number(a.act) - Number(b.act);
-                        if (actCmp !== 0) return actCmp;
-                    }
-                    if (a.chapter != null && b.chapter != null) {
-                        const chCmp = Number(a.chapter) - Number(b.chapter);
-                        if (chCmp !== 0) return chCmp;
-                    }
+                    // Numeric-aware compare so 10 sorts after 2 and "1.1" / "1.10"
+                    // / "2.1" stay in order.  Missing values sort last.
+                    const actCmp = compareActChapter(a.act, b.act);
+                    if (actCmp !== 0) return actCmp;
+                    const chCmp = compareActChapter(a.chapter, b.chapter);
+                    if (chCmp !== 0) return chCmp;
                     return (a.sequence ?? 9999) - (b.sequence ?? 9999);
                 });
             }

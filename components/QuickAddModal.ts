@@ -4,6 +4,7 @@ import { SceneManager } from '../services/SceneManager';
 import { LocationManager } from '../services/LocationManager';
 import type SceneCardsPlugin from '../main';
 import { renderAutocompleteInput, renderTagPillInput } from './InlineSuggest';
+import { isPureNumericActChapter, nextNumericActChapter } from '../utils/actChapter';
 
 /**
  * Modal for quickly creating new scenes
@@ -75,18 +76,30 @@ export class QuickAddModal extends Modal {
         actGroup.createEl('label', { text: 'Act', cls: 'story-line-field-label' });
         const actSelect = actGroup.createEl('select', { cls: 'dropdown story-line-field-input' });
         actSelect.createEl('option', { text: 'None', value: '' });
-        // Dynamic act count: offer at least 5, or up to max existing act + 2
-        const maxExistingAct = this.sceneManager.getAllScenes()
-            .reduce((mx, s) => Math.max(mx, Number(s.act) || 0), 0);
+        // Dynamic act count: offer at least 5, or up to max existing numeric act + 2.
+        // Non-numeric acts (e.g. "1.1", "Prologue") are skipped so they don't
+        // collapse the count via NaN poisoning. To assign a custom string-named
+        // act, set it from the Inspector (free-text input).
+        const maxExistingAct = nextNumericActChapter(
+            this.sceneManager.getAllScenes().map(s => s.act),
+        ) - 1;
         const actCount = Math.max(5, maxExistingAct + 2);
         for (let i = 1; i <= actCount; i++) {
             actSelect.createEl('option', { text: `Act ${i}`, value: String(i) });
         }
         if (this.result.act != null) {
+            // If the prefilled act isn't in the dropdown (e.g. a string act),
+            // append it as a one-off option so the user sees it preserved.
+            if (!isPureNumericActChapter(this.result.act)) {
+                actSelect.createEl('option', { text: `Act ${this.result.act}`, value: String(this.result.act) });
+            }
             actSelect.value = String(this.result.act);
         }
         actSelect.addEventListener('change', () => {
-            this.result.act = actSelect.value ? Number(actSelect.value) : undefined;
+            const raw = actSelect.value;
+            if (!raw) { this.result.act = undefined; return; }
+            // Preserve string acts; coerce pure integers to number.
+            this.result.act = isPureNumericActChapter(raw) ? Number(raw) : raw;
         });
 
         const chapterGroup = actChapterRow.createDiv({ cls: 'story-line-field-group' });

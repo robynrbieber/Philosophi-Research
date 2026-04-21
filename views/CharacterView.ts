@@ -13,6 +13,7 @@ import { isMobile, DESKTOP_ONLY_CHARACTER_MODES, applyMobileClass } from '../com
 import { RenameConfirmModal } from '../components/RenameConfirmModal';
 import { AddFieldModal } from '../components/AddFieldModal';
 import type { UniversalFieldTemplate } from '../services/FieldTemplateService';
+import { formatActChapterPrefix } from '../utils/actChapter';
 
 import type SceneCardsPlugin from '../main';
 
@@ -57,6 +58,12 @@ export class CharacterView extends ItemView {
     private searchText: string = '';
     /** Current sort mode for the overview grid */
     private sortBy: 'name' | 'modified' | 'created' | 'role' = 'name';
+    /**
+     * When true and the active project belongs to a series, the overview
+     * grid hides characters whose `books[]` field excludes the current
+     * book (i.e. is non-empty and does not contain the current title).
+     */
+    private bookFilterActive: boolean = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -238,6 +245,24 @@ export class CharacterView extends ItemView {
             this.renderCharacterOverview(container);
         });
 
+        // Series book filter — only meaningful when the active project belongs
+        // to a series and characters are shared at series level.
+        const currentBook = this.plugin.sceneManager.getCurrentBookTitle();
+        const inSeries = !!this.plugin.sceneManager.getSeriesFolder();
+        if (inSeries && currentBook) {
+            const filterToggle = searchRow.createEl('button', {
+                cls: `codex-book-filter${this.bookFilterActive ? ' active' : ''}`,
+                text: this.bookFilterActive ? `Showing: ${currentBook}` : 'All books',
+            });
+            attachTooltip(filterToggle, this.bookFilterActive
+                ? `Click to show all series characters`
+                : `Click to hide characters not in “${currentBook}”`);
+            filterToggle.addEventListener('click', () => {
+                this.bookFilterActive = !this.bookFilterActive;
+                this.renderCharacterOverview(container);
+            });
+        }
+
         const q = this.searchText.toLowerCase();
 
         let fileCharacters = this.characterManager.getAllCharacters();
@@ -262,6 +287,17 @@ export class CharacterView extends ItemView {
         // Apply search filter to file-backed characters
         if (q) {
             fileCharacters = fileCharacters.filter(c => c.name.toLowerCase().includes(q));
+        }
+
+        // Apply book-membership filter (series mode only).
+        // A character is shown when its `books` field is missing/empty
+        // (“appears in every book”) or contains the current book title.
+        if (this.bookFilterActive && currentBook) {
+            const lower = currentBook.toLowerCase();
+            fileCharacters = fileCharacters.filter(c => {
+                if (!c.books || c.books.length === 0) return true;
+                return c.books.some(b => b.toLowerCase() === lower);
+            });
         }
 
         // Apply sort
@@ -491,6 +527,13 @@ export class CharacterView extends ItemView {
         card.addEventListener('click', () => {
             this.selectedCharacter = char.filePath;
             this.renderView(this.rootContainer!);
+        });
+
+        // Right-click context menu — promote / demote between project and
+        // series, and toggle book membership (series mode only).
+        card.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.showCharacterContextMenu(char, e);
         });
     }
 
@@ -1958,7 +2001,9 @@ export class CharacterView extends ItemView {
                 const item = listSection.createDiv('character-side-scene-item');
                 const isPov = scene.pov && charAliases.has(scene.pov.toLowerCase());
 
-                const act = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
+                // Use shared formatter so string acts (e.g. "1.1", "Prologue")
+                // are shown verbatim and pure-numeric acts are zero-padded.
+                const act = formatActChapterPrefix(scene.act, '??');
                 const seq = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
 
                 item.createSpan({ cls: 'scene-id', text: `[${act}-${seq}]` });
@@ -2537,6 +2582,104 @@ export class CharacterView extends ItemView {
         await this.characterManager.loadCharacters(this.sceneManager.getCharacterFolder());
         if (this.rootContainer) {
             this.renderView(this.rootContainer);
+        }
+    }
+
+    /* ───── Character card context menu (promote/demote, book membership) ───── */
+
+    private showCharacterContextMenu(char: Character, e: MouseEvent): void {
+        const menu = new obsidian.Menu();
+        const sm = this.plugin.sceneManager;
+        const seriesFolder = sm.getSeriesFolder();
+        const seriesCharFolder = seriesFolder
+            ? `${seriesFolder}/Codex/Characters`
+            : null;
+        const projectCharFolder = sm.getProjectLocalCharacterFolder();
+        const currentBook = sm.getCurrentBookTitle();
+
+        menu.addItem(item =>
+            item.setTitle(char.name).setDisabled(true));
+        menu.addSeparator();
+
+        // Promote / Demote between project and series folder
+        if (seriesFolder && seriesCharFolder && projectCharFolder) {
+            const inSeries = char.filePath.startsWith(seriesCharFolder + '/');
+            if (inSeries) {
+                menu.addItem(item =>
+                    item.setTitle('Demote to project (book-only)')
+                        .setIcon('arrow-down-from-line')
+                        .onClick(() => this.demoteCharacterToProject(char, projectCharFolder)));
+            } else {
+                menu.addItem(item =>
+                    item.setTitle('Promote to series (shared)')
+                        .setIcon('arrow-up-from-line')
+                        .onClick(() => this.promoteCharacterToSeries(char, seriesCharFolder)));
+            }
+            menu.addSeparator();
+        }
+
+        // Toggle current-book membership (only meaningful in series mode)
+        if (seriesFolder && currentBook) {
+            const lower = currentBook.toLowerCase();
+            const inBook = !char.books || char.books.length === 0
+                || char.books.some(b => b.toLowerCase() === lower);
+            const allBooks = !char.books || char.books.length === 0;
+
+            if (allBooks) {
+                menu.addItem(item =>
+                    item.setTitle(`Restrict to "${currentBook}" only`)
+                        .setIcon('book-marked')
+                        .onClick(() => this.setCharacterBooks(char, [currentBook])));
+            } else if (inBook) {
+                menu.addItem(item =>
+                    item.setTitle(`Remove from "${currentBook}"`)
+                        .setIcon('book-x')
+                        .onClick(() => this.setCharacterBooks(char,
+                            (char.books || []).filter(b => b.toLowerCase() !== lower))));
+            } else {
+                menu.addItem(item =>
+                    item.setTitle(`Add to "${currentBook}"`)
+                        .setIcon('book-plus')
+                        .onClick(() => this.setCharacterBooks(char,
+                            [...(char.books || []), currentBook])));
+            }
+            menu.addItem(item =>
+                item.setTitle('Share across all books')
+                    .setIcon('books')
+                    .setDisabled(allBooks)
+                    .onClick(() => this.setCharacterBooks(char, [])));
+        }
+
+        menu.showAtMouseEvent(e);
+    }
+
+    private async promoteCharacterToSeries(char: Character, seriesCharFolder: string): Promise<void> {
+        try {
+            await this.characterManager.moveCharacter(char, seriesCharFolder);
+            new Notice(`"${char.name}" promoted to series`);
+            await this.plugin.refreshOpenViews();
+        } catch (err) {
+            new Notice(`Could not promote: ${(err as Error).message}`);
+        }
+    }
+
+    private async demoteCharacterToProject(char: Character, projectCharFolder: string): Promise<void> {
+        try {
+            await this.characterManager.moveCharacter(char, projectCharFolder);
+            new Notice(`"${char.name}" demoted to project`);
+            await this.plugin.refreshOpenViews();
+        } catch (err) {
+            new Notice(`Could not demote: ${(err as Error).message}`);
+        }
+    }
+
+    private async setCharacterBooks(char: Character, books: string[]): Promise<void> {
+        try {
+            const updated: Character = { ...char, books: books.length ? books : undefined };
+            await this.characterManager.saveCharacter(updated);
+            await this.plugin.refreshOpenViews();
+        } catch (err) {
+            new Notice(`Could not update book membership: ${(err as Error).message}`);
         }
     }
 

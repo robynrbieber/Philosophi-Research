@@ -196,10 +196,7 @@ export default class SceneCardsPlugin extends Plugin {
             await this.viewSnapshotService.loadActiveState();
             // Load locations and characters for the active project
             try {
-                const locFolder = this.sceneManager.getLocationFolder();
-                if (locFolder) await this.locationManager.loadAll(locFolder);
-                const charFolder = this.sceneManager.getCharacterFolder();
-                if (charFolder) await this.characterManager.loadCharacters(charFolder);
+                await this.loadActiveProjectEntities();
             } catch { /* not set yet */ }
             // Scan extra source folders and route by frontmatter type
             try {
@@ -1332,6 +1329,63 @@ export default class SceneCardsPlugin extends Plugin {
     }
 
     /**
+     * Load characters and locations for the active project.
+     *
+     * When the project belongs to a series, `getCharacterFolder()` /
+     * `getLocationFolder()` already redirect to the shared series-level
+     * Codex folder. After loading from there we additionally scan the
+     * per-project `Codex/Characters/` and `Codex/Locations/` folders so
+     * book-only characters and locations can coexist with series-shared
+     * ones. The series scan wins on file-path collisions because
+     * `addFile()` skips paths that are already loaded.
+     */
+    async loadActiveProjectEntities(): Promise<void> {
+        const adapter = this.app.vault.adapter;
+
+        const locFolder = this.sceneManager.getLocationFolder();
+        if (locFolder) await this.locationManager.loadAll(locFolder);
+        const charFolder = this.sceneManager.getCharacterFolder();
+        if (charFolder) await this.characterManager.loadCharacters(charFolder);
+
+        // Series mode: also scan the per-project Codex folder for book-only
+        // characters and locations.
+        if (!this.sceneManager.getSeriesFolder()) return;
+
+        const localCharFolder = this.sceneManager.getProjectLocalCharacterFolder();
+        if (localCharFolder && localCharFolder !== charFolder && await adapter.exists(localCharFolder)) {
+            const listing = await adapter.list(localCharFolder);
+            for (const f of listing.files) {
+                if (!f.endsWith('.md')) continue;
+                try {
+                    const fp = normalizePath(f);
+                    const content = await adapter.read(fp);
+                    this.characterManager.addFile(content, fp);
+                } catch { /* skip unreadable */ }
+            }
+        }
+
+        const localLocFolder = this.sceneManager.getProjectLocalLocationFolder();
+        if (localLocFolder && localLocFolder !== locFolder && await adapter.exists(localLocFolder)) {
+            const scanLoc = async (folder: string): Promise<void> => {
+                if (!await adapter.exists(folder)) return;
+                const listing = await adapter.list(folder);
+                for (const f of listing.files) {
+                    if (!f.endsWith('.md')) continue;
+                    try {
+                        const fp = normalizePath(f);
+                        const content = await adapter.read(fp);
+                        this.locationManager.addFile(content, fp);
+                    } catch { /* skip unreadable */ }
+                }
+                for (const sub of listing.folders) {
+                    await scanLoc(normalizePath(sub));
+                }
+            };
+            await scanLoc(localLocFolder);
+        }
+    }
+
+    /**
      * Recursively scan user-configured extra folders and route each .md
      * file to the appropriate manager based on its frontmatter type: field.
      */
@@ -1428,10 +1482,7 @@ export default class SceneCardsPlugin extends Plugin {
     async refreshOpenViews(): Promise<void> {
         // Keep LocationManager, CharacterManager, and CodexManager in sync
         try {
-            const locFolder = this.sceneManager.getLocationFolder();
-            if (locFolder) await this.locationManager.loadAll(locFolder);
-            const charFolder = this.sceneManager.getCharacterFolder();
-            if (charFolder) await this.characterManager.loadCharacters(charFolder);
+            await this.loadActiveProjectEntities();
             await this.scanExtraFolders();
             const codexFolder = this.sceneManager.getCodexFolder();
             if (codexFolder) {

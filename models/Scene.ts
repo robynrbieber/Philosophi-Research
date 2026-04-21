@@ -184,6 +184,8 @@ export interface SceneFilter {
     locations?: string[];
     tags?: string[];
     searchText?: string;
+    /** Filter by custom (universal) field values — keyed by template id → list of accepted values */
+    customFields?: Record<string, string[]>;
 }
 
 /**
@@ -305,9 +307,10 @@ What disrupts the status quo?`,
 ];
 
 /**
- * Group-by mode for board view columns
+ * Group-by mode for board view columns.
+ * Built-in values plus opaque custom-field group keys of the form `cf:<templateId>`.
  */
-export type BoardGroupBy = 'act' | 'chapter' | 'status' | 'pov';
+export type BoardGroupBy = 'act' | 'chapter' | 'status' | 'pov' | (string & {});
 
 // ── Beat Sheet Templates ─────────────────────────────────
 

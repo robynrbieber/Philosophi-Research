@@ -5,6 +5,8 @@ import type SceneCardsPlugin from './main';
 import { HELP_VIEW_TYPE } from './constants';
 import { SLDocxSettings, SL_DEFAULT_DOCX_SETTINGS } from './services/DocxConverter';
 import { SLPdfSettings, SL_DEFAULT_PDF_SETTINGS } from './services/PdfConverter';
+import { AddFieldModal } from './components/AddFieldModal';
+import type { UniversalFieldTemplate } from './services/FieldTemplateService';
 
 // ═══════════════════════════════════════════════════════
 //  COLOR PALETTES — Catppuccin + Mood-based
@@ -1667,6 +1669,39 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 }));
 
         // ═══════════════════════════════════════════
+        //  Custom Scene Fields
+        // ═══════════════════════════════════════════
+        containerEl.createEl('h2', { text: 'Custom Scene Fields' });
+        containerEl.createEl('p', {
+            text: 'Define your own metadata fields that appear on every scene\u2019s Inspector. Useful for Story Grid functions, Truby aspects, beat-sheet labels, genre conventions, and any other scene tagging your method requires. Dropdown and multi-select fields can also be used to filter and group scenes on the Board.',
+            cls: 'setting-item-description',
+        });
+
+        const sceneFieldListEl = containerEl.createDiv('story-line-scene-fields-list');
+        this.renderSceneCustomFieldList(sceneFieldListEl);
+
+        new Setting(containerEl)
+            .addButton(btn => btn
+                .setButtonText('Add Scene Field')
+                .setCta()
+                .onClick(() => {
+                    if (!this.plugin.fieldTemplates) return;
+                    const modal = new AddFieldModal(
+                        this.app,
+                        'Scene',
+                        null,
+                        async (template) => {
+                            template.category = 'scene';
+                            await this.plugin.fieldTemplates.add(template);
+                            this.renderSceneCustomFieldList(sceneFieldListEl);
+                        },
+                        undefined,
+                        ['Scene'],
+                    );
+                    modal.open();
+                }));
+
+        // ═══════════════════════════════════════════
         //  Export & Import
         // ═══════════════════════════════════════════
         containerEl.createEl('h2', { text: 'Export & Import' });
@@ -2216,6 +2251,68 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                         this.plugin.settings.sceneTemplates.splice(i, 1);
                         await this.plugin.saveSettings();
                         this.renderTemplateList(container);
+                    }));
+        }
+    }
+
+    /** Render the list of user-defined custom scene fields */
+    private renderSceneCustomFieldList(container: HTMLElement): void {
+        container.empty();
+        if (!this.plugin.fieldTemplates) {
+            container.createEl('p', {
+                text: 'Open a project first to manage scene custom fields (templates are stored per project).',
+                cls: 'setting-item-description',
+            });
+            return;
+        }
+
+        const sceneTpls: UniversalFieldTemplate[] = this.plugin.fieldTemplates.getAll()
+            .filter(t => (t.category || 'character') === 'scene')
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+        if (sceneTpls.length === 0) {
+            container.createEl('p', {
+                text: 'No custom scene fields yet. Click "Add Scene Field" to create one.',
+                cls: 'setting-item-description',
+            });
+            return;
+        }
+
+        for (const tpl of sceneTpls) {
+            const typeLabel = tpl.type === 'multi-select' ? 'Multi-select'
+                : tpl.type.charAt(0).toUpperCase() + tpl.type.slice(1);
+            const optionsHint = (tpl.type === 'dropdown' || tpl.type === 'multi-select') && tpl.options.length > 0
+                ? ` — ${tpl.options.length} option${tpl.options.length === 1 ? '' : 's'}`
+                : '';
+            new Setting(container)
+                .setName(tpl.label || '(unnamed)')
+                .setDesc(`${typeLabel}${optionsHint}`)
+                .addExtraButton(btn => btn
+                    .setIcon('pencil')
+                    .setTooltip('Edit field')
+                    .onClick(() => {
+                        const modal = new AddFieldModal(
+                            this.app,
+                            tpl.section,
+                            tpl,
+                            async (updated) => {
+                                await this.plugin.fieldTemplates.update(tpl.id, updated);
+                                this.renderSceneCustomFieldList(container);
+                            },
+                            async () => {
+                                await this.plugin.fieldTemplates.remove(tpl.id);
+                                this.renderSceneCustomFieldList(container);
+                            },
+                            ['Scene'],
+                        );
+                        modal.open();
+                    }))
+                .addExtraButton(btn => btn
+                    .setIcon('trash')
+                    .setTooltip('Delete field')
+                    .onClick(async () => {
+                        await this.plugin.fieldTemplates.remove(tpl.id);
+                        this.renderSceneCustomFieldList(container);
                     }));
         }
     }

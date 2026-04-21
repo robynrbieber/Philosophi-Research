@@ -272,6 +272,36 @@ export class CharacterManager {
         return updated;
     }
 
+    /**
+     * Move a character file to a different folder. Used by the Promote /
+     * Demote actions to shuttle a character between the per-project Codex/
+     * Characters folder and the series-level shared folder.
+     *
+     * Wikilinks in scenes reference characters by NAME (not file path), so
+     * no link cascade is needed — only the file location changes.
+     */
+    async moveCharacter(character: Character, targetFolderPath: string): Promise<Character> {
+        const oldPath = normalizePath(character.filePath);
+        await this.ensureFolder(targetFolderPath);
+        const basename = oldPath.split('/').pop() ?? `${character.name}.md`;
+        const newPath = normalizePath(`${targetFolderPath}/${basename}`);
+        if (newPath === oldPath) return character;
+
+        if (this.app.vault.getAbstractFileByPath(newPath)) {
+            throw new Error(`A character file already exists at: ${newPath}`);
+        }
+
+        const file = this.app.vault.getAbstractFileByPath(oldPath);
+        if (file instanceof TFile) {
+            await this.app.fileManager.renameFile(file, newPath);
+        }
+
+        this.characters.delete(oldPath);
+        const updated: Character = { ...character, filePath: newPath };
+        this.characters.set(newPath, updated);
+        return updated;
+    }
+
     // ── Private helpers ────────────────────────────────
 
     private async parseCharacterFile(file: TFile): Promise<Character | null> {
@@ -326,6 +356,7 @@ export class CharacterManager {
             expectedChange: fm.expectedChange,
             habits: fm.habits,
             props: fm.props,
+            books: this.parseStringList(fm.books),
             custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
             universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
             created: fm.created,
