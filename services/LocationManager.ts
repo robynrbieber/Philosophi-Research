@@ -3,6 +3,7 @@ import {
     StoryWorld, StoryLocation, WorldOrLocation,
     WORLD_FIELD_KEYS, LOCATION_FIELD_KEYS,
 } from '../models/Location';
+import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 
 /**
  * Manages world & location .md files — loading, saving, creating, deleting.
@@ -52,12 +53,16 @@ export class LocationManager {
         if (!await adapter.exists(folderPath)) return;
 
         const listing = await adapter.list(folderPath);
+        // Folder-based fallback (issue #74): files inside the Locations folder
+        // are accepted even if `type:` is missing or has been overwritten by
+        // a template. Default missing types to 'location' so the entry doesn't
+        // disappear from the Codex.
         for (const f of listing.files) {
             if (f.endsWith('.md')) {
                 try {
                     const filePath = normalizePath(f);
                     const content = await adapter.read(filePath);
-                    this.parseAndStoreContent(content, filePath);
+                    this.parseAndStoreContent(content, filePath, /*folderFallback*/ true);
                 } catch { /* file unreadable — skip */ }
             }
         }
@@ -66,57 +71,73 @@ export class LocationManager {
         }
     }
 
-    private parseAndStoreContent(content: string, filePath: string): void {
+    private parseAndStoreContent(content: string, filePath: string, folderFallback = false): void {
         const fm = this.extractFrontmatter(content);
-        if (!fm) return;
+        if (!fm && !folderFallback) return;
+        const safeFm = (fm ?? {}) as Record<string, any>;
+
+        // Resolve effective type — explicit `type:` wins; otherwise fall back
+        // to 'location' for Codex/Locations residents (issue #74).
+        let effectiveType = safeFm.type;
+        if (effectiveType !== 'world' && effectiveType !== 'location') {
+            if (!folderFallback) return;
+            effectiveType = 'location';
+        }
+        const fmEff: Record<string, any> = safeFm;
 
         const body = this.extractBody(content);
         const basename = filePath.split('/').pop()?.replace(/\.md$/i, '') ?? filePath;
 
-        if (fm.type === 'world') {
+        if (effectiveType === 'world') {
             const world: StoryWorld = {
                 filePath,
                 type: 'world',
-                name: fm.name || basename,
-                image: fm.image,
-                gallery: this.parseGallery(fm.gallery),
-                description: fm.description,
-                geography: fm.geography,
-                culture: fm.culture,
-                politics: fm.politics,
-                magicTechnology: fm.magicTechnology,
-                beliefs: fm.beliefs,
-                economy: fm.economy,
-                history: fm.history,
-                books: this.parseStringList(fm.books),
-                custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
-                universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
-                created: fm.created,
-                modified: fm.modified,
+                name: fmEff.name || basename,
+                image: fmEff.image,
+                gallery: this.parseGallery(fmEff.gallery),
+                description: fmEff.description,
+                geography: fmEff.geography,
+                culture: fmEff.culture,
+                politics: fmEff.politics,
+                magicTechnology: fmEff.magicTechnology,
+                beliefs: fmEff.beliefs,
+                economy: fmEff.economy,
+                history: fmEff.history,
+                books: this.parseStringList(fmEff.books),
+                custom: fmEff.custom && typeof fmEff.custom === 'object' ? fmEff.custom : undefined,
+                universalFields: hydrateUniversalFieldsFromTopLevel(
+                    fmEff,
+                    fmEff.universalFields && typeof fmEff.universalFields === 'object' ? fmEff.universalFields : undefined,
+                ),
+                created: fmEff.created,
+                modified: fmEff.modified,
                 notes: body || undefined,
             };
             this.worlds.set(filePath, world);
-        } else if (fm.type === 'location') {
+        } else if (effectiveType === 'location') {
             const loc: StoryLocation = {
                 filePath,
                 type: 'location',
-                name: fm.name || basename,
-                image: fm.image,
-                gallery: this.parseGallery(fm.gallery),
-                locationType: fm.locationType,
-                world: fm.world,
-                parent: fm.parent,
-                description: fm.description,
-                atmosphere: fm.atmosphere,
-                significance: fm.significance,
-                inhabitants: fm.inhabitants,
-                connectedLocations: fm.connectedLocations,
-                mapNotes: fm.mapNotes,
-                books: this.parseStringList(fm.books),
-                custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
-                universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
-                created: fm.created,
-                modified: fm.modified,
+                name: fmEff.name || basename,
+                image: fmEff.image,
+                gallery: this.parseGallery(fmEff.gallery),
+                locationType: fmEff.locationType,
+                world: fmEff.world,
+                parent: fmEff.parent,
+                description: fmEff.description,
+                atmosphere: fmEff.atmosphere,
+                significance: fmEff.significance,
+                inhabitants: fmEff.inhabitants,
+                connectedLocations: fmEff.connectedLocations,
+                mapNotes: fmEff.mapNotes,
+                books: this.parseStringList(fmEff.books),
+                custom: fmEff.custom && typeof fmEff.custom === 'object' ? fmEff.custom : undefined,
+                universalFields: hydrateUniversalFieldsFromTopLevel(
+                    fmEff,
+                    fmEff.universalFields && typeof fmEff.universalFields === 'object' ? fmEff.universalFields : undefined,
+                ),
+                created: fmEff.created,
+                modified: fmEff.modified,
                 notes: body || undefined,
             };
             this.locations.set(filePath, loc);
@@ -292,6 +313,8 @@ export class LocationManager {
         } else {
             delete fm.universalFields;
         }
+        // Issue #71 — mirror to top-level YAML keys for templates that opt in
+        mirrorUniversalFieldsToTopLevel(fm, item.universalFields);
 
         const finalBody = item.notes ?? body;
         const newContent = `---\n${stringifyYaml(fm)}---\n${finalBody ? '\n' + finalBody : ''}`;

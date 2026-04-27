@@ -5,7 +5,7 @@ import { SceneManager } from './SceneManager';
 import { compareActChapter } from '../utils/actChapter';
 import { CharacterManager } from './CharacterManager';
 import { LocationManager } from './LocationManager';
-import { Character, relationDisplayLabel } from '../models/Character';
+import { Character, relationDisplayLabel, getRoleDisplay } from '../models/Character';
 import { StoryWorld, StoryLocation } from '../models/Location';
 import { SLMarkdownToDocxConverter, SLDocxSettings, SLObsidianFontSettings } from './DocxConverter';
 import { SLPdfSettings } from './PdfConverter';
@@ -222,7 +222,7 @@ export class ExportService {
                 for (const char of characters) {
                     lines.push(`### ${char.name}`);
                     lines.push('');
-                    if (char.role) lines.push(`**Role:** ${char.role}  `);
+                    if (char.role) lines.push(`**Role:** ${getRoleDisplay(char.role)}  `);
                     if (char.age) lines.push(`**Age:** ${char.age}  `);
                     if (char.occupation) lines.push(`**Occupation:** ${char.occupation}  `);
                     if (char.personality) lines.push(`**Personality:** ${char.personality}  `);
@@ -354,7 +354,7 @@ export class ExportService {
                 })),
                 characters: this.characterManager.getAllCharacters().map(c => {
                     const obj: Record<string, any> = { name: c.name };
-                    if (c.role) obj.role = c.role;
+                    if (c.role) obj.role = Array.isArray(c.role) ? c.role : c.role;
                     if (c.age) obj.age = c.age;
                     if (c.occupation) obj.occupation = c.occupation;
                     if (c.personality) obj.personality = c.personality;
@@ -614,7 +614,7 @@ ${body}
                 ]);
                 for (const c of characters) {
                     rows.push([
-                        c.name, c.role || '', String(c.age ?? ''), c.occupation || '',
+                        c.name, getRoleDisplay(c.role), String(c.age ?? ''), c.occupation || '',
                         c.personality || '', c.formativeMemories || '', c.startingPoint || '',
                         c.goal || '', c.expectedChange || '',
                         c.internalMotivation || '', c.externalMotivation || '',

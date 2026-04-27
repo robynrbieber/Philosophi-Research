@@ -1,5 +1,6 @@
 import { Scene, SceneFilter, SortConfig, SortField, STATUS_ORDER, getStatusOrder } from '../models/Scene';
 import { compareActChapter } from '../utils/actChapter';
+import { compareActChapter } from '../utils/actChapter';
 
 /**
  * Read-only interface for accessing the scene store.
@@ -330,9 +331,11 @@ export class SceneQueryService {
             let cmp = 0;
             switch (sort.field) {
                 case 'sequence':
-                    // Multi-key sort: act → chapter → sequence (reading order)
-                    cmp = Number(a.act ?? 0) - Number(b.act ?? 0);
-                    if (cmp === 0) cmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+                    // Issue #76 — reading order: act → chapter → sequence,
+                    // using the string-aware comparator so non-numeric acts
+                    // like "Prologue" or "1.1" sort correctly.
+                    cmp = compareActChapter(a.act, b.act);
+                    if (cmp === 0) cmp = compareActChapter(a.chapter, b.chapter);
                     if (cmp === 0) cmp = (a.sequence ?? 9999) - (b.sequence ?? 9999);
                     break;
                 case 'chronologicalOrder':
@@ -347,12 +350,13 @@ export class SceneQueryService {
                 }
                     break;
                 case 'act':
-                    cmp = Number(a.act ?? 0) - Number(b.act ?? 0);
+                    // Issue #76 — string-aware
+                    cmp = compareActChapter(a.act, b.act);
                     break;
                 case 'chapter':
-                    // Multi-key sort: act → chapter → sequence (reading order)
-                    cmp = Number(a.act ?? 0) - Number(b.act ?? 0);
-                    if (cmp === 0) cmp = Number(a.chapter ?? 0) - Number(b.chapter ?? 0);
+                    // Issue #76 — reading order with string-aware comparator
+                    cmp = compareActChapter(a.act, b.act);
+                    if (cmp === 0) cmp = compareActChapter(a.chapter, b.chapter);
                     if (cmp === 0) cmp = (a.sequence ?? 9999) - (b.sequence ?? 9999);
                     break;
                 case 'wordcount':

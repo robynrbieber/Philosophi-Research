@@ -2,6 +2,8 @@ import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normal
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { SceneManager } from './services/SceneManager';
 import { registerCustomStatuses } from './models/Scene';
+import { setWriteSceneFieldsAsWikilinks, setWordcountExclusions } from './services/MetadataParser';
+import { setActiveTemplatesProvider, setTopLevelMirrorEnabled } from './services/FieldTemplateService';
 import {
     BOARD_VIEW_TYPE,
     TIMELINE_VIEW_TYPE,
@@ -92,6 +94,9 @@ export default class SceneCardsPlugin extends Plugin {
         this.linkScanner.setCodexManager(this.codexManager);
         this.cascadeRename = new CascadeRenameService(this.app, this.sceneManager, this.characterManager, this.locationManager);
         this.fieldTemplates = new FieldTemplateService(this.app, () => this.getProjectSystemFolder());
+        // Issue #71 — expose templates to parsers for top-level YAML mirroring
+        setActiveTemplatesProvider(() => this.fieldTemplates.getAll());
+        setTopLevelMirrorEnabled(this.settings.universalFieldsMirrorTopLevel !== false);
         this.seriesManager = new SeriesManager(this.app, this);
         this.researchManager = new ResearchManager(this.app, this);
 
@@ -659,6 +664,13 @@ export default class SceneCardsPlugin extends Plugin {
 
     async loadSettings(): Promise<void> {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        // Issue #73 — propagate the wikilink-writer toggle to MetadataParser
+        setWriteSceneFieldsAsWikilinks(this.settings.writeFieldsAsWikilinks !== false);
+        // Issue #78 — propagate wordcount-exclusion toggles to MetadataParser
+        setWordcountExclusions({
+            comments: this.settings.excludeCommentsFromWordcount !== false,
+            checklists: this.settings.excludeChecklistFromWordcount === true,
+        });
         // Snapshot the global colour settings so we can restore them when
         // switching to a project that has no per-project overrides.
         this._globalColorDefaults = {
@@ -687,6 +699,12 @@ export default class SceneCardsPlugin extends Plugin {
     async saveSettings(): Promise<void> {
         this.applyImageSizingVariables();
         registerCustomStatuses(this.settings.customStatuses || []);
+        setWriteSceneFieldsAsWikilinks(this.settings.writeFieldsAsWikilinks !== false);
+        setTopLevelMirrorEnabled(this.settings.universalFieldsMirrorTopLevel !== false);
+        setWordcountExclusions({
+            comments: this.settings.excludeCommentsFromWordcount !== false,
+            checklists: this.settings.excludeChecklistFromWordcount === true,
+        });
         const toSave: Record<string, any> = { ...this.settings };
         if (this._systemMigrationDone) {
             // Strip per-project data from the global data.json payload

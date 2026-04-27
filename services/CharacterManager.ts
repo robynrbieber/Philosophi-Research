@@ -1,5 +1,6 @@
 import { App, TFile, TFolder, parseYaml, stringifyYaml, normalizePath } from 'obsidian';
-import { Character, CharacterRelation, CHARACTER_FIELD_KEYS, LEGACY_RELATION_FIELDS_TO_CLEAN, normalizeCharacterRelations } from '../models/Character';
+import { Character, CharacterRelation, CHARACTER_FIELD_KEYS, LEGACY_RELATION_FIELDS_TO_CLEAN, normalizeCharacterRelations, normalizeRoleEntries } from '../models/Character';
+import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 
 /**
  * Manages character .md files — loading, saving, creating, and deleting
@@ -29,7 +30,11 @@ export class CharacterManager {
                 try {
                     const filePath = normalizePath(f);
                     const content = await adapter.read(filePath);
-                    const character = this.parseCharacterContent(content, filePath);
+                    // Folder-based fallback (issue #74): files inside the
+                    // Characters folder are accepted even if `type:` is
+                    // missing, so user-inserted templates don't make the
+                    // entry vanish from the Codex.
+                    const character = this.parseCharacterContent(content, filePath, /*folderFallback*/ true);
                     if (character) {
                         this.characters.set(filePath, character);
                     }
@@ -230,6 +235,8 @@ export class CharacterManager {
         } else {
             delete fm.universalFields;
         }
+        // Issue #71 — mirror to top-level YAML keys for templates that opt in
+        mirrorUniversalFieldsToTopLevel(fm, character.universalFields);
 
         // Write notes to body
         const finalBody = character.notes ?? body;
@@ -313,54 +320,64 @@ export class CharacterManager {
      * Parse raw markdown content as a Character.
      * Used by both TFile-based and adapter-based loading.
      */
-    private parseCharacterContent(content: string, filePath: string): Character | null {
+    private parseCharacterContent(content: string, filePath: string, folderFallback = false): Character | null {
         const fm = this.extractFrontmatter(content);
-        if (!fm || fm.type !== 'character') return null;
+        // Folder-based fallback (issue #74): when this file already lives
+        // inside the Characters folder, accept it even if `type:` is missing
+        // or has been overwritten (e.g. by a Templater template). Otherwise
+        // require the discriminator to match.
+        if (!fm && !folderFallback) return null;
+        const safeFm = (fm ?? {}) as Record<string, any>;
+        if (safeFm.type !== 'character' && !folderFallback) return null;
 
         const body = this.extractBody(content);
         const basename = filePath.split('/').pop()?.replace(/\.md$/i, '') ?? filePath;
-        const relations = normalizeCharacterRelations(this.parseRelations(fm.relations) || this.buildLegacyRelations(fm));
+        const relations = normalizeCharacterRelations(this.parseRelations(safeFm.relations) || this.buildLegacyRelations(safeFm));
 
         const character: Character = {
             filePath,
             type: 'character',
-            name: fm.name || basename,
-            tagline: fm.tagline,
-            image: fm.image,
-            gallery: this.parseGallery(fm.gallery),
-            nickname: fm.nickname,
-            age: fm.age != null ? String(fm.age) : undefined,
-            role: fm.role,
-            occupation: fm.occupation,
-            residency: fm.residency,
-            locations: this.parseStringList(fm.locations),
-            family: fm.family,
-            appearance: fm.appearance,
-            distinguishingFeatures: fm.distinguishingFeatures,
-            style: fm.style,
-            quirks: fm.quirks,
-            personality: fm.personality,
-            internalMotivation: fm.internalMotivation,
-            externalMotivation: fm.externalMotivation,
-            strengths: fm.strengths,
-            flaws: fm.flaws,
-            fears: fm.fears,
-            belief: fm.belief || fm.coreBeliefs,
-            misbelief: fm.misbelief,
-            formativeMemories: fm.formativeMemories,
-            accomplishments: fm.accomplishments,
-            secrets: fm.secrets,
+            name: safeFm.name || basename,
+            tagline: safeFm.tagline,
+            image: safeFm.image,
+            gallery: this.parseGallery(safeFm.gallery),
+            nickname: safeFm.nickname,
+            age: safeFm.age != null ? String(safeFm.age) : undefined,
+            role: safeFm.role,
+            roles: normalizeRoleEntries(safeFm.roles),
+            occupation: safeFm.occupation,
+            residency: safeFm.residency,
+            locations: this.parseStringList(safeFm.locations),
+            family: safeFm.family,
+            appearance: safeFm.appearance,
+            distinguishingFeatures: safeFm.distinguishingFeatures,
+            style: safeFm.style,
+            quirks: safeFm.quirks,
+            personality: safeFm.personality,
+            internalMotivation: safeFm.internalMotivation,
+            externalMotivation: safeFm.externalMotivation,
+            strengths: safeFm.strengths,
+            flaws: safeFm.flaws,
+            fears: safeFm.fears,
+            belief: safeFm.belief || safeFm.coreBeliefs,
+            misbelief: safeFm.misbelief,
+            formativeMemories: safeFm.formativeMemories,
+            accomplishments: safeFm.accomplishments,
+            secrets: safeFm.secrets,
             relations: relations.length ? relations : undefined,
-            startingPoint: fm.startingPoint,
-            goal: fm.goal,
-            expectedChange: fm.expectedChange,
-            habits: fm.habits,
-            props: fm.props,
-            books: this.parseStringList(fm.books),
-            custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
-            universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
-            created: fm.created,
-            modified: fm.modified,
+            startingPoint: safeFm.startingPoint,
+            goal: safeFm.goal,
+            expectedChange: safeFm.expectedChange,
+            habits: safeFm.habits,
+            props: safeFm.props,
+            books: this.parseStringList(safeFm.books),
+            custom: safeFm.custom && typeof safeFm.custom === 'object' ? safeFm.custom : undefined,
+            universalFields: hydrateUniversalFieldsFromTopLevel(
+                safeFm,
+                safeFm.universalFields && typeof safeFm.universalFields === 'object' ? safeFm.universalFields : undefined,
+            ),
+            created: safeFm.created,
+            modified: safeFm.modified,
             notes: body || undefined,
         };
 

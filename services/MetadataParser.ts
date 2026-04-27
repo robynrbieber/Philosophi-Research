@@ -1,5 +1,58 @@
 import { App, TFile, TFolder, parseYaml, stringifyYaml } from 'obsidian';
 import { Scene, SceneStatus, TimelineMode, TIMELINE_MODES, getStatusOrder } from '../models/Scene';
+import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
+
+/**
+ * Issue #73 — frontmatter scene fields that point at other entities (scenes,
+ * characters, locations) and should ideally be written as `[[wikilinks]]` so
+ * Obsidian keeps them in sync on rename. Readers strip wikilink syntax in
+ * either case, so flipping this on/off is non-destructive.
+ */
+const SCENE_LINK_FIELDS_SCALAR = ['pov', 'location'] as const;
+const SCENE_LINK_FIELDS_ARRAY = ['characters', 'setup_scenes', 'payoff_scenes'] as const;
+
+/** Wrap a plain entity name in `[[Name]]`, idempotent. */
+export function toWikilink(name: string | undefined | null): string | undefined {
+    if (name === undefined || name === null) return undefined;
+    const s = String(name).trim();
+    if (!s) return undefined;
+    if (/^\[\[.+\]\]$/.test(s)) return s; // already a wikilink
+    return `[[${s}]]`;
+}
+
+/**
+ * Module-level toggle controlling whether `MetadataParser` writes scene
+ * link-fields as wikilinks. Set from main.ts when settings load.
+ */
+let _writeSceneFieldsAsWikilinks = true;
+export function setWriteSceneFieldsAsWikilinks(on: boolean): void {
+    _writeSceneFieldsAsWikilinks = !!on;
+}
+
+/**
+ * Issue #78 — module-level toggles controlling what countWords skips:
+ *  - %%…%% Obsidian comment blocks (default on)
+ *  - markdown task lines like `- [ ]` / `- [x]` (default off)
+ * Set from main.ts when settings load/save.
+ */
+let _excludeCommentsFromWordcount = true;
+let _excludeChecklistFromWordcount = false;
+export function setWordcountExclusions(opts: { comments?: boolean; checklists?: boolean }): void {
+    if (typeof opts.comments === 'boolean') _excludeCommentsFromWordcount = opts.comments;
+    if (typeof opts.checklists === 'boolean') _excludeChecklistFromWordcount = opts.checklists;
+}
+function wrapScalar(v: any): any {
+    if (!_writeSceneFieldsAsWikilinks) return v;
+    if (v === undefined || v === null || v === '') return v;
+    return toWikilink(String(v));
+}
+function wrapArray(arr: any): any {
+    if (!_writeSceneFieldsAsWikilinks) return arr;
+    if (!Array.isArray(arr)) return arr;
+    return arr
+        .map((s: any) => toWikilink(String(s)))
+        .filter((s): s is string => !!s);
+}
 
 /**
  * Parses frontmatter from markdown content and extracts Scene data
@@ -62,7 +115,10 @@ export class MetadataParser {
             subtitle: frontmatter.subtitle,
             color: frontmatter.color,
             codexLinks: this.parseCodexLinks(frontmatter.codexLinks),
-            universalFields: frontmatter.universalFields && typeof frontmatter.universalFields === 'object' ? frontmatter.universalFields : undefined,
+            universalFields: hydrateUniversalFieldsFromTopLevel(
+                frontmatter,
+                frontmatter.universalFields && typeof frontmatter.universalFields === 'object' ? frontmatter.universalFields : undefined,
+            ),
             beatsheet: frontmatter.beatsheet,
         };
     }
@@ -130,7 +186,13 @@ export class MetadataParser {
                 continue;
             }
             if (value !== undefined) {
-                frontmatter[key] = value;
+                if ((SCENE_LINK_FIELDS_SCALAR as readonly string[]).includes(key)) {
+                    frontmatter[key] = wrapScalar(value);
+                } else if ((SCENE_LINK_FIELDS_ARRAY as readonly string[]).includes(key)) {
+                    frontmatter[key] = wrapArray(value);
+                } else {
+                    frontmatter[key] = value;
+                }
             } else {
                 delete frontmatter[key];
             }
@@ -143,14 +205,26 @@ export class MetadataParser {
         const finalBody = updates.body ?? body;
         frontmatter.wordcount = this.countWords(finalBody);
 
+        // Issue #71 — mirror universal fields to top-level YAML keys
+        mirrorUniversalFieldsToTopLevel(frontmatter, frontmatter.universalFields);
+
         const newContent = `---\n${stringifyYaml(frontmatter)}---\n\n${finalBody}`;
         await app.vault.modify(file, newContent);
     }
 
     /**
-     * Generate frontmatter content for a new scene
+     * Generate frontmatter content for a new scene.
+     *
+     * Issue #77 \u2014 `extraFrontmatter` lets callers (SceneManager.createScene)
+     * inject arbitrary YAML keys defined under Settings \u2192 "Default scene
+     * frontmatter" (e.g. `cssclasses: [fountain]`). StoryLine-managed keys
+     * always win on conflict so the scene model stays consistent.
      */
-    static generateSceneContent(scene: Partial<Scene>, template?: string): string {
+    static generateSceneContent(
+        scene: Partial<Scene>,
+        template?: string,
+        extraFrontmatter?: Record<string, any>,
+    ): string {
         const fm: Record<string, any> = {
             type: 'scene',
             title: scene.title || 'Untitled Scene',
@@ -160,9 +234,9 @@ export class MetadataParser {
         if (scene.chapter !== undefined) fm.chapter = scene.chapter;
         if (scene.sequence !== undefined) fm.sequence = scene.sequence;
         if (scene.chronologicalOrder !== undefined) fm.chronologicalOrder = scene.chronologicalOrder;
-        if (scene.pov) fm.pov = scene.pov;
-        if (scene.characters?.length) fm.characters = scene.characters;
-        if (scene.location) fm.location = scene.location;
+        if (scene.pov) fm.pov = wrapScalar(scene.pov);
+        if (scene.characters?.length) fm.characters = wrapArray(scene.characters);
+        if (scene.location) fm.location = wrapScalar(scene.location);
         if (scene.timeline) fm.timeline = scene.timeline;
         if (scene.storyDate) fm.storyDate = scene.storyDate;
         if (scene.storyTime) fm.storyTime = scene.storyTime;
@@ -170,8 +244,8 @@ export class MetadataParser {
         if (scene.conflict) fm.conflict = scene.conflict;
         if (scene.emotion) fm.emotion = scene.emotion;
         if (scene.tags?.length) fm.tags = scene.tags;
-        if (scene.setup_scenes?.length) fm.setup_scenes = scene.setup_scenes;
-        if (scene.payoff_scenes?.length) fm.payoff_scenes = scene.payoff_scenes;
+        if (scene.setup_scenes?.length) fm.setup_scenes = wrapArray(scene.setup_scenes);
+        if (scene.payoff_scenes?.length) fm.payoff_scenes = wrapArray(scene.payoff_scenes);
         if (scene.notes) fm.notes = scene.notes;
         if (scene.corkboardNote) fm.corkboardNote = true;
         if (scene.corkboardNoteColor) fm.corkboardNoteColor = scene.corkboardNoteColor;
@@ -189,9 +263,22 @@ export class MetadataParser {
         if (scene.universalFields && Object.keys(scene.universalFields).length > 0) {
             fm.universalFields = scene.universalFields;
         }
+        // Issue #71 — mirror universal fields to top-level YAML keys
+        mirrorUniversalFieldsToTopLevel(fm, scene.universalFields);
         fm.wordcount = scene.body ? this.countWords(scene.body) : 0;
         fm.created = new Date().toISOString().split('T')[0];
         fm.modified = new Date().toISOString().split('T')[0];
+
+        // Issue #77 \u2014 merge user-defined "Default scene frontmatter" keys.
+        // StoryLine-owned keys always win, so we only add keys that aren't
+        // already present.
+        if (extraFrontmatter && typeof extraFrontmatter === 'object') {
+            for (const [k, v] of Object.entries(extraFrontmatter)) {
+                if (k && !(k in fm) && v !== undefined && v !== null) {
+                    fm[k] = v;
+                }
+            }
+        }
 
         const body = scene.body || '';
 
@@ -223,11 +310,35 @@ export class MetadataParser {
     }
 
     /**
-     * Strip wikilink brackets from a string
+     * Strip wikilink brackets from a string. Handles:
+     *   `[[Name]]`             → `Name`
+     *   `[[Path/To/Name]]`     → `Name`     (last path segment)
+     *   `[[Name|Display]]`     → `Display`  (alias preferred for display)
+     *   `[[Name#heading]]`     → `Name`
+     * Quoted YAML strings are also unwrapped. Issue #73.
      */
-    private static cleanWikilink(value: string | undefined): string | undefined {
-        if (!value) return undefined;
-        return value.replace(/^\[\[/, '').replace(/\]\]$/, '');
+    static cleanWikilink(value: string | undefined): string | undefined {
+        if (value === undefined || value === null) return undefined;
+        let s = String(value).trim();
+        if (!s) return undefined;
+        // Strip surrounding YAML quotes that may have leaked through
+        if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+            s = s.slice(1, -1).trim();
+        }
+        const m = s.match(/^\[\[([^\]]+)\]\]$/);
+        if (!m) return s;
+        let inner = m[1];
+        // Alias: prefer the right-hand display label
+        const pipe = inner.indexOf('|');
+        if (pipe >= 0) {
+            inner = inner.slice(pipe + 1).trim();
+        } else {
+            // Drop block/heading refs and keep last path segment
+            inner = inner.split('#')[0];
+            const slash = inner.lastIndexOf('/');
+            if (slash >= 0) inner = inner.slice(slash + 1);
+        }
+        return inner.trim();
     }
 
     /**
@@ -235,7 +346,9 @@ export class MetadataParser {
      */
     private static parseCharacters(chars: any): string[] | undefined {
         if (!Array.isArray(chars)) return undefined;
-        return chars.map((c: string) => c.replace(/^\[\[/, '').replace(/\]\]$/, ''));
+        return chars
+            .map((c: any) => this.cleanWikilink(String(c)) ?? '')
+            .filter(s => s.length > 0);
     }
 
     /**
@@ -243,7 +356,9 @@ export class MetadataParser {
      */
     private static parseStringArray(arr: any): string[] | undefined {
         if (!Array.isArray(arr)) return undefined;
-        return arr.map((s: string) => String(s).replace(/^\[\[/, '').replace(/\]\]$/, ''));
+        return arr
+            .map((s: any) => this.cleanWikilink(String(s)) ?? '')
+            .filter(s => s.length > 0);
     }
 
     /**
@@ -271,7 +386,9 @@ export class MetadataParser {
         let hasAny = false;
         for (const [key, val] of Object.entries(raw)) {
             if (Array.isArray(val)) {
-                const arr = val.map(String).filter(Boolean);
+                const arr = val
+                    .map((v: any) => this.cleanWikilink(String(v)) ?? '')
+                    .filter(Boolean);
                 if (arr.length > 0) {
                     result[key] = arr;
                     hasAny = true;
@@ -282,12 +399,23 @@ export class MetadataParser {
     }
 
     /**
-     * Count words in body text
+     * Count words in body text. Issue #78 — strips Obsidian `%%comments%%`
+     * (and optionally markdown task lines) before tokenising so production
+     * wordcounts match what will actually be exported.
      */
     private static countWords(text: string): number {
         if (!text) return 0;
+        let working = text;
+        // Issue #78 — strip Obsidian comment blocks first (multiline, non-greedy)
+        if (_excludeCommentsFromWordcount) {
+            working = working.replace(/%%[\s\S]*?%%/g, '');
+        }
+        // Issue #78 — optionally drop checkbox/task lines (`- [ ]`, `- [x]`, `* [X]`)
+        if (_excludeChecklistFromWordcount) {
+            working = working.replace(/^[ \t]*[-*+]\s*\[[ xX]\]\s.*$/gm, '');
+        }
         // Remove markdown headers, links, etc
-        const cleaned = text
+        const cleaned = working
             .replace(/^#+\s+.*/gm, '')
             .replace(/\[\[.*?\]\]/g, '')
             .replace(/[*_~`]/g, '')

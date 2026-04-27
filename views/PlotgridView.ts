@@ -615,6 +615,11 @@ export class PlotgridView extends ItemView {
         if (sceneManager && this.currentSort) {
             const field = this.currentSort.field;
             const dir = this.currentSort.direction === 'desc' ? -1 : 1;
+            // Issue #76 \u2014 reading-order fields use the shared act \u2192 chapter
+            // \u2192 sequence comparator (string-aware so non-numeric acts/chapters
+            // like "Prologue" or "1.1" sort correctly). Other fields fall
+            // back to the previous generic comparator.
+            const isReadingOrder = field === 'sequence' || field === 'chapter' || field === 'act';
             rowIndices.sort((ai, bi) => {
                 const rowA = this.data.rows[ai];
                 const rowB = this.data.rows[bi];
@@ -623,6 +628,16 @@ export class PlotgridView extends ItemView {
                 if (!sceneA && !sceneB) return 0;
                 if (!sceneA) return 1;
                 if (!sceneB) return -1;
+                if (isReadingOrder) {
+                    let cmp = compareActChapter(sceneA.act, sceneB.act);
+                    if (cmp === 0 && (field === 'sequence' || field === 'chapter')) {
+                        cmp = compareActChapter(sceneA.chapter, sceneB.chapter);
+                    }
+                    if (cmp === 0 && field === 'sequence') {
+                        cmp = (sceneA.sequence ?? 9999) - (sceneB.sequence ?? 9999);
+                    }
+                    return cmp * dir;
+                }
                 const valA = (sceneA as any)[field];
                 const valB = (sceneB as any)[field];
                 if (valA == null && valB == null) return 0;

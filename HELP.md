@@ -226,7 +226,7 @@ A dedicated character management system with rich profiles. Characters are acces
 
 #### Character Detail Editor
 - **Collapsible sections** organized into seven categories:
-  - **Basic Information** — name, age, role, occupation, nickname, residency, locations.
+  - **Basic Information** — name, age, role, occupation, nickname, residency, locations. *(Since 1.9.6 a character can hold more than one role at once — type comma-separated values such as `protagonist, narrator` and one badge per role is rendered.)*
   - **Physical Characteristics** — appearance, distinguishing features.
   - **Personality** — traits, strengths, weaknesses, fears, motivations.
   - **Backstory** — background, key events, secrets.
@@ -439,7 +439,7 @@ Each scene is a Markdown file with YAML frontmatter. StoryLine manages these fie
 | `chapter` | Chapter number | `7` |
 | `sequence` | Reading order (as written) | `14` |
 | `chronologicalOrder` | In-story chronological order | `8` |
-| `pov` | Point of view character | `"Anna"` |
+| `pov` | Point of view character | `"[[Anna]]"` |
 | `characters` | Characters present (wikilinks) | `["[[Anna]]", "[[Erik]]"]` |
 | `location` | Setting (wikilink) | `"[[Castle]]"` |
 | `status` | Completion status | `draft` |
@@ -460,6 +460,17 @@ Each scene is a Markdown file with YAML frontmatter. StoryLine manages these fie
 | `payoff_scenes` | Scenes that pay off this one | `["path/to/scene.md"]` |
 
 **Status progression:** `idea` → `outlined` → `draft` → `written` → `revised` → `final`
+
+**References as wikilinks** *(since 1.9.6)* — `pov`, `location`, `characters`, `setup_scenes` and `payoff_scenes` are written as Obsidian `[[wikilinks]]` by default so they auto-update when you rename a character or scene. Plain-text values still work — readers accept either form. Toggle the writer at **Settings → Write scene references as wikilinks**.
+
+**Wordcount exclusions** *(since 1.9.6)* — Two toggles under **Settings → Scene Cards** control what `MetadataParser.countWords` actually counts:
+
+- **Exclude `%%comments%%` from wordcount** *(default on)* — Obsidian comment blocks are stripped before counting, so author notes and TODOs do not inflate scene/manuscript totals.
+- **Also ignore checkbox lines** *(default off)* — When enabled, lines starting with `- [ ]` or `- [x]` are also stripped, useful for outline-style scenes that mix prose with task lists.
+
+These settings flow through scene cards, the inspector, the Writing Tracker, and exports.
+
+**Default scene frontmatter** *(since 1.9.6)* — Universal Field Templates have an optional **Default value** that is auto-applied to newly created scenes (multi-select fields accept comma-separated defaults). In addition, **Settings → Default scene frontmatter** accepts a free-form YAML block whose keys are merged into every newly created scene's frontmatter. StoryLine-owned keys (`type`, `title`, `act`, `chapter`, `sequence`, `status`, `wordcount`, …) always win on conflict, so the default snippet can never overwrite the engine's own metadata.
 
 Write your scene content below the frontmatter as normal Markdown.
 
@@ -754,6 +765,7 @@ You'll be prompted for:
 - **Type** — `text`, `textarea`, `dropdown`, or `multi-select`.
 - **Options** — for dropdown / multi-select: the choices the user can pick (e.g. `Inciting Incident, Turning Point, Crisis, Climax, Resolution`).
 - **Placeholder / hint text** (optional).
+- **Top-level YAML key** *(optional, since 1.9.6)* — when set, the field's value is also written as a real top-level YAML key (in addition to `universalFields:`) so it appears in Obsidian's Properties panel, Bases, Dataview and the graph. Auto-suggested from the label; reserved StoryLine keys (`type`, `pov`, `act`, `chapter`, `tags`, …) are blocked. Leave blank to keep the field inside `universalFields:` only. The global toggle lives at **Settings → Mirror custom fields to top-level YAML**.
 
 Fields can be edited or deleted anytime from either location (pencil / trash icons).
 

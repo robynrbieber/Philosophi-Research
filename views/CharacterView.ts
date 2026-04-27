@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf, TFile, Notice, Modal, Setting, requestUrl } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Scene, STATUS_CONFIG, resolveStatusCfg } from '../models/Scene';
-import { Character, CharacterRelation, CharacterRelationCategory, CHARACTER_CATEGORIES, CHARACTER_ROLES, CharacterFieldDef, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, extractCharacterProps, extractCharacterLocationTags, extractAllCharacterTags, normalizeCharacterRelations, TagType, computeReciprocalUpdates } from '../models/Character';
+import { Character, CharacterRelation, CharacterRelationCategory, CHARACTER_CATEGORIES, CHARACTER_ROLES, CharacterFieldDef, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, extractCharacterProps, extractCharacterLocationTags, extractAllCharacterTags, normalizeCharacterRelations, TagType, computeReciprocalUpdates, getRoleList, getRoleDisplay, getPrimaryRole, RoleEntry } from '../models/Character';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
@@ -304,8 +304,8 @@ export class CharacterView extends ItemView {
         if (this.sortBy === 'role') {
             const roleOrder: Record<string, number> = { protagonist: 0, antagonist: 1, supporting: 2, minor: 3 };
             fileCharacters.sort((a, b) => {
-                const ra = roleOrder[(a.role || '').toLowerCase()] ?? 99;
-                const rb = roleOrder[(b.role || '').toLowerCase()] ?? 99;
+                const ra = roleOrder[getPrimaryRole(a.role).toLowerCase()] ?? 99;
+                const rb = roleOrder[getPrimaryRole(b.role).toLowerCase()] ?? 99;
                 return ra !== rb ? ra - rb : a.name.localeCompare(b.name);
             });
         } else if (this.sortBy === 'modified') {
@@ -417,11 +417,15 @@ export class CharacterView extends ItemView {
     private renderOverviewCard(grid: HTMLElement, char: Character, scenes: Scene[], aliasMap?: Map<string, string>): void {
         const card = grid.createDiv('character-overview-card');
 
-        // Role badge
-        if (char.role) {
-            const badge = card.createDiv('character-role-badge');
-            badge.textContent = char.role;
-            badge.addClass(this.roleClass(char.role));
+        // Role badges — supports string or string[] (issue #72 Tier 1)
+        const roleList = getRoleList(char.role);
+        if (roleList.length) {
+            const wrap = card.createDiv('character-role-badges');
+            for (const r of roleList) {
+                const badge = wrap.createDiv('character-role-badge');
+                badge.textContent = r;
+                badge.addClass(this.roleClass(r));
+            }
         }
 
         // Portrait / placeholder
@@ -452,7 +456,7 @@ export class CharacterView extends ItemView {
 
         // Short description snippet — per-character tagline field selector, with auto fallback
         const taglineKey = char.tagline; // a field key like 'personality', 'occupation', etc.
-        const autoSnippet = char.personality || char.occupation || char.role || '';
+        const autoSnippet = char.personality || char.occupation || getRoleDisplay(char.role) || '';
         const snippet = (taglineKey ? ((char as any)[taglineKey] || '') : '') || autoSnippet;
         if (snippet) {
             card.createEl('p', { cls: 'character-card-snippet', text: snippet });
@@ -988,7 +992,10 @@ export class CharacterView extends ItemView {
             });
         }
 
-        const value = (draft as any)[field.key] ?? '';
+        // Coerce array shapes (e.g. role: string[]) to a comma-separated string
+        // for input rendering. Issue #72 Tier 1.
+        let value: any = (draft as any)[field.key] ?? '';
+        if (Array.isArray(value)) value = value.map(v => String(v).trim()).filter(Boolean).join(', ');
 
         if (field.key === 'relations') {
             this.renderRelationsField(row, draft);
@@ -1018,22 +1025,39 @@ export class CharacterView extends ItemView {
         }
 
         if (field.key === 'role') {
-            // Role gets a dropdown
-            const select = row.createEl('select', { cls: 'character-field-input dropdown' });
-            select.createEl('option', { text: field.placeholder, value: '' });
+            // Role accepts a single value or a comma-separated list of values
+            // (issue #72 Tier 1). Rendered as a text input with a datalist of
+            // suggestions so the user can pick or type freely (e.g.
+            // "Mentor, Love Interest, Antagonist").
+            const listId = `character-role-list-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const input = row.createEl('input', {
+                cls: 'character-field-input',
+                type: 'text',
+                attr: { placeholder: field.placeholder, list: listId },
+            });
+            input.value = value;
+            const datalist = row.createEl('datalist', { attr: { id: listId } });
             for (const r of CHARACTER_ROLES) {
-                const opt = select.createEl('option', { text: r, value: r });
-                if (value === r) opt.selected = true;
+                datalist.createEl('option', { attr: { value: r } });
             }
-            // Also allow freeform if current value isn't in list
-            if (value && !CHARACTER_ROLES.includes(value)) {
-                const opt = select.createEl('option', { text: value, value: value });
-                opt.selected = true;
-            }
-            select.addEventListener('change', () => {
-                (draft as any)[field.key] = select.value;
+            input.addEventListener('input', () => {
+                const raw = input.value;
+                // Persist as array when comma-separated, else single string
+                if (raw.includes(',')) {
+                    (draft as any)[field.key] = raw
+                        .split(',')
+                        .map(s => s.trim())
+                        .filter(Boolean);
+                } else {
+                    (draft as any)[field.key] = raw;
+                }
                 this.scheduleSave(draft);
             });
+
+            // Issue #72 Tier 2 — role history editor (repeating rows).
+            // Renders below the simple role input; only rows the user has
+            // explicitly added are persisted to the `roles:` YAML array.
+            this.renderRoleHistoryEditor(row, draft);
         } else if (field.multiline) {
             const textarea = row.createEl('textarea', {
                 cls: 'character-field-textarea',
@@ -1248,6 +1272,130 @@ export class CharacterView extends ItemView {
                 this.scheduleSave(draft);
             });
         }
+    }
+
+    /**
+     * Issue #72 Tier 2 — repeating-row editor for the structured role
+     * history. Each row binds to one entry in `draft.roles`. Rows can be
+     * added or removed; empty rows are stripped on save.
+     */
+    private renderRoleHistoryEditor(row: HTMLElement, draft: Character): void {
+        const container = row.createDiv('character-role-history');
+
+        const header = container.createDiv('character-role-history-header');
+        header.createSpan({ cls: 'character-role-history-title', text: 'Role history (optional)' });
+        header.createSpan({
+            cls: 'character-role-history-hint',
+            text: 'Track role changes across scenes, plotlines and books.',
+        });
+
+        const list = container.createDiv('character-role-history-list');
+
+        const persist = () => {
+            const cleaned: RoleEntry[] = [];
+            for (const e of (draft.roles || [])) {
+                const role = String(e.role || '').trim();
+                if (!role) continue;
+                const out: RoleEntry = { role };
+                if (e.from && e.from.trim()) out.from = e.from.trim();
+                if (e.plotline && e.plotline.trim()) out.plotline = e.plotline.trim();
+                if (e.book && e.book.trim()) out.book = e.book.trim();
+                cleaned.push(out);
+            }
+            draft.roles = cleaned;
+            this.scheduleSave(draft);
+        };
+
+        const renderRows = () => {
+            list.empty();
+            const entries = draft.roles || [];
+            entries.forEach((entry, idx) => {
+                const r = list.createDiv('character-role-history-row');
+
+                const roleListId = `character-role-history-list-${Date.now()}-${idx}-${Math.random().toString(36).slice(2)}`;
+
+                const roleInput = r.createEl('input', {
+                    cls: 'character-role-history-input character-role-history-role',
+                    type: 'text',
+                    attr: { placeholder: 'role', list: roleListId },
+                });
+                roleInput.value = entry.role || '';
+                const dl = r.createEl('datalist', { attr: { id: roleListId } });
+                for (const opt of CHARACTER_ROLES) dl.createEl('option', { attr: { value: opt } });
+                roleInput.addEventListener('input', () => {
+                    entry.role = roleInput.value;
+                    persist();
+                });
+
+                const fromInput = r.createEl('input', {
+                    cls: 'character-role-history-input character-role-history-from',
+                    type: 'text',
+                    attr: { placeholder: 'from (scene or [[wikilink]])' },
+                });
+                fromInput.value = entry.from || '';
+                fromInput.addEventListener('input', () => {
+                    entry.from = fromInput.value;
+                    persist();
+                });
+
+                const plotInput = r.createEl('input', {
+                    cls: 'character-role-history-input character-role-history-plotline',
+                    type: 'text',
+                    attr: { placeholder: 'plotline' },
+                });
+                plotInput.value = entry.plotline || '';
+                plotInput.addEventListener('input', () => {
+                    entry.plotline = plotInput.value;
+                    persist();
+                });
+
+                const bookInput = r.createEl('input', {
+                    cls: 'character-role-history-input character-role-history-book',
+                    type: 'text',
+                    attr: { placeholder: 'book label' },
+                });
+                bookInput.value = entry.book || '';
+                bookInput.addEventListener('input', () => {
+                    entry.book = bookInput.value;
+                    persist();
+                });
+
+                const removeBtn = r.createEl('button', {
+                    cls: 'character-role-history-remove',
+                    text: '×',
+                    attr: { title: 'Remove this entry', type: 'button' },
+                });
+                removeBtn.addEventListener('click', () => {
+                    (draft.roles || []).splice(idx, 1);
+                    persist();
+                    renderRows();
+                });
+            });
+
+            if (!entries.length) {
+                list.createDiv({
+                    cls: 'character-role-history-empty',
+                    text: 'No role history entries yet.',
+                });
+            }
+        };
+
+        const addBtn = container.createEl('button', {
+            cls: 'character-role-history-add',
+            text: '+ Add role entry',
+            attr: { type: 'button' },
+        });
+        addBtn.addEventListener('click', () => {
+            if (!draft.roles) draft.roles = [];
+            draft.roles.push({ role: '' });
+            renderRows();
+            // Focus the role input on the new last row
+            const inputs = list.querySelectorAll('.character-role-history-role');
+            const last = inputs[inputs.length - 1] as HTMLInputElement | undefined;
+            last?.focus();
+        });
+
+        renderRows();
     }
 
     private renderRelationsField(row: HTMLElement, draft: Character): void {

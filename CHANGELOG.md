@@ -2,6 +2,31 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.6
+
+### Bug Fixes
+
+- **Codex / character / location notes vanishing after a template insert** *([#74](https://github.com/PixeroJan/obsidian-storyline/issues/74))* — When a Templates / Templater plugin replaced the YAML block and dropped the `type:` discriminator, the affected note silently disappeared from the Codex, Characters or Locations view. StoryLine now falls back to folder-based detection: any note that lives under the canonical entity folder (`Codex/<Category>/`, `Characters/`, `World/Locations/`) is recognised even if `type:` is missing, wrong, or the frontmatter is empty.
+- **Plot Grid sorting by Sequence / Chapter / Act now respects non-numeric values** *([#76](https://github.com/PixeroJan/obsidian-storyline/issues/76))* — Sorting rows by Act, Chapter, or Sequence used to coerce values via `Number(...)`, which silently turned strings like `Prologue`, `Epilogue`, or `1.1` into `NaN` and produced an apparently random order. Plot Grid (and the shared `SceneQueryService` used by every other view) now uses the numeric-aware `compareActChapter` comparator and falls back through Act → Chapter → Sequence in reading order. *Note: the second half of the issue — automatic sequence reflow when inserting a chapter mid-book — is intentionally deferred to a later release; it requires a project-wide renumber that we want to design carefully.*
+
+### New Features
+
+- **Multiple roles per character** *([#72](https://github.com/PixeroJan/obsidian-storyline/issues/72), Tier 1)* — A character can now hold more than one role at the same time (e.g. *protagonist* + *narrator*). The role field in the Character inspector accepts comma-separated values and renders one badge per role. Existing single-role characters keep working unchanged.
+- **Role history across scenes / plotlines / books** *([#72](https://github.com/PixeroJan/obsidian-storyline/issues/72), Tier 2)* — Characters can now record a *history* of role changes in a structured `roles:` YAML array. Each entry has a role label and optional `from` (scene name or `[[wikilink]]`), `plotline`, and `book` (free-text label) anchors. A new repeating-row editor under the role field in the Character inspector lets you add/remove entries. Both the legacy `role:` field and the new `roles:` history coexist; if both are set, the structured history wins for display order. The `book:` anchor is plain author-facing metadata — no cross-book plumbing required.
+- **Wikilink-aware scene references** *([#73](https://github.com/PixeroJan/obsidian-storyline/issues/73))* — Scene fields that reference other notes (`pov`, `location`, `characters`, `setup_scenes`, `payoff_scenes`) are now stored as Obsidian `[[wikilinks]]` so renames are picked up automatically by Obsidian's metadata cache. Plain-text values continue to work — the readers accept either form. Toggle in **Settings → Write scene references as wikilinks** (on by default).
+- **Custom fields visible to Properties / Bases / Dataview** *([#71](https://github.com/PixeroJan/obsidian-storyline/issues/71))* — Universal Field Templates gained an optional **Top-level YAML key**. When set, the field's value is mirrored to a real top-level YAML key (in addition to `universalFields:`) so it appears in Obsidian's Properties panel, Bases, Dataview and the graph. Reserved StoryLine keys (`type`, `pov`, `act`, `chapter`, `tags`, …) are blocked. Toggle in **Settings → Mirror custom fields to top-level YAML** (on by default).
+- **Step-sibling and teammate relations** *([#70](https://github.com/PixeroJan/obsidian-storyline/issues/70))* — Added `step-sibling` to the family relation list and `teammate` to the professional relation list, with matching symmetric inverses.
+- **Default scene frontmatter snippet** *([#77](https://github.com/PixeroJan/obsidian-storyline/issues/77))* — Universal Field Templates gained an optional **Default value** that is applied automatically when a new scene is created (multi-select fields accept comma-separated defaults). In addition, **Settings → Default scene frontmatter** accepts a free-form YAML block whose keys are merged into every newly created scene's frontmatter. StoryLine-owned keys (`type`, `title`, `act`, `chapter`, `sequence`, `status`, `wordcount`, …) always win on conflict, so the default snippet can never overwrite the engine's own metadata.
+- **Wordcount can now ignore comments and checkbox lines** *([#78](https://github.com/PixeroJan/obsidian-storyline/issues/78))* — Two new toggles under **Settings → Scene Cards**:
+  - **Exclude `%%comments%%` from wordcount** *(default on)* — Obsidian comment blocks no longer inflate the count, so author notes and TODOs stay invisible to the manuscript total.
+  - **Also ignore checkbox lines** *(default off)* — When enabled, `- [ ]` and `- [x]` lines are also stripped before counting, which is useful for outline-style scenes that mix prose with task lists.
+  Both toggles flow through the central `MetadataParser.countWords` helper, so they apply consistently to scene cards, the inspector, the Writing Tracker, and exports.
+
+### Internal
+
+- **Series Arc View — foundation** *([#66](https://github.com/PixeroJan/obsidian-storyline/issues/66) Phase 1, scaffold only)* — A new `SceneProvider` indirection layer (`services/SceneProvider.ts`) was added so future view code can pull scenes from either the active book or every book in a series. Settings flags `seriesArcView` (default off) and `warnOnCrossBookMove` (default on) are reserved. The cross-book Manuscript / Kanban / Plot Grid rendering itself ships in a follow-up release.
+
+---
 ## Version 1.9.5
 
 ### Bug Fixes

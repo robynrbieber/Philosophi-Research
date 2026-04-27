@@ -21,8 +21,20 @@ export interface Character {
     nickname?: string;
     /** Age or date of birth */
     age?: string;
-    /** Role in the story */
-    role?: string;
+    /** Role in the story (string or list of roles — issue #72 Tier 1) */
+    role?: string | string[];
+    /**
+     * Structured role history (issue #72 Tier 2). Each entry is a role the
+     * character holds, optionally anchored to a starting scene, plotline,
+     * and/or a free-text book label. `book:` is plain author-facing
+     * metadata — it is NOT a project reference and requires no
+     * cross-book resolution.
+     *
+     * When this array is present and non-empty, `getRoleList` /
+     * `getPrimaryRole` derive their results from it. The legacy `role`
+     * field is still read as a fallback for unmigrated characters.
+     */
+    roles?: RoleEntry[];
     /** Occupation or vocation */
     occupation?: string;
     /** Where they live / are from */
@@ -205,6 +217,139 @@ export interface CharacterFieldDef {
     multiline?: boolean;
 }
 
+/**
+ * Issue #72 Tier 2 — a single entry in a character's role history.
+ *
+ * All anchor fields are optional. `from` accepts either a plain scene
+ * name ("The Choice") or an Obsidian wikilink ("[[Chapter 12 - The
+ * Choice]]") so renames stay safe. `plotline` is a free-text plotline
+ * tag used to scope the role to a single arc. `book` is a free-text
+ * label like "Book 2" — author-facing only, not a project reference.
+ */
+export interface RoleEntry {
+    role: string;
+    from?: string;
+    plotline?: string;
+    book?: string;
+}
+
+/**
+ * Normalize a frontmatter `roles:` value into a clean RoleEntry[].
+ * Accepts undefined, an array of strings, or an array of objects. Strings
+ * are upgraded to `{ role: <string> }` so legacy/manually-edited YAML keeps
+ * working.
+ */
+export function normalizeRoleEntries(raw: unknown): RoleEntry[] {
+    if (!Array.isArray(raw)) return [];
+    const out: RoleEntry[] = [];
+    for (const item of raw) {
+        if (typeof item === 'string') {
+            const r = item.trim();
+            if (r) out.push({ role: r });
+            continue;
+        }
+        if (item && typeof item === 'object') {
+            const obj = item as Record<string, unknown>;
+            const role = String(obj.role ?? '').trim();
+            if (!role) continue;
+            const entry: RoleEntry = { role };
+            const from = obj.from != null ? String(obj.from).trim() : '';
+            const plotline = obj.plotline != null ? String(obj.plotline).trim() : '';
+            const book = obj.book != null ? String(obj.book).trim() : '';
+            if (from) entry.from = from;
+            if (plotline) entry.plotline = plotline;
+            if (book) entry.book = book;
+            out.push(entry);
+        }
+    }
+    return out;
+}
+
+/**
+ * Normalize the `role` field (issue #72 Tier 1) into a string array.
+ * Accepts string, string[], or undefined. Splits comma-separated strings.
+ *
+ * Issue #72 Tier 2: when the character also has a structured `roles[]`
+ * history, callers should prefer `getRoleEntries(character)` and derive
+ * the display list from there — see `getRoleList(character)` overload
+ * below.
+ */
+export function getRoleList(role: string | string[] | undefined): string[];
+export function getRoleList(character: Pick<Character, 'role' | 'roles'>): string[];
+export function getRoleList(input: any): string[] {
+    // Character object overload — prefer Tier 2 roles[] if present.
+    if (input && typeof input === 'object' && !Array.isArray(input) && ('role' in input || 'roles' in input)) {
+        const c = input as Pick<Character, 'role' | 'roles'>;
+        if (c.roles && c.roles.length) {
+            const seen = new Set<string>();
+            const out: string[] = [];
+            for (const e of c.roles) {
+                const r = String(e.role || '').trim();
+                if (!r) continue;
+                const key = r.toLowerCase();
+                if (seen.has(key)) continue;
+                seen.add(key);
+                out.push(r);
+            }
+            if (out.length) return out;
+        }
+        return getRoleListFromRaw(c.role);
+    }
+    return getRoleListFromRaw(input as string | string[] | undefined);
+}
+
+function getRoleListFromRaw(role: string | string[] | undefined): string[] {
+    if (!role) return [];
+    if (Array.isArray(role)) {
+        return role.map(r => String(r).trim()).filter(Boolean);
+    }
+    return String(role)
+        .split(',')
+        .map(r => r.trim())
+        .filter(Boolean);
+}
+
+/** Render the role field as a human-readable comma-separated string. */
+export function getRoleDisplay(role: string | string[] | undefined): string;
+export function getRoleDisplay(character: Pick<Character, 'role' | 'roles'>): string;
+export function getRoleDisplay(input: any): string {
+    return getRoleList(input).join(', ');
+}
+
+/** First role (used for sort / category ordering). */
+export function getPrimaryRole(role: string | string[] | undefined): string;
+export function getPrimaryRole(character: Pick<Character, 'role' | 'roles'>): string;
+export function getPrimaryRole(input: any): string {
+    return getRoleList(input)[0] ?? '';
+}
+
+/**
+ * Issue #72 Tier 2 — return the role entries that apply under the given
+ * filter (matching `book` and/or `plotline` labels case-insensitively).
+ * Entries with no anchor for a given filter are considered to apply
+ * everywhere for that dimension.
+ */
+export function getRolesAt(
+    character: Pick<Character, 'roles'>,
+    opts?: { book?: string; plotline?: string },
+): RoleEntry[] {
+    const roles = character.roles || [];
+    if (!opts || (!opts.book && !opts.plotline)) return [...roles];
+    const wantBook = opts.book ? opts.book.trim().toLowerCase() : '';
+    const wantPlot = opts.plotline ? opts.plotline.trim().toLowerCase() : '';
+    return roles.filter(e => {
+        if (wantBook) {
+            const eb = (e.book || '').trim().toLowerCase();
+            if (eb && eb !== wantBook) return false;
+        }
+        if (wantPlot) {
+            const ep = (e.plotline || '').trim().toLowerCase();
+            if (ep && ep !== wantPlot) return false;
+        }
+        return true;
+    });
+}
+
 export type CharacterRelationCategory =
     | 'family'
     | 'romantic'
@@ -233,12 +378,12 @@ export const RELATION_CATEGORIES: { value: CharacterRelationCategory; label: str
 ];
 
 export const RELATION_TYPES_BY_CATEGORY: Record<CharacterRelationCategory, string[]> = {
-    family: ['sibling', 'half-sibling', 'twin', 'parent', 'child', 'step-parent', 'step-child', 'adoptive-parent', 'adopted-child', 'guardian', 'ward', 'grandparent', 'grandchild', 'aunt/uncle', 'niece/nephew', 'cousin', 'in-law'],
+    family: ['sibling', 'half-sibling', 'step-sibling', 'twin', 'parent', 'child', 'step-parent', 'step-child', 'adoptive-parent', 'adopted-child', 'guardian', 'ward', 'grandparent', 'grandchild', 'aunt/uncle', 'niece/nephew', 'cousin', 'in-law'],
     romantic: ['partner', 'spouse', 'ex-partner'],
     social: ['ally', 'friend', 'best-friend', 'confidant', 'acquaintance'],
     conflict: ['enemy', 'rival', 'betrayer', 'avenger'],
     guidance: ['mentor', 'mentee', 'leader', 'follower', 'boss', 'subordinate', 'commander', 'second-in-command', 'master', 'apprentice'],
-    professional: ['colleague', 'business-partner', 'client', 'handler', 'asset'],
+    professional: ['colleague', 'teammate', 'business-partner', 'client', 'handler', 'asset'],
     story: ['protector', 'dependent', 'owes-debt-to', 'sworn-to', 'bound-by-oath', 'idolizes', 'fears', 'obsessed-with'],
     custom: [],
 };
@@ -277,6 +422,7 @@ const INVERSE_RELATIONS: Record<string, string> = {
     // Symmetric family
     'sibling': 'sibling',
     'half-sibling': 'half-sibling',
+    'step-sibling': 'step-sibling',
     'twin': 'twin',
     'cousin': 'cousin',
     'in-law': 'in-law',
@@ -308,6 +454,7 @@ const INVERSE_RELATIONS: Record<string, string> = {
     'apprentice': 'master',
     // Professional (symmetric)
     'colleague': 'colleague',
+    'teammate': 'teammate',
     'business-partner': 'business-partner',
     'client': 'client',
     'handler': 'asset',
@@ -480,7 +627,7 @@ export const CHARACTER_CATEGORIES: CharacterFieldCategory[] = [
  * Frontmatter keys that map to Character fields (excludes computed/meta keys)
  */
 export const CHARACTER_FIELD_KEYS: (keyof Character)[] = [
-    'name', 'tagline', 'image', 'gallery', 'nickname', 'age', 'role', 'occupation', 'residency', 'locations', 'family', 'relations',
+    'name', 'tagline', 'image', 'gallery', 'nickname', 'age', 'role', 'roles', 'occupation', 'residency', 'locations', 'family', 'relations',
     'appearance', 'distinguishingFeatures', 'style', 'quirks',
     'personality', 'internalMotivation', 'externalMotivation', 'strengths', 'flaws', 'fears', 'belief', 'misbelief',
     'formativeMemories', 'accomplishments', 'secrets',

@@ -6,6 +6,7 @@ import {
     getBuiltinCodexCategory,
     makeCustomCodexCategory,
 } from '../models/Codex';
+import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 
 /**
  * Manages generic Codex entries — loading, saving, creating, and deleting
@@ -116,7 +117,9 @@ export class CodexManager {
                 try {
                     const fp = normalizePath(f);
                     const content = await adapter.read(fp);
-                    const entry = this.parseEntry(content, fp, catDef);
+                    // Folder-based fallback: if the file lives under the category
+                    // folder, accept it even if `type:` is missing/wrong (issue #74).
+                    const entry = this.parseEntry(content, fp, catDef, /*folderFallback*/ true);
                     if (entry) catMap.set(fp, entry);
                 } catch { /* skip unreadable */ }
             }
@@ -297,6 +300,8 @@ export class CodexManager {
         } else {
             delete fm.universalFields;
         }
+        // Issue #71 — mirror to top-level YAML keys for templates that opt in
+        mirrorUniversalFieldsToTopLevel(fm, entry.universalFields);
 
         const finalBody = entry.notes ?? body;
         const newContent = `---\n${stringifyYaml(fm)}---\n${finalBody ? '\n' + finalBody : ''}`;
@@ -369,12 +374,19 @@ export class CodexManager {
         content: string,
         filePath: string,
         catDef: CodexCategoryDef,
+        folderFallback = false,
     ): CodexEntry | null {
         const fm = this.extractFrontmatter(content);
-        if (!fm) return null;
+        // If frontmatter is missing entirely, only accept when folder-based
+        // fallback applies (file lives inside the category folder — issue #74).
+        const safeFm: Record<string, any> = fm ?? {};
+        if (!fm && !folderFallback) return null;
 
-        // Accept entries whose type matches the category id
-        if (fm.type !== catDef.id) return null;
+        // Accept entries whose type matches the category id.
+        // Folder-based fallback (issue #74): when the file already lives in
+        // the category folder (e.g. user inserted a template that wiped
+        // `type:`), still recognise it so it doesn't vanish from the Codex.
+        if (safeFm.type !== catDef.id && !folderFallback) return null;
 
         const body = this.extractBody(content);
         const basename = filePath.split('/').pop()?.replace(/\.md$/i, '') ?? filePath;
@@ -382,22 +394,25 @@ export class CodexManager {
         const entry: CodexEntry = {
             filePath,
             type: catDef.id,
-            name: fm.name || basename,
-            image: fm.image,
-            gallery: this.parseGallery(fm.gallery),
-            created: fm.created,
-            modified: fm.modified,
+            name: safeFm.name || basename,
+            image: safeFm.image,
+            gallery: this.parseGallery(safeFm.gallery),
+            created: safeFm.created,
+            modified: safeFm.modified,
             notes: body || undefined,
-            custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
-            universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
-            books: Array.isArray(fm.books) ? fm.books.map(String) : undefined,
+            custom: safeFm.custom && typeof safeFm.custom === 'object' ? safeFm.custom : undefined,
+            universalFields: hydrateUniversalFieldsFromTopLevel(
+                safeFm,
+                safeFm.universalFields && typeof safeFm.universalFields === 'object' ? safeFm.universalFields : undefined,
+            ),
+            books: Array.isArray(safeFm.books) ? safeFm.books.map(String) : undefined,
         };
 
         // Load all standard field values
         for (const key of catDef.fieldKeys) {
             if (key === 'name' || key === 'image' || key === 'gallery') continue;
-            if (fm[key] !== undefined && fm[key] !== null) {
-                entry[key] = fm[key];
+            if (safeFm[key] !== undefined && safeFm[key] !== null) {
+                entry[key] = safeFm[key];
             }
         }
 

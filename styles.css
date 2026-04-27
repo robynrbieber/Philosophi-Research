@@ -10302,3 +10302,151 @@ body.theme-dark .location-field-input.dropdown {
 .sl-manuscript-embedded-split .markdown-preview-sizer > .embedded-backlinks {
     display: none !important;
 }
+
+/* === Issue #72 Tier 2 â€” Character role history editor === */
+.character-role-history { margin-top: 8px; padding: 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; background: var(--background-secondary); }
+.character-role-history-header { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+.character-role-history-title { font-weight: 600; font-size: 0.9em; }
+.character-role-history-hint { font-size: 0.8em; color: var(--text-muted); }
+.character-role-history-list { display: flex; flex-direction: column; gap: 4px; }
+.character-role-history-row { display: grid; grid-template-columns: 1.2fr 1.5fr 1fr 1fr auto; gap: 4px; align-items: center; }
+.character-role-history-input { font-size: 0.85em; padding: 3px 6px; }
+.character-role-history-remove { background: transparent; border: 1px solid var(--background-modifier-border); border-radius: 4px; color: var(--text-muted); cursor: pointer; padding: 2px 8px; }
+.character-role-history-remove:hover { color: var(--text-error); border-color: var(--text-error); }
+.character-role-history-empty { font-size: 0.8em; color: var(--text-muted); font-style: italic; padding: 4px; }
+.character-role-history-add { margin-top: 6px; font-size: 0.85em; padding: 4px 10px; background: var(--interactive-normal); border: 1px solid var(--background-modifier-border); border-radius: 4px; cursor: pointer; }
+.character-role-history-add:hover { background: var(--interactive-hover); }
+
+
+
+/* -------------------------------------------------------------------
+   Kanban Board — Custom Layout Overrides
+   -------------------------------------------------------------------
+   Cosmetic refinements scoped to the Kanban column view so they do
+   not bleed into Board / Corkboard / Manuscript scene cards.
+   Sources: user-provided CSS snippets attached to the relevant issue
+   (Columns / Scene Counter / Scene Stage / Scene Badge / Word Count
+   / Progress Buttons / Subtitle).
+   =================================================================== */
+
+/* -- Columns: translucent grey backgrounds + secondary card surface -- */
+.story-line-column-header {
+    --card-opacity: 0.25;
+    --card-brightness: 128;
+    background-color: rgba(
+        var(--card-brightness),
+        var(--card-brightness),
+        var(--card-brightness),
+        var(--card-opacity)
+    ) !important;
+}
+
+.story-line-column-body {
+    --card-opacity: 0.15;
+    --card-brightness: 128;
+    background-color: rgba(
+        var(--card-brightness),
+        var(--card-brightness),
+        var(--card-brightness),
+        var(--card-opacity)
+    ) !important;
+}
+
+.story-line-column-add {
+    --card-opacity: 0.25;
+    --card-brightness: 128;
+    background-color: rgba(
+        var(--card-brightness),
+        var(--card-brightness),
+        var(--card-brightness),
+        var(--card-opacity)
+    ) !important;
+}
+
+.story-line-column-body .scene-card {
+    background-color: var(--background-secondary) !important;
+}
+
+/* -- Scene counter (sequence chip) -- */
+.story-line-column-body .scene-card-seq {
+    width: auto;
+    padding: 1px 5px;
+    position: relative;
+    left: -4px;
+    background-color: rgba(200, 200, 200, 0.5);
+    border-radius: 4px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-normal);
+    letter-spacing: 0.04em;
+}
+
+/* -- Scene stage / status icon -- */
+.story-line-column-body .scene-card-status-icon {
+    position: relative;
+    left: -8px;
+    filter: saturate(0.5);
+}
+
+.story-line-column-body .scene-card-status-icon svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* -- Detected badge -- */
+.story-line-column-body .scene-card-detected-badge {
+    position: absolute !important;
+    top: 6px !important;
+    left: 100px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    border: none !important;
+    overflow: hidden;
+    opacity: 0.75;
+    filter: saturate(1.4);
+    line-height: 0 !important;
+}
+
+.story-line-column-body .scene-card-detected-badge > span:nth-child(1) {
+    display: flex !important;
+    align-items: center !important;
+}
+
+.story-line-column-body .scene-card-detected-badge > span:nth-child(2) {
+    display: inline-block;
+    transform: translate(1px, -1px) !important;
+    line-height: normal !important;
+}
+
+/* -- Footer / wordcount / progress buttons (anchored top-right) -- */
+.story-line-column-body .scene-card-footer {
+    position: static !important;
+}
+
+.story-line-column-body .scene-card-wordcount {
+    position: absolute !important;
+    top: 12px !important;
+    right: 8px !important;
+}
+
+.story-line-column-body .scene-card-progress {
+    position: absolute !important;
+    top: 12px !important;
+    right: calc(8px + var(--wordcount-width, 60px)) !important;
+}
+
+.story-line-column-body .scene-card-dot.filled {
+    position: relative !important;
+    top: -1.5px !important;
+}
+
+/* -- Subtitle -- */
+.story-line-column-body .scene-card-subtitle {
+    font-size: 0.85rem;
+    font-weight: 400;
+    margin-left: -8px;
+    margin-right: -12px;
+}

@@ -656,6 +656,59 @@ export interface SceneCardsSettings {
 
     /** Play a sound when the writing sprint timer ends */
     sprintEndSound: boolean;
+
+    /**
+     * Issue #73 — when true, scene/character/location references in YAML are
+     * written as Obsidian wikilinks (`[[Name]]`). Existing plain-text values
+     * remain readable; readers strip wikilink syntax in either case.
+     */
+    writeFieldsAsWikilinks?: boolean;
+
+    /**
+     * Issue #71 — when true, custom field values defined via Universal Field
+     * Templates are mirrored to top-level YAML keys (in addition to the
+     * `universalFields:` block) so they are visible to Obsidian Properties,
+     * Bases, and Dataview. Each template controls its own `topLevelKey`.
+     */
+    universalFieldsMirrorTopLevel?: boolean;
+
+    /**
+     * Issue #66 — when true (and the active project belongs to a series),
+     * cross-book "Series Arc View" scope is enabled in supported views.
+     * Phase 1 is read-only and currently scaffolded only — see
+     * `services/SceneProvider.ts` for the in-progress implementation.
+     */
+    seriesArcView?: boolean;
+
+    /**
+     * Issue #66 — when true, warn the user if a scene move would cross a
+     * book boundary in Series Arc View. Defaults to true. Used by the
+     * Phase 1 follow-up that wires writes through SceneProvider.
+     */
+    warnOnCrossBookMove?: boolean;
+
+    /**
+     * Issue #78 — when true, Obsidian `%%comment%%` blocks are stripped
+     * from scene bodies before counting words. Defaults to true so that
+     * `wordcount` reflects what the reader will actually see.
+     */
+    excludeCommentsFromWordcount?: boolean;
+
+    /**
+     * Issue #78 — when true, markdown task lines (`- [ ] …`, `- [x] …`)
+     * are also dropped from the wordcount. Defaults to false because some
+     * authors keep checklists as production notes that ship with the manuscript.
+     */
+    excludeChecklistFromWordcount?: boolean;
+
+    /**
+     * Issue #77 — raw YAML snippet merged into the frontmatter of every
+     * newly-created scene. Lets users default fields like
+     * `cssclasses: [fountain]` for use with companion plugins. StoryLine's
+     * own keys (type, title, act, chapter, sequence, status…) always win
+     * on conflict.
+     */
+    defaultSceneFrontmatter?: string;
 }
 
 /**
@@ -743,6 +796,13 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     timelineDragScrollSpeed: 8,
     timelineDragScrollZone: 60,
     sprintEndSound: true,
+    writeFieldsAsWikilinks: true,
+    universalFieldsMirrorTopLevel: true,
+    seriesArcView: false,
+    warnOnCrossBookMove: true,
+    excludeCommentsFromWordcount: true,
+    excludeChecklistFromWordcount: false,
+    defaultSceneFrontmatter: '',
 };
 
 /**
@@ -1182,6 +1242,63 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.plugin.settings.sprintEndSound = value;
                     await this.plugin.saveSettings();
                 }));
+
+        new Setting(containerEl)
+            .setName('Write scene references as wikilinks')
+            .setDesc('Issue #73 — when on, scene fields like POV, location, characters, setup_scenes and payoff_scenes are stored as Obsidian [[wikilinks]] so they auto-update on rename. Existing plain-text values keep working.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.writeFieldsAsWikilinks !== false)
+                .onChange(async (value) => {
+                    this.plugin.settings.writeFieldsAsWikilinks = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Mirror custom fields to top-level YAML')
+            .setDesc('Issue #71 — when on, Universal Field values are also written as top-level YAML keys (using each template\'s "Top-level key") so they show up in Obsidian Properties, Bases, and Dataview. Reserved StoryLine keys are skipped automatically.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.universalFieldsMirrorTopLevel !== false)
+                .onChange(async (value) => {
+                    this.plugin.settings.universalFieldsMirrorTopLevel = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // ── Issue #78 — Wordcount exclusions ──
+        new Setting(containerEl)
+            .setName('Exclude `%%comments%%` from wordcount')
+            .setDesc('Issue #78 — strip Obsidian comment blocks (anything between `%%` markers) before counting words. Keeps `wordcount` aligned with what readers will actually see.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.excludeCommentsFromWordcount !== false)
+                .onChange(async (value) => {
+                    this.plugin.settings.excludeCommentsFromWordcount = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Also ignore checkbox lines (`- [ ]`, `- [x]`)')
+            .setDesc('Issue #78 — also drop markdown task lines from the wordcount. Off by default because some authors keep checklists in the manuscript body.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.excludeChecklistFromWordcount === true)
+                .onChange(async (value) => {
+                    this.plugin.settings.excludeChecklistFromWordcount = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // ── Issue #77 — Default scene frontmatter ──
+        new Setting(containerEl)
+            .setName('Default scene frontmatter')
+            .setDesc('Issue #77 — raw YAML merged into the frontmatter of every newly-created scene. Useful for companion plugins (e.g. `cssclasses: [fountain]`). StoryLine\'s own keys (type, title, act, chapter, sequence, status…) always win on conflict.')
+            .addTextArea(ta => {
+                ta.setPlaceholder('cssclasses:\n  - fountain\n')
+                    .setValue(this.plugin.settings.defaultSceneFrontmatter || '')
+                    .onChange(async (value) => {
+                        this.plugin.settings.defaultSceneFrontmatter = value;
+                        await this.plugin.saveSettings();
+                    });
+                ta.inputEl.rows = 4;
+                ta.inputEl.style.width = '100%';
+                ta.inputEl.style.fontFamily = 'var(--font-monospace)';
+            });
 
         const focusDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
         focusDetails.createEl('summary', { text: 'Focus Mode Settings' });

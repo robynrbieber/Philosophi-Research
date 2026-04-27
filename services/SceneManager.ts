@@ -739,8 +739,18 @@ export class SceneManager implements ISceneStore {
             sceneData.beatsheet = this._activeProject.activeBeatSheet;
         }
 
+        // Issue #77 \u2014 seed universalFields with template defaults for any
+        // scene-category fields that have a defaultValue and aren't already set.
+        if (!isNote) {
+            sceneData.universalFields = this.seedSceneUniversalDefaults(sceneData.universalFields);
+        }
+
+        // Issue #77 \u2014 parse the user's "Default scene frontmatter" YAML
+        // snippet into extra keys to merge. StoryLine keys win on conflict.
+        const extraFm = isNote ? undefined : this.parseDefaultSceneFrontmatter();
+
         // Generate content
-        const content = MetadataParser.generateSceneContent(sceneData);
+        const content = MetadataParser.generateSceneContent(sceneData, undefined, extraFm);
 
         // Create file
         const file = await this.app.vault.create(filePath, content);
@@ -1585,6 +1595,48 @@ export class SceneManager implements ISceneStore {
         if (!existing) {
             await this.app.vault.createFolder(normalized);
         }
+    }
+
+    /**
+     * Issue #77 \u2014 parse the user's `defaultSceneFrontmatter` setting (raw
+     * YAML) into a plain object suitable for merging into a new scene's
+     * frontmatter. Returns `undefined` when the setting is empty or invalid
+     * so the caller can skip the merge cleanly.
+     */
+    private parseDefaultSceneFrontmatter(): Record<string, any> | undefined {
+        const raw = this.plugin.settings.defaultSceneFrontmatter;
+        if (!raw || !raw.trim()) return undefined;
+        try {
+            const parsed = parseYaml(raw);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                return parsed as Record<string, any>;
+            }
+        } catch (err) {
+            console.warn('StoryLine: invalid YAML in defaultSceneFrontmatter setting', err);
+        }
+        return undefined;
+    }
+
+    /**
+     * Issue #77 \u2014 seed `universalFields` with `defaultValue` from every
+     * scene-category template that defines one, without overwriting any
+     * value the caller already supplied.
+     */
+    private seedSceneUniversalDefaults(existing: Record<string, any> | undefined): Record<string, any> | undefined {
+        const templates = this.plugin?.fieldTemplates?.getAll?.() ?? [];
+        const sceneTemplates = templates.filter(t => (t.category || 'character') === 'scene' && t.defaultValue);
+        if (sceneTemplates.length === 0) return existing;
+        const out: Record<string, any> = { ...(existing || {}) };
+        for (const t of sceneTemplates) {
+            if (out[t.id] !== undefined && out[t.id] !== '' && !(Array.isArray(out[t.id]) && out[t.id].length === 0)) continue;
+            const dv = t.defaultValue!;
+            if (t.type === 'multi-select') {
+                out[t.id] = dv.split(',').map(s => s.trim()).filter(Boolean);
+            } else {
+                out[t.id] = dv;
+            }
+        }
+        return Object.keys(out).length > 0 ? out : undefined;
     }
 
     // ────────────────────────────────────

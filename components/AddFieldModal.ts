@@ -1,5 +1,5 @@
-import { App, Modal, Setting } from 'obsidian';
-import { UniversalFieldTemplate, UniversalFieldType, generateId } from '../services/FieldTemplateService';
+import { App, Modal, Notice, Setting } from 'obsidian';
+import { UniversalFieldTemplate, UniversalFieldType, generateId, suggestTopLevelKey, isReservedTopLevelKey } from '../services/FieldTemplateService';
 import { CHARACTER_CATEGORIES } from '../models/Character';
 
 // ═══════════════════════════════════════════════════════
@@ -24,6 +24,9 @@ export class AddFieldModal extends Modal {
     private placeholder = '';
     private options: string[] = [];
     private folderSource = '';
+    private topLevelKey = '';
+    private topLevelKeyTouched = false;
+    private defaultValue = '';
 
     /**
      * @param app            Obsidian App
@@ -55,6 +58,9 @@ export class AddFieldModal extends Modal {
             this.placeholder = existing.placeholder;
             this.options = [...existing.options];
             this.folderSource = existing.folderSource ?? '';
+            this.topLevelKey = existing.topLevelKey ?? '';
+            this.topLevelKeyTouched = !!existing.topLevelKey;
+            this.defaultValue = existing.defaultValue ?? '';
         } else {
             this.section = defaultSection;
         }
@@ -76,13 +82,20 @@ export class AddFieldModal extends Modal {
         });
 
         // ── Label ──
+        let topLevelKeyInput: HTMLInputElement | null = null;
         new Setting(contentEl)
             .setName('Field label')
             .setDesc('The name shown next to the input')
             .addText(text => {
                 text.setPlaceholder('e.g. Species')
                     .setValue(this.label)
-                    .onChange(v => { this.label = v.trim(); });
+                    .onChange(v => {
+                        this.label = v.trim();
+                        if (!this.topLevelKeyTouched && topLevelKeyInput) {
+                            this.topLevelKey = suggestTopLevelKey(this.label);
+                            topLevelKeyInput.value = this.topLevelKey;
+                        }
+                    });
                 text.inputEl.focus();
             });
 
@@ -194,6 +207,30 @@ export class AddFieldModal extends Modal {
                     .onChange(v => { this.folderSource = v.trim(); });
             });
 
+        // ── Top-level YAML key (issue #71) ──
+        new Setting(contentEl)
+            .setName('Top-level YAML key (optional)')
+            .setDesc('When set, this field\'s value is also written as a top-level YAML key so it appears in Obsidian Properties / Bases / Dataview. Leave blank to keep it inside `universalFields:` only. Reserved StoryLine keys are not allowed.')
+            .addText(text => {
+                text.setPlaceholder(suggestTopLevelKey(this.label || 'field'))
+                    .setValue(this.topLevelKey)
+                    .onChange(v => {
+                        this.topLevelKey = v.trim();
+                        this.topLevelKeyTouched = true;
+                    });
+                topLevelKeyInput = text.inputEl;
+            });
+
+        // ── Default value (issue #77) ──
+        new Setting(contentEl)
+            .setName('Default value (optional)')
+            .setDesc('Pre-fill this field on newly-created entities (currently applied to scenes). For multi-select fields, separate values with commas.')
+            .addText(text => {
+                text.setPlaceholder('e.g. Draft, fountain, Setup')
+                    .setValue(this.defaultValue)
+                    .onChange(v => { this.defaultValue = v; });
+            });
+
         // ── Action buttons ──
         const footer = contentEl.createDiv('storyline-add-field-footer');
 
@@ -231,6 +268,18 @@ export class AddFieldModal extends Modal {
             // Filter empty options
             const cleanOptions = this.options.map(o => o.trim()).filter(Boolean);
 
+            const tlk = this.topLevelKey.trim();
+            if (tlk) {
+                if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(tlk)) {
+                    new Notice('Top-level YAML key must start with a letter and use only letters, numbers, or underscores.');
+                    return;
+                }
+                if (isReservedTopLevelKey(tlk)) {
+                    new Notice(`"${tlk}" is reserved by StoryLine. Choose a different key.`);
+                    return;
+                }
+            }
+
             const template: UniversalFieldTemplate = {
                 id: this.existing?.id ?? generateId(),
                 label: this.label,
@@ -240,6 +289,8 @@ export class AddFieldModal extends Modal {
                 options: (this.type === 'dropdown' || this.type === 'multi-select') ? cleanOptions : [],
                 folderSource: this.type === 'multi-select' && this.folderSource ? this.folderSource : undefined,
                 placeholder: this.placeholder,
+                topLevelKey: tlk || undefined,
+                defaultValue: this.defaultValue.trim() ? this.defaultValue.trim() : undefined,
                 order: this.existing?.order ?? Date.now(),
             };
 

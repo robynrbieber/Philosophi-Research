@@ -30,6 +30,19 @@ export interface UniversalFieldTemplate {
     placeholder: string;
     /** Sort order within the section (higher = further down, default 0) */
     order: number;
+    /**
+     * Issue #71 — when set, the field's value is mirrored to a top-level
+     * YAML key with this name (in addition to `universalFields[id]`).
+     * This makes the value visible to Obsidian Properties, Bases, and
+     * Dataview without requiring users to dig into nested objects.
+     */
+    topLevelKey?: string;
+    /**
+     * Issue #77 — optional default value applied when a new entity
+     * (currently scenes) is created. For multi-select fields this can be
+     * a comma-separated string; the consumer normalises it.
+     */
+    defaultValue?: string;
 }
 
 /** On-disk shape of field-templates.json */
@@ -138,6 +151,8 @@ export class FieldTemplateService {
                     folderSource: f.folderSource,
                     placeholder: f.placeholder ?? '',
                     order: typeof f.order === 'number' ? f.order : 0,
+                    topLevelKey: typeof f.topLevelKey === 'string' && f.topLevelKey.trim() ? f.topLevelKey.trim() : undefined,
+                    defaultValue: typeof f.defaultValue === 'string' && f.defaultValue.length > 0 ? f.defaultValue : undefined,
                 }));
             } else {
                 this.templates = [];
@@ -175,3 +190,109 @@ export class FieldTemplateService {
 export function generateId(): string {
     return `uf_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
+
+// ── Issue #71 — top-level YAML mirror for custom fields ──
+
+/**
+ * Reserved frontmatter keys that universal-field topLevelKey values must
+ * never collide with. Editing these from a custom field would corrupt
+ * core StoryLine data.
+ */
+export const RESERVED_TOP_LEVEL_KEYS: ReadonlySet<string> = new Set([
+    'type', 'name', 'title', 'created', 'modified',
+    'act', 'chapter', 'sequence', 'chronologicalOrder', 'chronological_order',
+    'pov', 'characters', 'location', 'tags', 'status',
+    'storyDate', 'story_date', 'storyTime', 'story_time', 'timeline',
+    'conflict', 'emotion', 'intensity', 'wordcount', 'target_wordcount',
+    'setup_scenes', 'payoff_scenes', 'codexLinks', 'beatsheet',
+    'corkboardNote', 'corkboardNoteColor', 'corkboardNoteImage',
+    'corkboardNoteCaption', 'plotgridOrigin', 'subtitle', 'color',
+    'timeline_mode', 'timeline_strand',
+    'image', 'gallery', 'tagline', 'role', 'occupation', 'residency',
+    'family', 'appearance', 'personality', 'goal', 'belief', 'misbelief',
+    'fears', 'flaws', 'strengths', 'relations', 'books',
+    'world', 'parent', 'description', 'geography', 'culture', 'politics',
+    'magicTechnology', 'beliefs', 'economy', 'history', 'locationType',
+    'atmosphere', 'significance', 'inhabitants', 'connectedLocations',
+    'mapNotes',
+    'custom', 'universalFields', 'notes',
+]);
+
+/** Slugify a label into a YAML-safe top-level key. */
+export function suggestTopLevelKey(label: string): string {
+    return String(label || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40)
+        || 'field';
+}
+
+/** True if a top-level key is safe to use (not reserved). */
+export function isReservedTopLevelKey(key: string): boolean {
+    return RESERVED_TOP_LEVEL_KEYS.has(String(key || '').trim());
+}
+
+/** Module-level template provider so parsers don't depend on plugin instance. */
+let _templatesProvider: () => UniversalFieldTemplate[] = () => [];
+let _topLevelMirrorEnabled = true;
+export function setActiveTemplatesProvider(fn: () => UniversalFieldTemplate[]): void {
+    _templatesProvider = fn;
+}
+export function setTopLevelMirrorEnabled(on: boolean): void {
+    _topLevelMirrorEnabled = !!on;
+}
+export function getActiveTemplates(): UniversalFieldTemplate[] {
+    try { return _templatesProvider() || []; } catch { return []; }
+}
+
+/**
+ * Hydrate `universalFields` from any matching top-level YAML keys. If a
+ * template's `topLevelKey` is present in fm and the corresponding
+ * universalFields[id] is missing, copy the value across. Issue #71.
+ */
+export function hydrateUniversalFieldsFromTopLevel(
+    fm: Record<string, any>,
+    universalFields: Record<string, any> | undefined,
+): Record<string, any> | undefined {
+    const templates = getActiveTemplates();
+    if (!templates.length) return universalFields;
+    let result = universalFields ? { ...universalFields } : undefined;
+    for (const t of templates) {
+        const k = t.topLevelKey;
+        if (!k || isReservedTopLevelKey(k)) continue;
+        const top = fm[k];
+        if (top === undefined || top === null || top === '') continue;
+        if (!result) result = {};
+        if (result[t.id] === undefined || result[t.id] === '' || result[t.id] === null) {
+            result[t.id] = top;
+        }
+    }
+    return result;
+}
+
+/**
+ * Mirror universal-field values back to top-level YAML keys for templates
+ * that opt in via `topLevelKey`. Mutates `fm` in place. Issue #71.
+ * Removes the top-level key when the value is empty so the YAML stays clean.
+ */
+export function mirrorUniversalFieldsToTopLevel(
+    fm: Record<string, any>,
+    universalFields: Record<string, any> | undefined,
+): void {
+    if (!_topLevelMirrorEnabled) return;
+    const templates = getActiveTemplates();
+    if (!templates.length) return;
+    for (const t of templates) {
+        const k = t.topLevelKey;
+        if (!k || isReservedTopLevelKey(k)) continue;
+        const v = universalFields ? universalFields[t.id] : undefined;
+        if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) {
+            delete fm[k];
+        } else {
+            fm[k] = v;
+        }
+    }
+}
+
