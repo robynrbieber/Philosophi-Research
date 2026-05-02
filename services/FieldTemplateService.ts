@@ -54,6 +54,25 @@ export interface FieldTemplateFile {
 const EMPTY_FILE: FieldTemplateFile = { version: 1, fields: [] };
 
 /**
+ * Change event fired by {@link FieldTemplateService} after a template is
+ * added, updated, or removed. The plugin uses this to keep entity files'
+ * top-level YAML in sync with the template's `topLevelKey` / `folderSource`
+ * settings (issue #71 follow-up: existing entries should auto-migrate).
+ */
+export interface FieldTemplateChange {
+    type: 'add' | 'update' | 'remove';
+    id: string;
+    /** Snapshot of the template *after* the change (undefined for `remove`). */
+    template?: UniversalFieldTemplate;
+    /** topLevelKey value *before* the change (set on update / remove). */
+    oldTopLevelKey?: string;
+    /** Whether the topLevelKey changed during this update. */
+    topLevelKeyChanged?: boolean;
+    /** Whether the folderSource flag changed during this update. */
+    folderSourceChanged?: boolean;
+}
+
+/**
  * Manages universal field templates stored in the project's System/ folder.
  * Templates define extra fields that appear on *every* character sheet in the
  * chosen section.  The actual per-character data lives in the character's
@@ -64,11 +83,18 @@ export class FieldTemplateService {
     private templates: UniversalFieldTemplate[] = [];
     /** Resolver set by the plugin so we don't depend on main.ts directly */
     private getSystemFolder: () => string;
+    private onChange?: (change: FieldTemplateChange) => void | Promise<void>;
 
     constructor(app: App, getSystemFolder: () => string) {
         this.app = app;
         this.getSystemFolder = getSystemFolder;
     }
+
+    /** Register a callback to run after add/update/remove. Used for migrations. */
+    setOnChange(fn: (change: FieldTemplateChange) => void | Promise<void>): void {
+        this.onChange = fn;
+    }
+
 
     // ── Accessors ──────────────────────────────────────
 
@@ -103,20 +129,50 @@ export class FieldTemplateService {
     async add(template: UniversalFieldTemplate): Promise<void> {
         this.templates.push(template);
         await this.save();
+        try {
+            await this.onChange?.({
+                type: 'add',
+                id: template.id,
+                template,
+                topLevelKeyChanged: !!template.topLevelKey,
+                folderSourceChanged: !!template.folderSource,
+            });
+        } catch (e) { console.error('[StoryLine] FieldTemplate onChange (add):', e); }
     }
 
     /** Update an existing template in-place and persist */
     async update(id: string, patch: Partial<Omit<UniversalFieldTemplate, 'id'>>): Promise<void> {
         const t = this.templates.find(f => f.id === id);
         if (!t) return;
+        const oldTopLevelKey = t.topLevelKey;
+        const oldFolderSource = t.folderSource;
         Object.assign(t, patch);
         await this.save();
+        try {
+            await this.onChange?.({
+                type: 'update',
+                id,
+                template: { ...t },
+                oldTopLevelKey,
+                topLevelKeyChanged: oldTopLevelKey !== t.topLevelKey,
+                folderSourceChanged: oldFolderSource !== t.folderSource,
+            });
+        } catch (e) { console.error('[StoryLine] FieldTemplate onChange (update):', e); }
     }
 
     /** Remove a template by ID and persist */
     async remove(id: string): Promise<void> {
+        const removed = this.templates.find(t => t.id === id);
         this.templates = this.templates.filter(t => t.id !== id);
         await this.save();
+        try {
+            await this.onChange?.({
+                type: 'remove',
+                id,
+                oldTopLevelKey: removed?.topLevelKey,
+                topLevelKeyChanged: !!removed?.topLevelKey,
+            });
+        } catch (e) { console.error('[StoryLine] FieldTemplate onChange (remove):', e); }
     }
 
     /** Reorder: move template to a new position within its section */
@@ -248,9 +304,57 @@ export function getActiveTemplates(): UniversalFieldTemplate[] {
 }
 
 /**
+ * Strip Obsidian wikilink brackets and any pipe-aliases off a value, leaving
+ * just the target name. Safe to call on plain strings, wikilink strings, or
+ * arrays mixing both. Used when reading universal-field values back from a
+ * top-level YAML key that may have been written as `[[Note]]` for a
+ * folder-sourced field.
+ */
+export function stripWikilinks(value: any): any {
+    const strip = (s: string): string => {
+        const m = s.match(/^\[\[([^\]]+)\]\]$/);
+        if (!m) return s;
+        const inner = m[1];
+        const pipeIdx = inner.indexOf('|');
+        return (pipeIdx >= 0 ? inner.slice(0, pipeIdx) : inner).trim();
+    };
+    if (Array.isArray(value)) {
+        return value.map(v => (typeof v === 'string' ? strip(v) : v));
+    }
+    if (typeof value === 'string') return strip(value);
+    return value;
+}
+
+/**
+ * Wrap a folder-sourced field value as Obsidian wikilink(s) for top-level
+ * YAML mirroring, so the property becomes clickable in Properties / Bases /
+ * Dataview. The internal `universalFields[id]` representation stays as plain
+ * names to keep the dropdown UI matching its options. Already-wikilinked
+ * input is left untouched.
+ */
+function wrapAsWikilinks(value: any): any {
+    const wrap = (s: string): string => {
+        const trimmed = s.trim();
+        if (!trimmed) return s;
+        if (/^\[\[[^\]]+\]\]$/.test(trimmed)) return trimmed;
+        return `[[${trimmed}]]`;
+    };
+    if (Array.isArray(value)) {
+        return value.map(v => (typeof v === 'string' && v.trim() ? wrap(v) : v));
+    }
+    if (typeof value === 'string') return wrap(value);
+    return value;
+}
+
+/**
  * Hydrate `universalFields` from any matching top-level YAML keys. If a
  * template's `topLevelKey` is present in fm and the corresponding
  * universalFields[id] is missing, copy the value across. Issue #71.
+ *
+ * For folder-sourced templates, top-level YAML may store `[[Wikilinks]]`
+ * (so Obsidian Properties shows them as clickable links). We strip the
+ * brackets when copying back so the in-memory value matches the dropdown
+ * option strings.
  */
 export function hydrateUniversalFieldsFromTopLevel(
     fm: Record<string, any>,
@@ -266,7 +370,8 @@ export function hydrateUniversalFieldsFromTopLevel(
         if (top === undefined || top === null || top === '') continue;
         if (!result) result = {};
         if (result[t.id] === undefined || result[t.id] === '' || result[t.id] === null) {
-            result[t.id] = top;
+            const isFolderSourced = !!t.folderSource && (t.type === 'dropdown' || t.type === 'multi-select');
+            result[t.id] = isFolderSourced ? stripWikilinks(top) : top;
         }
     }
     return result;
@@ -276,6 +381,10 @@ export function hydrateUniversalFieldsFromTopLevel(
  * Mirror universal-field values back to top-level YAML keys for templates
  * that opt in via `topLevelKey`. Mutates `fm` in place. Issue #71.
  * Removes the top-level key when the value is empty so the YAML stays clean.
+ *
+ * For folder-sourced dropdown / multi-select templates, the mirrored value
+ * is wrapped in `[[wikilinks]]` so it becomes clickable in Obsidian
+ * Properties / Bases / Dataview.
  */
 export function mirrorUniversalFieldsToTopLevel(
     fm: Record<string, any>,
@@ -291,8 +400,10 @@ export function mirrorUniversalFieldsToTopLevel(
         if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) {
             delete fm[k];
         } else {
-            fm[k] = v;
+            const isFolderSourced = !!t.folderSource && (t.type === 'dropdown' || t.type === 'multi-select');
+            fm[k] = isFolderSourced ? wrapAsWikilinks(v) : v;
         }
     }
 }
+
 

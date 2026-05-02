@@ -130,7 +130,8 @@ export class AddFieldModal extends Modal {
                         optionsContainer.style.display = showOpts ? '' : 'none';
                     }
                     if (folderSourceContainer) {
-                        folderSourceContainer.style.display = this.type === 'multi-select' ? '' : 'none';
+                        const showFolderSrc = this.type === 'multi-select' || this.type === 'dropdown';
+                        folderSourceContainer.style.display = showFolderSrc ? '' : 'none';
                     }
                 });
             });
@@ -195,9 +196,9 @@ export class AddFieldModal extends Modal {
             if (inputs.length) (inputs[inputs.length - 1] as HTMLInputElement).focus();
         });
 
-        // ── Folder source (multi-select only) ──
+        // ── Folder source (dropdown / multi-select) ──
         folderSourceContainer = contentEl.createDiv('storyline-field-folder-source-container');
-        if (this.type !== 'multi-select') folderSourceContainer.style.display = 'none';
+        if (this.type !== 'multi-select' && this.type !== 'dropdown') folderSourceContainer.style.display = 'none';
         new Setting(folderSourceContainer)
             .setName('Folder source (optional)')
             .setDesc('Vault folder path whose note names become selectable options (e.g. Traits/)')
@@ -287,7 +288,7 @@ export class AddFieldModal extends Modal {
                 category: this.existing?.category,
                 type: this.type,
                 options: (this.type === 'dropdown' || this.type === 'multi-select') ? cleanOptions : [],
-                folderSource: this.type === 'multi-select' && this.folderSource ? this.folderSource : undefined,
+                folderSource: (this.type === 'multi-select' || this.type === 'dropdown') && this.folderSource ? this.folderSource : undefined,
                 placeholder: this.placeholder,
                 topLevelKey: tlk || undefined,
                 defaultValue: this.defaultValue.trim() ? this.defaultValue.trim() : undefined,

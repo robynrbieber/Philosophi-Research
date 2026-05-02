@@ -981,9 +981,27 @@ export class LocationView extends ItemView {
         } else if (tpl.type === 'dropdown') {
             const select = row.createEl('select', { cls: 'location-field-input dropdown' });
             select.createEl('option', { text: tpl.placeholder || 'Select…', value: '' });
-            for (const opt of tpl.options) {
+
+            const dropdownOptions = [...tpl.options];
+            if (tpl.folderSource) {
+                const folder = this.app.vault.getAbstractFileByPath(tpl.folderSource);
+                if (folder && 'children' in folder) {
+                    for (const child of (folder as obsidian.TFolder).children) {
+                        if (child instanceof obsidian.TFile && child.extension === 'md') {
+                            if (!dropdownOptions.includes(child.basename)) dropdownOptions.push(child.basename);
+                        }
+                    }
+                }
+                dropdownOptions.sort((a, b) => a.localeCompare(b));
+            }
+
+            for (const opt of dropdownOptions) {
                 const el = select.createEl('option', { text: opt, value: opt });
                 if (value === opt) el.selected = true;
+            }
+            if (value && !dropdownOptions.includes(value)) {
+                const el = select.createEl('option', { text: value, value });
+                el.selected = true;
             }
             select.addEventListener('change', () => {
                 draft.universalFields![tpl.id] = select.value;

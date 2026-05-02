@@ -87,6 +87,7 @@ export class CodexView extends ItemView {
 
     async onClose(): Promise<void> {
         await this.flushPendingSave();
+        document.querySelectorAll('.gallery-lightbox-window').forEach(w => w.remove());
     }
 
     /**
@@ -849,11 +850,25 @@ export class CodexView extends ItemView {
         } else if (tpl.type === 'dropdown') {
             const select = row.createEl('select', { cls: 'codex-field-input dropdown' });
             select.createEl('option', { text: tpl.placeholder || 'Select…', value: '' });
-            for (const opt of tpl.options) {
+
+            const dropdownOptions = [...tpl.options];
+            if (tpl.folderSource) {
+                const folder = this.app.vault.getAbstractFileByPath(tpl.folderSource);
+                if (folder && 'children' in folder) {
+                    for (const child of (folder as obsidian.TFolder).children) {
+                        if (child instanceof obsidian.TFile && child.extension === 'md') {
+                            if (!dropdownOptions.includes(child.basename)) dropdownOptions.push(child.basename);
+                        }
+                    }
+                }
+                dropdownOptions.sort((a, b) => a.localeCompare(b));
+            }
+
+            for (const opt of dropdownOptions) {
                 const el = select.createEl('option', { text: opt, value: opt });
                 if (value === opt) el.selected = true;
             }
-            if (value && !tpl.options.includes(value)) {
+            if (value && !dropdownOptions.includes(value)) {
                 const el = select.createEl('option', { text: value, value });
                 el.selected = true;
             }
@@ -1090,6 +1105,10 @@ export class CodexView extends ItemView {
                         attr: { src, alt: entry.caption || 'Gallery image' },
                     });
                     img.style.cursor = 'pointer';
+                    img.addEventListener('click', () => {
+                        const galleryWidth = wrapper.offsetWidth;
+                        this.openGalleryLightbox(gallery, activeIndex, galleryWidth);
+                    });
                     img.onerror = () => {
                         img.remove();
                         const ph = viewer.createDiv('character-gallery-placeholder');
@@ -1608,6 +1627,163 @@ export class CodexView extends ItemView {
         if (this._pendingDraft) {
             await this.executeSave(this._pendingDraft);
         }
+    }
+
+    /**
+     * Open a non-modal, draggable/resizable floating window showing a gallery image.
+     * Mirrors the lightbox in CharacterView / LocationView so codex entries
+     * (items, etc.) can also expand thumbnails to a larger view.
+     */
+    private openGalleryLightbox(
+        gallery: Array<{ path: string; caption: string }>,
+        startIndex: number,
+        galleryWidth: number,
+    ): void {
+        document.querySelector('.gallery-lightbox-window')?.remove();
+
+        let currentIndex = startIndex;
+        const winWidth = Math.min(Math.round(galleryWidth * 2), window.innerWidth - 40);
+        const winHeight = Math.round((winWidth * 3) / 4) + 36 + 28;
+
+        const win = document.body.createDiv('gallery-lightbox-window');
+        win.style.width = `${winWidth}px`;
+        win.style.height = `${winHeight}px`;
+
+        const titlebar = win.createDiv('gallery-lightbox-titlebar');
+        const titleText = titlebar.createSpan({ cls: 'gallery-lightbox-title' });
+        const closeBtn = titlebar.createEl('button', { cls: 'gallery-lightbox-close', attr: { title: 'Close' } });
+        obsidian.setIcon(closeBtn, 'x');
+        closeBtn.addEventListener('click', () => { cleanup(); win.remove(); });
+
+        const contentRow = win.createDiv('gallery-lightbox-content-row');
+
+        const prevBtn = contentRow.createEl('button', { cls: 'gallery-lightbox-nav-btn', attr: { title: 'Previous' } });
+        obsidian.setIcon(prevBtn, 'chevron-left');
+        prevBtn.addEventListener('click', () => {
+            currentIndex = (currentIndex - 1 + gallery.length) % gallery.length;
+            renderContent();
+        });
+
+        const imgContainer = contentRow.createDiv('gallery-lightbox-content');
+
+        const nextBtn = contentRow.createEl('button', { cls: 'gallery-lightbox-nav-btn', attr: { title: 'Next' } });
+        obsidian.setIcon(nextBtn, 'chevron-right');
+        nextBtn.addEventListener('click', () => {
+            currentIndex = (currentIndex + 1) % gallery.length;
+            renderContent();
+        });
+
+        const captionEl = win.createDiv('gallery-lightbox-caption');
+        const resizeHandle = win.createDiv('gallery-lightbox-resize-handle');
+
+        const zoomLevels = new Map<number, number>();
+        const getZoom = () => zoomLevels.get(currentIndex) ?? 1;
+        const setZoom = (z: number) => { zoomLevels.set(currentIndex, z); };
+
+        const renderContent = () => {
+            const entry = gallery[currentIndex];
+            const src = resolveImagePath(this.app, entry.path);
+            titleText.textContent = entry.caption || `Image ${currentIndex + 1} of ${gallery.length}`;
+            imgContainer.empty();
+            if (src) {
+                const img = imgContainer.createEl('img', { attr: { src, alt: entry.caption || 'Gallery image' } });
+                img.style.transformOrigin = 'center center';
+                const z = getZoom();
+                if (z !== 1) img.style.transform = `scale(${z})`;
+            }
+            captionEl.textContent = entry.caption || '';
+            captionEl.style.display = entry.caption ? '' : 'none';
+            prevBtn.style.display = gallery.length > 1 ? '' : 'none';
+            nextBtn.style.display = gallery.length > 1 ? '' : 'none';
+        };
+        renderContent();
+
+        imgContainer.addEventListener('wheel', (e: WheelEvent) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            const newZoom = Math.max(0.5, Math.min(5, getZoom() + delta));
+            setZoom(newZoom);
+            const img = imgContainer.querySelector('img');
+            if (img) img.style.transform = `scale(${newZoom})`;
+        }, { passive: false });
+
+        let pinchStartDist = 0;
+        let pinchStartZoom = 1;
+        imgContainer.addEventListener('touchstart', (e: TouchEvent) => {
+            if (e.touches.length === 2) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                pinchStartDist = Math.hypot(dx, dy);
+                pinchStartZoom = getZoom();
+            }
+        }, { passive: true });
+        imgContainer.addEventListener('touchmove', (e: TouchEvent) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.hypot(dx, dy);
+                const scale = dist / pinchStartDist;
+                const newZoom = Math.max(0.5, Math.min(5, pinchStartZoom * scale));
+                setZoom(newZoom);
+                const img = imgContainer.querySelector('img');
+                if (img) img.style.transform = `scale(${newZoom})`;
+            }
+        }, { passive: false });
+
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        titlebar.addEventListener('pointerdown', (e: PointerEvent) => {
+            if ((e.target as HTMLElement).closest('.gallery-lightbox-close')) return;
+            isDragging = true;
+            const rect = win.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+            win.style.left = `${rect.left}px`;
+            win.style.top = `${rect.top}px`;
+            win.style.transform = 'none';
+            titlebar.setPointerCapture(e.pointerId);
+            e.preventDefault();
+        });
+        titlebar.addEventListener('pointermove', (e: PointerEvent) => {
+            if (!isDragging) return;
+            win.style.left = `${e.clientX - dragOffsetX}px`;
+            win.style.top = `${e.clientY - dragOffsetY}px`;
+        });
+        titlebar.addEventListener('pointerup', () => { isDragging = false; });
+        titlebar.addEventListener('lostpointercapture', () => { isDragging = false; });
+
+        let isResizing = false;
+        let resizeStartX = 0;
+        let resizeStartY = 0;
+        let startW = 0;
+        let startH = 0;
+        resizeHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+            isResizing = true;
+            resizeStartX = e.clientX;
+            resizeStartY = e.clientY;
+            startW = win.offsetWidth;
+            startH = win.offsetHeight;
+            resizeHandle.setPointerCapture(e.pointerId);
+            e.preventDefault();
+            e.stopPropagation();
+        });
+        resizeHandle.addEventListener('pointermove', (e: PointerEvent) => {
+            if (!isResizing) return;
+            const newW = Math.max(200, startW + (e.clientX - resizeStartX));
+            const newH = Math.max(150, startH + (e.clientY - resizeStartY));
+            win.style.width = `${newW}px`;
+            win.style.height = `${newH}px`;
+        });
+        resizeHandle.addEventListener('pointerup', () => { isResizing = false; });
+        resizeHandle.addEventListener('lostpointercapture', () => { isResizing = false; });
+
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') { cleanup(); win.remove(); }
+        };
+        document.addEventListener('keydown', onKey);
+        const cleanup = () => { document.removeEventListener('keydown', onKey); };
     }
 }
 

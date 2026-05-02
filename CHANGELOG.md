@@ -2,6 +2,21 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.7
+
+### Bug Fixes
+
+- **Codex gallery thumbnails opened nothing in items / custom categories** — In the Character profile, clicking the large gallery image opened a draggable lightbox window. In the codex (items and any user-added categories) the same gallery only swapped thumbnails into the viewer; clicking the main image did nothing. `CodexView.renderGallerySection` is now wired to the same `openGalleryLightbox` helper used by `CharacterView` and `LocationView`, so codex entries can also expand gallery images to a larger floating window with prev/next, zoom and Escape-to-close.
+- **Scene cards: word count and progress dots overlapping** — The three progress dots (●●○) were absolutely positioned at the top-right corner of each scene card and rendered on top of the word count badge. They were first moved to the lower-right corner, but on cards with a long row of character pills (e.g. three names) the pills could still slide under the dots. The dots are now anchored just below the word count (top-right, under the wordcount badge), where they never collide with either the wordcount or the character pills.
+- **Board columns had inconsistent widths** — `.story-line-column` used `min-width: 260px; max-width: 320px`, so an act whose scenes had wider content (more character pills) ended up visibly wider than an act whose scenes had fewer pills. Columns are now a fixed `width: 300px`, and scene cards inside the column body get `width: 100%; min-width: 0; box-sizing: border-box` so the character-pill row wraps to a new line *inside the card* instead of stretching the parent column.
+- **Custom fields with `topLevelKey` did not migrate existing entries** — Adding a Top-level YAML key to an existing dropdown / multi-select template (or flipping the global *Mirror custom fields to top-level YAML* toggle on) only affected new edits; previously-saved values stayed locked inside `universalFields:` until the user re-selected each one by hand. StoryLine now retro-mirrors all characters, codex entries, locations and scenes whenever a template's top-level key or folder source changes — and runs the same sweep when the global mirror toggle is enabled. Renamed top-level keys also clean up the stale property name automatically.
+
+### New Features
+
+- **Folder-sourced custom-field selections become clickable wikilinks** — When a dropdown or multi-select Universal Field draws its options from a vault folder (e.g. *Traits/*, *Houses/*, *Magic Systems/*), the value mirrored to top-level YAML is now wrapped as `[[Note Name]]`. Obsidian Properties, Bases, Dataview and the graph all treat the property as a real link, so you can jump straight from a character's Properties panel to the source note. The in-app dropdown UI keeps showing plain names — bracket stripping/wrapping happens only at the YAML boundary.
+- **Folder source available for dropdown fields too** — Previously only multi-select fields could be sourced from a folder of notes. The Add/Edit Field modal now exposes the same *Folder source (optional)* setting for single-value dropdowns, with the matching wikilink-on-mirror behaviour above.
+
+---
 ## Version 1.9.6
 
 ### Bug Fixes

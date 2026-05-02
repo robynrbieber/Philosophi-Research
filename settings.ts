@@ -1259,8 +1259,17 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.universalFieldsMirrorTopLevel !== false)
                 .onChange(async (value) => {
+                    const wasOn = this.plugin.settings.universalFieldsMirrorTopLevel !== false;
                     this.plugin.settings.universalFieldsMirrorTopLevel = value;
                     await this.plugin.saveSettings();
+                    // When the user flips the toggle ON, retro-mirror every
+                    // existing entity so values already saved in
+                    // `universalFields:` flow into the top-level YAML keys
+                    // without requiring a manual re-edit per record.
+                    if (value && !wasOn) {
+                        try { await this.plugin.migrateUniversalFieldMirror(); }
+                        catch (e) { console.error('[StoryLine] mirror toggle migration:', e); }
+                    }
                 }));
 
         // ── Issue #78 — Wordcount exclusions ──

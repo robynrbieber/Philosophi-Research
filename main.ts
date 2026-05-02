@@ -3,7 +3,7 @@ import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './se
 import { SceneManager } from './services/SceneManager';
 import { registerCustomStatuses } from './models/Scene';
 import { setWriteSceneFieldsAsWikilinks, setWordcountExclusions } from './services/MetadataParser';
-import { setActiveTemplatesProvider, setTopLevelMirrorEnabled } from './services/FieldTemplateService';
+import { setActiveTemplatesProvider, setTopLevelMirrorEnabled, mirrorUniversalFieldsToTopLevel, hydrateUniversalFieldsFromTopLevel, isReservedTopLevelKey, type FieldTemplateChange } from './services/FieldTemplateService';
 import {
     BOARD_VIEW_TYPE,
     TIMELINE_VIEW_TYPE,
@@ -97,6 +97,12 @@ export default class SceneCardsPlugin extends Plugin {
         // Issue #71 — expose templates to parsers for top-level YAML mirroring
         setActiveTemplatesProvider(() => this.fieldTemplates.getAll());
         setTopLevelMirrorEnabled(this.settings.universalFieldsMirrorTopLevel !== false);
+        // Issue #71 follow-up — when a template's topLevelKey or folderSource
+        // changes, retro-mirror existing entities so users don't have to
+        // re-edit every record by hand.
+        this.fieldTemplates.setOnChange(async (change) => {
+            await this.migrateUniversalFieldMirror(change);
+        });
         this.seriesManager = new SeriesManager(this.app, this);
         this.researchManager = new ResearchManager(this.app, this);
 
@@ -926,6 +932,99 @@ export default class SceneCardsPlugin extends Plugin {
      */
     getProjectSystemFolder(): string {
         return `${this.getProjectBaseFolder()}/System`;
+    }
+
+    // ────────────────────────────────────
+    //  Issue #71 follow-up — universal-field migrations
+    // ────────────────────────────────────
+
+    /**
+     * Re-mirror universal-field values to top-level YAML for every existing
+     * entity (characters, codex entries, locations, scenes) after a template
+     * change. This means users adding `topLevelKey` to a previously-saved
+     * field — or turning the global mirror toggle on — instantly see their
+     * existing data flow into Properties / Bases / Dataview without having
+     * to re-edit each note. Folder-sourced selections are wrapped as
+     * `[[wikilinks]]` automatically by the mirror function.
+     *
+     * Pass `change` from the FieldTemplateService to also clean up a renamed
+     * topLevelKey or a deleted template's stale top-level YAML key. Pass
+     * nothing to do a full re-mirror sweep (used when the global toggle
+     * flips on).
+     */
+    async migrateUniversalFieldMirror(change?: FieldTemplateChange): Promise<void> {
+        const oldKey = change?.oldTopLevelKey && change.topLevelKeyChanged ? change.oldTopLevelKey : undefined;
+        const removedTpl = change?.type === 'remove';
+
+        // Only run when something user-visible would actually change.
+        // For add/update, skip if neither topLevelKey nor folderSource changed.
+        if (change && change.type !== 'remove') {
+            if (!change.topLevelKeyChanged && !change.folderSourceChanged) return;
+        }
+        // Mirror writes only happen when the global toggle is on; if it's off
+        // we still want to clean up old top-level keys (rename / removal),
+        // but skip the full re-mirror sweep otherwise.
+        const mirrorOn = this.settings.universalFieldsMirrorTopLevel !== false;
+        if (!mirrorOn && !oldKey && !removedTpl) return;
+
+        const files = this.collectEntityFiles();
+        let touched = 0;
+        for (const file of files) {
+            try {
+                await this.app.fileManager.processFrontMatter(file, (fm) => {
+                    let didChange = false;
+                    // Strip a renamed / removed top-level key.
+                    if (oldKey && !isReservedTopLevelKey(oldKey) && fm[oldKey] !== undefined) {
+                        delete fm[oldKey];
+                        didChange = true;
+                    }
+                    if (removedTpl && change?.oldTopLevelKey && !isReservedTopLevelKey(change.oldTopLevelKey)) {
+                        if (fm[change.oldTopLevelKey] !== undefined) {
+                            delete fm[change.oldTopLevelKey];
+                            didChange = true;
+                        }
+                    }
+                    if (mirrorOn) {
+                        const before = JSON.stringify(fm);
+                        // Hydrate first so values that only live in top-level
+                        // YAML get a universalFields counterpart, then mirror
+                        // back to apply the (possibly new) wikilink wrapping.
+                        const hydrated = hydrateUniversalFieldsFromTopLevel(fm, fm.universalFields);
+                        if (hydrated !== fm.universalFields) fm.universalFields = hydrated;
+                        mirrorUniversalFieldsToTopLevel(fm, fm.universalFields);
+                        if (JSON.stringify(fm) !== before) didChange = true;
+                    }
+                    if (didChange) touched++;
+                });
+            } catch (e) {
+                console.error('[StoryLine] migrateUniversalFieldMirror:', file.path, e);
+            }
+        }
+        if (touched > 0) {
+            new Notice(`StoryLine: synced custom-field YAML in ${touched} file${touched === 1 ? '' : 's'}.`);
+        }
+    }
+
+    /**
+     * Collect every TFile that may carry `universalFields`: characters,
+     * codex entries, locations, and scenes (across all loaded projects).
+     */
+    private collectEntityFiles(): TFile[] {
+        const files: TFile[] = [];
+        const seen = new Set<string>();
+        const push = (p: string | undefined | null) => {
+            if (!p || seen.has(p)) return;
+            const af = this.app.vault.getAbstractFileByPath(p);
+            if (af instanceof TFile && af.extension === 'md') {
+                seen.add(p);
+                files.push(af);
+            }
+        };
+        try { for (const c of this.characterManager?.getAllCharacters() ?? []) push(c.filePath); } catch { /* noop */ }
+        try { for (const e of this.codexManager?.getAllEntries() ?? []) push(e.filePath); } catch { /* noop */ }
+        try { for (const l of this.locationManager?.getAllLocations() ?? []) push(l.filePath); } catch { /* noop */ }
+        try { for (const s of this.sceneManager?.getAllScenes() ?? []) push(s.filePath); } catch { /* noop */ }
+        return files;
     }
 
     /**
