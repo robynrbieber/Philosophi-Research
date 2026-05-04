@@ -130,7 +130,7 @@ A standalone sidebar panel that displays the full Inspector for the currently ac
 
 ### Stats View
 
-Statistics dashboard with eight collapsible sections: project overview with goal tracking and reading time estimate, writing sprint timer with daily goal and streak, writing history with daily bar charts (7d/30d/90d/All), progress breakdown by status/chapter/act, character & world coverage analysis with character × chapter heatmap, setup & payoff map with chain visualization, pacing & tension with dialogue ratio, tension curve, and pacing coach, prose analysis with readability scores and word frequency, echo finder for repeated phrases, and automated plot hole warnings.
+Statistics dashboard with eight collapsible sections: project overview with goal tracking and reading time estimate, writing sprint timer with **daily / weekly / monthly progress rings** and streak, writing history with daily bar charts (7d/30d/90d/All), progress breakdown by status/chapter/act, character & world coverage analysis with character × chapter heatmap, setup & payoff map with chain visualization, pacing & tension with dialogue ratio, tension curve, and pacing coach, prose analysis with readability scores and word frequency, echo finder for repeated phrases, and automated plot hole warnings.
 
 ![Stats — Overview](screenshots/12.Stats.jpg)
 
@@ -180,6 +180,8 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Plot Hole Detection** — Automated validation across six categories.
 - **Pacing Analysis** — Bar charts and histograms for scene length and distribution.
 - **Writing Sprint** — Built-in countdown timer for focused writing sessions.
+- **Writing Goals** — Set daily, weekly, and monthly word-count targets in Settings → Writing Goals. The Stats view shows three circular progress rings (Today / This week / This month) that turn green when you hit each goal.
+- **Custom Location Types** — Add your own location types (Planet, Star System, Galaxy, Dimension, etc.) under Settings → Custom Location Types, or use the **+ Add custom type…** option in the Location editor's Type dropdown. Built-in types like City, Town, and Wilderness remain available.
 - **Story Navigator** — Compact sidebar panel with search, sort, plotline filter, act grouping, pinned scenes, progress bar, and a **Scene Details** button. Auto-opens on project load.
 - **Scene Details Sidebar** — Standalone Inspector panel that follows the active editor file. Edit scene metadata side-by-side with your writing.
 - **Research Sidebar** — Right-sidebar panel for storing research notes, web clips, images, and open questions. Search, tag filter, type filter, and auto-suggest mode that surfaces relevant posts based on the active scene's metadata.

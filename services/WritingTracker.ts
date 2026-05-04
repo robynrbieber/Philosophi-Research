@@ -204,6 +204,47 @@ export class WritingTracker {
         return { ...this.history };
     }
 
+    /** Sum of words written across the last N days (inclusive of today). */
+    getWordsInLastDays(days: number): number {
+        if (days <= 0) return 0;
+        let total = 0;
+        const d = new Date();
+        for (let i = 0; i < days; i++) {
+            total += this.history[this.dateKey(d)] || 0;
+            d.setDate(d.getDate() - 1);
+        }
+        return total;
+    }
+
+    /** Words written from Monday of the current week through today (inclusive). */
+    getThisWeekWords(): number {
+        const now = new Date();
+        // JS getDay(): 0 = Sunday, 1 = Monday, …, 6 = Saturday.
+        // Treat Monday as the first day of the week.
+        const dow = now.getDay();
+        const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+        let total = 0;
+        const d = new Date(now);
+        for (let i = 0; i <= daysSinceMonday; i++) {
+            total += this.history[this.dateKey(d)] || 0;
+            d.setDate(d.getDate() - 1);
+        }
+        return total;
+    }
+
+    /** Words written from day 1 of the current calendar month through today. */
+    getThisMonthWords(): number {
+        const now = new Date();
+        const day = now.getDate();
+        let total = 0;
+        const d = new Date(now);
+        for (let i = 0; i < day; i++) {
+            total += this.history[this.dateKey(d)] || 0;
+            d.setDate(d.getDate() - 1);
+        }
+        return total;
+    }
+
     // ── Sprint controls ────────────────────────────────
 
     /** Start a timed writing sprint */

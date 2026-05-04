@@ -2,6 +2,19 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.8
+
+### Bug Fixes
+
+- **Cannot create new notes in the corkboard when *Auto-generate Sequence* is off** *([#81](https://github.com/PixeroJan/obsidian-storyline/issues/81))* — With auto-sequence disabled, every new sticky note resolved to the same `00-00 Untitled.md` filename, and the second create failed because the file already existed. `SceneManager.createScene()` now appends ` (1)`, ` (2)`, … to the filename until it is unique, so unlimited untitled notes (and untitled scenes) can be created in the corkboard regardless of the auto-sequence setting.
+- **Infinite loop when creating a new series whose name matches the active book** *([#82](https://github.com/PixeroJan/obsidian-storyline/issues/82))* — Naming a new series the same as the current book made `seriesFolder` resolve to the book's own folder, so `moveFolderRecursive` kept moving the destination subtree into itself, spawning an unbounded chain of identically-named subfolders. `SeriesManager.createSeriesFromProject()` and `addProjectToSeries()` now refuse the operation up front with a friendly notice (suggesting e.g. *"`<name>` Series"*), and `moveFolderRecursive()` defensively rejects any move whose destination is inside the source.
+
+### New Features
+
+- **Weekly & monthly word goals + circular progress rings** — Settings → **Writing Goals** gained two new targets: **Weekly word goal** (default `7000`, Monday → today) and **Monthly word goal** (default `30000`, day 1 → today). The Stats view's *Writing Sprint* section now shows three SVG progress rings (Today / This week / This month) under the existing daily progress bar. Each arc turns green when its goal is reached, and the percentage label is uncapped, so blowing past a target shows the actual value (e.g. *127%*). Backed by three new helpers on `WritingTracker` (`getWordsInLastDays`, `getThisWeekWords`, `getThisMonthWords`) — no on-disk format change.
+- **Custom location types** *(user request — sci-fi / D&D campaigns)* — The Location editor's **Type** dropdown now lists the built-in types (City, Town, Wilderness, …) followed by your own custom types (e.g. **Planet**, **Star System**, **Galactic Region**, **Galaxy**, **Dimension**). Add a new type on the fly via the **+ Add custom type…** option at the bottom of the dropdown, or manage the full list under **Settings → Custom Location Types**. Custom types are vault-wide and persist across all projects; the existing `locationType` YAML field accepts any string, so your data stays clean and portable.
+
+---
 ## Version 1.9.7
 
 ### Bug Fixes

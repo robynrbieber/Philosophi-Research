@@ -270,6 +270,7 @@ A hierarchical worldbuilding and location management system. Locations are acces
 - **Image gallery** — add up to 10 images with captions. Browse via carousel or open in a floating lightbox. See [Image Galleries](#image-galleries).
 - **Image picker** — import from computer (saved into `<Project>/Images/` with automatic dedup), choose from vault, or remove.
 - **Custom fields** for any additional notes.
+- **Custom location types** — the **Type** dropdown on a Location includes built-in options (City, Town, Wilderness, …) plus any types you've added. Pick **+ Add custom type…** at the bottom of the list to add a new one on the fly (e.g. **Planet**, **Star System**, **Galactic Region**, **Galaxy**, **Dimension**) — useful for sci-fi, fantasy, and tabletop campaigns. You can also manage the list under **Settings → Custom Location Types**.
 - **Auto-save** with focus-loss protection (editing won't be interrupted).
 - **Side panel** shows:
   - Location/world stats (scene count, sub-location count).
@@ -304,6 +305,7 @@ A statistics dashboard organized into eight collapsible sections. Click any sect
 - **Session stats** — words written this session, duration, words per minute.
 - **Streak** — consecutive days with writing activity.
 - **Daily goal** — today's words vs. your daily target, with a progress bar.
+- **Progress rings** — three circular rings show progress toward your **Daily**, **Weekly** (Mon → today), and **Monthly** (day 1 → today) word goals. Each ring turns green when its goal is reached; the percentage label is uncapped, so you'll see "127%" if you blow past a target. Configure goals under Settings → Writing Goals.
 - **7-day sparkline** — miniature bar chart showing your last seven days of writing.
 
 #### 3. Writing History (collapsible)
@@ -1480,7 +1482,11 @@ Open **Settings → StoryLine** to configure:
 | Default Status | Status for new scenes | `idea` |
 | Auto-generate Sequence | Auto-number new scenes | On |
 | Default Target Word Count | Word count goal per scene | `800` |
+| Daily Word Goal | Daily writing target (rings + sparkline) | `1000` |
+| Weekly Word Goal | Weekly writing target (Mon → today) | `7000` |
+| Monthly Word Goal | Monthly writing target (day 1 → today) | `30000` |
 | Project Word Goal | Word count goal for the whole project | `80000` |
+| Custom Location Types | User-defined types (Planet, Star System, Galaxy, …) for the Location Type dropdown | — |
 | Default View | Which view opens first | `Board` |
 | Color Coding | Card color mode (status / POV / emotion / act / tag) | `status` |
 | Color Scheme | Choose from 16 palettes (Catppuccin + Moods) or custom | `mocha` |

@@ -568,7 +568,12 @@ export interface SceneCardsSettings {
 
     // Writing goals
     dailyWordGoal: number;
+    weeklyWordGoal: number;
+    monthlyWordGoal: number;
     projectWordGoal: number;
+
+    // Custom location types (user-defined)
+    customLocationTypes?: string[];
 
     // Advanced
     enablePlotHoleDetection: boolean;
@@ -741,7 +746,10 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     locationDetailPortraitHeight: 80,
 
     dailyWordGoal: 1000,
+    weeklyWordGoal: 7000,
+    monthlyWordGoal: 30000,
     projectWordGoal: 80000,
+    customLocationTypes: [],
 
     enablePlotHoleDetection: true,
     showWarnings: true,
@@ -1207,6 +1215,64 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 }));
 
         // ═══════════════════════════════════════════
+        //  Custom Location Types
+        // ═══════════════════════════════════════════
+        containerEl.createEl('h2', { text: 'Custom Location Types' });
+
+        const locTypesDesc = containerEl.createEl('p', {
+            cls: 'setting-item-description',
+            text: 'Add your own location types (e.g. Planet, Star System, Galaxy, Dimension) — they appear in the Type dropdown alongside the built-in options.',
+        });
+        locTypesDesc.style.marginBottom = '8px';
+
+        const renderCustomTypes = () => {
+            // Remove any previously rendered list (when re-rendering after add/remove)
+            containerEl.querySelectorAll('.sl-custom-loc-type-row').forEach(el => el.remove());
+
+            const types = this.plugin.settings.customLocationTypes ?? [];
+            for (const t of types) {
+                new Setting(containerEl)
+                    .setClass('sl-custom-loc-type-row')
+                    .setName(t)
+                    .addButton(btn => btn
+                        .setIcon('trash')
+                        .setTooltip('Remove')
+                        .onClick(async () => {
+                            const list = (this.plugin.settings.customLocationTypes ?? [])
+                                .filter(x => x !== t);
+                            this.plugin.settings.customLocationTypes = list;
+                            await this.plugin.saveSettings();
+                            renderCustomTypes();
+                        }));
+            }
+
+            // Add input row at the bottom
+            let pending = '';
+            new Setting(containerEl)
+                .setClass('sl-custom-loc-type-row')
+                .setName('Add new type')
+                .addText(text => text
+                    .setPlaceholder('e.g. Planet')
+                    .onChange(v => (pending = v)))
+                .addButton(btn => btn
+                    .setButtonText('Add')
+                    .setCta()
+                    .onClick(async () => {
+                        const trimmed = pending.trim();
+                        if (!trimmed) return;
+                        const list = this.plugin.settings.customLocationTypes ?? [];
+                        if (list.some(x => x.toLowerCase() === trimmed.toLowerCase())) {
+                            return;
+                        }
+                        list.push(trimmed);
+                        this.plugin.settings.customLocationTypes = list;
+                        await this.plugin.saveSettings();
+                        renderCustomTypes();
+                    }));
+        };
+        renderCustomTypes();
+
+        // ═══════════════════════════════════════════
         //  Writing Goals & Focus
         // ═══════════════════════════════════════════
         containerEl.createEl('h2', { text: 'Writing Goals' });
@@ -1219,6 +1285,28 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .setValue(String(this.plugin.settings.dailyWordGoal))
                 .onChange(async (value) => {
                     this.plugin.settings.dailyWordGoal = Number(value) || 1000;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Weekly word goal')
+            .setDesc('Target number of words per week (Monday → today, shown in Stats view)')
+            .addText(text => text
+                .setPlaceholder('7000')
+                .setValue(String(this.plugin.settings.weeklyWordGoal))
+                .onChange(async (value) => {
+                    this.plugin.settings.weeklyWordGoal = Number(value) || 7000;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Monthly word goal')
+            .setDesc('Target number of words for the current calendar month (shown in Stats view)')
+            .addText(text => text
+                .setPlaceholder('30000')
+                .setValue(String(this.plugin.settings.monthlyWordGoal))
+                .onChange(async (value) => {
+                    this.plugin.settings.monthlyWordGoal = Number(value) || 30000;
                     await this.plugin.saveSettings();
                 }));
 

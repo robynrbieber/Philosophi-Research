@@ -813,15 +813,53 @@ export class LocationView extends ItemView {
         if (field.key === 'locationType') {
             const select = row.createEl('select', { cls: 'location-field-input dropdown' });
             select.createEl('option', { text: field.placeholder, value: '' });
+            // Built-in types
             for (const t of LOCATION_TYPES) {
                 const opt = select.createEl('option', { text: t, value: t.toLowerCase() });
                 if (String(value).toLowerCase() === t.toLowerCase()) opt.selected = true;
             }
-            if (value && !LOCATION_TYPES.map(t => t.toLowerCase()).includes(String(value).toLowerCase())) {
+            // User-defined custom types
+            const customTypes = this.plugin.settings.customLocationTypes ?? [];
+            if (customTypes.length > 0) {
+                const sep = select.createEl('option', { text: '──────────', value: '' });
+                sep.disabled = true;
+                for (const t of customTypes) {
+                    const opt = select.createEl('option', { text: t, value: t.toLowerCase() });
+                    if (String(value).toLowerCase() === t.toLowerCase()) opt.selected = true;
+                }
+            }
+            // Pre-existing value not in either list (legacy)
+            const knownLower = [
+                ...LOCATION_TYPES.map(t => t.toLowerCase()),
+                ...customTypes.map(t => t.toLowerCase()),
+            ];
+            if (value && !knownLower.includes(String(value).toLowerCase())) {
                 const opt = select.createEl('option', { text: String(value), value: String(value) });
                 opt.selected = true;
             }
-            select.addEventListener('change', () => {
+            // "+ Add custom type…" sentinel
+            const ADD_SENTINEL = '__add_custom_type__';
+            select.createEl('option', { text: '+ Add custom type…', value: ADD_SENTINEL });
+
+            select.addEventListener('change', async () => {
+                if (select.value === ADD_SENTINEL) {
+                    const name = await this.promptCustomLocationType();
+                    if (name) {
+                        const list = this.plugin.settings.customLocationTypes ?? [];
+                        if (!list.some(t => t.toLowerCase() === name.toLowerCase())) {
+                            list.push(name);
+                            this.plugin.settings.customLocationTypes = list;
+                            await this.plugin.saveSettings();
+                        }
+                        (draft as any)[field.key] = name.toLowerCase();
+                        this.scheduleSave(draft);
+                        if (this.rootContainer) this.renderDetail(this.rootContainer);
+                    } else {
+                        // Re-select the previous value
+                        select.value = String(value).toLowerCase();
+                    }
+                    return;
+                }
                 (draft as any)[field.key] = select.value;
                 this.scheduleSave(draft);
             });
@@ -1341,6 +1379,56 @@ export class LocationView extends ItemView {
     }
 
     // ── Auto-save ──────────────────────────────────────
+
+    /**
+     * Prompt the user for a custom location type name (e.g. "Planet",
+     * "Star System"). Returns the trimmed name or null if cancelled.
+     */
+    private promptCustomLocationType(): Promise<string | null> {
+        return new Promise(resolve => {
+            const modal = new Modal(this.app);
+            modal.titleEl.setText('Add custom location type');
+            let name = '';
+            new Setting(modal.contentEl)
+                .setName('Type name')
+                .setDesc('e.g. Planet, Star System, Galaxy, Dimension…')
+                .addText((text: any) => {
+                    text.setPlaceholder('Planet');
+                    text.onChange((v: string) => (name = v));
+                    setTimeout(() => text.inputEl?.focus(), 0);
+                    text.inputEl?.addEventListener('keydown', (e: KeyboardEvent) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const trimmed = name.trim();
+                            if (trimmed) {
+                                modal.close();
+                                resolve(trimmed);
+                            }
+                        }
+                    });
+                });
+            new Setting(modal.contentEl)
+                .addButton((btn: any) => {
+                    btn.setButtonText('Add').setCta().onClick(() => {
+                        const trimmed = name.trim();
+                        if (!trimmed) {
+                            new Notice('Please enter a type name.');
+                            return;
+                        }
+                        modal.close();
+                        resolve(trimmed);
+                    });
+                })
+                .addButton((btn: any) => {
+                    btn.setButtonText('Cancel').onClick(() => {
+                        modal.close();
+                        resolve(null);
+                    });
+                });
+            modal.onClose = () => resolve(null);
+            modal.open();
+        });
+    }
 
     private scheduleSave(draft: WorldOrLocation): void {
         if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);

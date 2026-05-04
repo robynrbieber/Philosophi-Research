@@ -731,8 +731,19 @@ export class SceneManager implements ISceneStore {
         const safeTitle = (sceneData.title || 'Untitled')
             .replace(/[\\/:*?"<>|]/g, '-')
             .substring(0, 60);
-        const fileName = `${actStr}-${seqStr} ${safeTitle}.md`;
-        const filePath = normalizePath(`${targetFolder}/${fileName}`);
+        const baseName = `${actStr}-${seqStr} ${safeTitle}`;
+        // Issue #81: when auto-generate sequence is off (or the caller didn't
+        // provide one), multiple new notes/scenes can collide on the same
+        // "00-00 Untitled.md" filename. Append a numeric suffix to ensure
+        // uniqueness so vault.create() doesn't fail with "File already exists".
+        let fileName = `${baseName}.md`;
+        let filePath = normalizePath(`${targetFolder}/${fileName}`);
+        let dedupe = 1;
+        while (this.app.vault.getAbstractFileByPath(filePath)) {
+            fileName = `${baseName} (${dedupe}).md`;
+            filePath = normalizePath(`${targetFolder}/${fileName}`);
+            dedupe++;
+        }
 
         // Auto-populate beatsheet from project's active beat sheet template
         if (!isNote && !sceneData.beatsheet && this._activeProject?.activeBeatSheet) {

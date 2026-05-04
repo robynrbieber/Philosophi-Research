@@ -334,9 +334,14 @@ export class StatsView extends ItemView {
         const logSection = section.createDiv('stats-sprint-log');
         this.renderSprintLog(logSection, tracker);
 
-        // ── Daily goal ─────────────────────────────────
+        // ── Daily / Weekly / Monthly goal rings ────────
         const dailyGoal = this.plugin.settings.dailyWordGoal || 1000;
+        const weeklyGoal = this.plugin.settings.weeklyWordGoal || 7000;
+        const monthlyGoal = this.plugin.settings.monthlyWordGoal || 30000;
         const todayWords = tracker.getTodayWords();
+        const weekWords = tracker.getThisWeekWords();
+        const monthWords = tracker.getThisMonthWords();
+
         const goalPct = Math.min(100, Math.round((todayWords / dailyGoal) * 100));
         const goalRow = section.createDiv('stats-sprint-goal');
         goalRow.createSpan({ text: `Today: ${todayWords.toLocaleString()} / ${dailyGoal.toLocaleString()} words (${goalPct}%)` });
@@ -344,6 +349,12 @@ export class StatsView extends ItemView {
         const goalFill = goalBar.createDiv('stats-bar-fill');
         goalFill.style.width = `${goalPct}%`;
         goalFill.style.backgroundColor = goalPct >= 100 ? 'var(--sl-success, #4CAF50)' : 'var(--sl-info, #2196F3)';
+
+        // Trio of progress rings (Today / This week / This month)
+        const ringsRow = section.createDiv('stats-rings');
+        this.renderProgressRing(ringsRow, 'Today', todayWords, dailyGoal, 'var(--sl-info, #2196F3)');
+        this.renderProgressRing(ringsRow, 'This week', weekWords, weeklyGoal, 'var(--sl-accent, #9c6bff)');
+        this.renderProgressRing(ringsRow, 'This month', monthWords, monthlyGoal, 'var(--sl-warning, #ffb74d)');
 
         // 7-day sparkline
         const recent = tracker.getRecentDays(7).reverse();
@@ -1580,6 +1591,80 @@ export class StatsView extends ItemView {
         card.createDiv({ cls: 'stats-sprint-card-value', text: value });
         card.createDiv({ cls: 'stats-sprint-card-label', text: label });
     }
+
+    /**
+     * Render a circular SVG progress ring with label, current/goal text, and
+     * a percentage in the center. Arc turns green when goal is reached;
+     * percentage is uncapped (e.g. 127% if user blew past their goal).
+     */
+    private renderProgressRing(
+        parent: HTMLElement,
+        label: string,
+        current: number,
+        goal: number,
+        color: string,
+        size = 92,
+    ): void {
+        const wrap = parent.createDiv('stats-ring');
+        wrap.createDiv({ cls: 'stats-ring-label', text: label });
+
+        const safeGoal = goal > 0 ? goal : 1;
+        const ratio = current / safeGoal;
+        const pct = Math.round(ratio * 100);
+        const reached = current >= goal && goal > 0;
+
+        const stroke = 10;
+        const r = (size - stroke) / 2;
+        const c = size / 2;
+        const circumference = 2 * Math.PI * r;
+        const filled = Math.max(0, Math.min(1, ratio));
+        const dash = circumference * filled;
+        const arcColor = reached ? 'var(--sl-success, #4CAF50)' : color;
+
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(SVG_NS, 'svg');
+        svg.setAttribute('width', String(size));
+        svg.setAttribute('height', String(size));
+        svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+        svg.classList.add('stats-ring-svg');
+
+        const track = document.createElementNS(SVG_NS, 'circle');
+        track.setAttribute('cx', String(c));
+        track.setAttribute('cy', String(c));
+        track.setAttribute('r', String(r));
+        track.setAttribute('fill', 'none');
+        track.setAttribute('stroke', 'var(--background-modifier-border, #444)');
+        track.setAttribute('stroke-width', String(stroke));
+        svg.appendChild(track);
+
+        const arc = document.createElementNS(SVG_NS, 'circle');
+        arc.setAttribute('cx', String(c));
+        arc.setAttribute('cy', String(c));
+        arc.setAttribute('r', String(r));
+        arc.setAttribute('fill', 'none');
+        arc.setAttribute('stroke', arcColor);
+        arc.setAttribute('stroke-width', String(stroke));
+        arc.setAttribute('stroke-linecap', 'round');
+        arc.setAttribute('stroke-dasharray', `${dash} ${circumference}`);
+        arc.setAttribute('transform', `rotate(-90 ${c} ${c})`);
+        svg.appendChild(arc);
+
+        const text = document.createElementNS(SVG_NS, 'text');
+        text.setAttribute('x', String(c));
+        text.setAttribute('y', String(c));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'central');
+        text.setAttribute('class', 'stats-ring-pct');
+        text.textContent = `${pct}%`;
+        svg.appendChild(text);
+
+        wrap.appendChild(svg);
+        wrap.createDiv({
+            cls: 'stats-ring-sub',
+            text: `${current.toLocaleString()} / ${goal.toLocaleString()}`,
+        });
+    }
+
 
     private median(values: number[]): number {
         if (values.length === 0) return 0;

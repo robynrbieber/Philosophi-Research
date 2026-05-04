@@ -97,12 +97,23 @@ export class SeriesManager {
         const seriesFolder = normalizePath(`${root}/${safeName}`);
         const adapter = this.app.vault.adapter;
 
-        // Ensure series folder exists
-        await this.ensureFolder(seriesFolder);
-
         // Determine current book base folder
         const bookFolders = deriveProjectFoldersFromFilePath(project.filePath);
         const bookBaseName = bookFolders.baseFolder.split('/').pop() ?? '';
+
+        // Issue #82: Refuse to create a series whose folder name collides
+        // with the active book's folder name. Otherwise the book's base
+        // folder == the series folder, and moving it into a same-named
+        // subfolder triggers an infinite recursive move.
+        if (safeName.toLowerCase() === bookBaseName.toLowerCase()) {
+            throw new Error(
+                `Series name "${seriesName}" matches the current book's folder name. ` +
+                `Please choose a different series name (e.g. "${seriesName} Series").`
+            );
+        }
+
+        // Ensure series folder exists
+        await this.ensureFolder(seriesFolder);
 
         // If the book is not already inside the series folder, move it
         const targetBookFolder = normalizePath(`${seriesFolder}/${bookBaseName}`);
@@ -182,6 +193,17 @@ export class SeriesManager {
         const adapter = this.app.vault.adapter;
         const bookFolders = deriveProjectFoldersFromFilePath(project.filePath);
         const bookBaseName = bookFolders.baseFolder.split('/').pop() ?? '';
+        const seriesFolderName = seriesFolder.split('/').pop() ?? '';
+
+        // Issue #82: refuse same-name collision between series folder and
+        // the book folder \u2014 would attempt to move the book into itself.
+        if (seriesFolderName.toLowerCase() === bookBaseName.toLowerCase()) {
+            throw new Error(
+                `Series folder \"${seriesFolderName}\" has the same name as the book folder. ` +
+                `Rename the book or the series before adding.`
+            );
+        }
+
         const targetBookFolder = normalizePath(`${seriesFolder}/${bookBaseName}`);
 
         // Move the book folder into the series
@@ -377,6 +399,20 @@ export class SeriesManager {
     private async moveFolderRecursive(source: string, dest: string): Promise<void> {
         const adapter = this.app.vault.adapter;
         if (!await adapter.exists(source)) return;
+
+        const normSource = normalizePath(source);
+        const normDest = normalizePath(dest);
+        // Defensive guard against pathological inputs (e.g. dest inside source
+        // due to a same-name collision between series and book — issue #82).
+        // Without this we would recurse forever moving the destination subtree
+        // back into itself.
+        if (normSource === normDest) return;
+        if (normDest.startsWith(`${normSource}/`)) {
+            throw new Error(
+                `Cannot move "${normSource}" into its own subfolder "${normDest}". ` +
+                `Choose a different destination name.`
+            );
+        }
 
         await this.ensureFolder(dest);
         const listing = await adapter.list(source);
