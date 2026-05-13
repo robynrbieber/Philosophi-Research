@@ -924,8 +924,66 @@ export class SceneManager implements ISceneStore {
     }
 
     /**
-     * Move a scene to the Archive/ folder (soft delete / cut scene).
+     * Issue #83 \u2014 Convert an arbitrary markdown file (an orphan note created
+     * by typing a `[[wikilink]]` to a non-existent file, for example) into a
+     * proper StoryLine scene. Adds the required scene frontmatter, assigns the
+     * next sequence number, and moves the file into the active project's
+     * Scenes/ folder so it appears in every view.
+     *
+     * Returns the new file path (which may equal `filePath` if no move was
+     * needed) or `null` on failure.
      */
+    async convertFileToScene(filePath: string): Promise<string | null> {
+        if (!this._activeProject) {
+            new Notice('No active StoryLine project. Open one first.');
+            return null;
+        }
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!file || !(file instanceof TFile) || file.extension !== 'md') {
+            new Notice('Selected file is not a markdown note.');
+            return null;
+        }
+
+        // Refuse if it's already indexed as a real (non-corkboard) scene.
+        const existing = this.scenes.get(filePath);
+        if (existing && existing.type === 'scene' && !existing.corkboardNote) {
+            new Notice('This file is already a scene.');
+            return filePath;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const content = await this.app.vault.read(file);
+        const fm = MetadataParser.extractFrontmatter(content) || {};
+        const body = MetadataParser.extractBody(content);
+
+        const updates: Partial<Scene> = {
+            type: 'scene',
+            title: fm.title || file.basename,
+            status: fm.status || 'idea',
+            created: fm.created || today,
+            corkboardNote: false,
+            plotgridOrigin: undefined,
+        };
+        if (fm.sequence === undefined) {
+            updates.sequence = this.getNextSequence();
+        }
+
+        // Write frontmatter (also recomputes wordcount + modified date)
+        await MetadataParser.updateFrontmatter(this.app, file, updates);
+
+        // Index the file so moveNoteToSceneFolder can reference it
+        const parsed = await MetadataParser.parseFile(this.app, file);
+        if (parsed) {
+            this.scenes.set(filePath, parsed);
+            this.bumpVersion(filePath);
+        }
+
+        // Now move it into Scenes/<Act N> if needed (reuses existing logic).
+        const newPath = await this.moveNoteToSceneFolder(filePath);
+        new Notice(`Converted "${file.basename}" to a scene.`);
+        return newPath;
+    }
+
     async archiveScene(filePath: string): Promise<string> {
         const file = this.app.vault.getAbstractFileByPath(filePath);
         if (!file || !(file instanceof TFile)) {

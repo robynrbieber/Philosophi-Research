@@ -13,6 +13,11 @@ export class ExportModal extends Modal {
     private format: ExportFormat = 'md';
     private exportScope: ExportScope = 'manuscript';
 
+    // Per-export options (issues #85 / #87)
+    private includeSceneTitles = true;
+    private numberScenesOnExport = false;
+    private includeCorkboardNotes = false;
+
     constructor(plugin: SceneCardsPlugin) {
         super(plugin.app);
         this.plugin = plugin;
@@ -47,6 +52,7 @@ export class ExportModal extends Modal {
 
         // Scope selection
         let scopeDropdown: any;
+        let renderManuscriptOptions: () => void = () => {};
         new Setting(contentEl)
             .setName('Content')
             .setDesc('What to include in the export')
@@ -55,7 +61,10 @@ export class ExportModal extends Modal {
                 dd.addOption('outline', 'Outline (metadata, stats, table)');
                 dd.addOption('manuscript', 'Manuscript (scene text in order)');
                 dd.setValue(this.exportScope);
-                dd.onChange(v => { this.exportScope = v as ExportScope; });
+                dd.onChange(v => {
+                    this.exportScope = v as ExportScope;
+                    renderManuscriptOptions();
+                });
             });
 
         // Format selection
@@ -75,6 +84,7 @@ export class ExportModal extends Modal {
                     if ((v === 'docx' || v === 'pdf') && this.exportScope !== 'manuscript') {
                         this.exportScope = 'manuscript';
                         scopeDropdown?.setValue('manuscript');
+                        renderManuscriptOptions();
                     }
                 });
             });
@@ -82,12 +92,68 @@ export class ExportModal extends Modal {
         // Actions
         const actions = contentEl.createDiv({ cls: 'storyline-export-actions' });
 
+        // Manuscript-only options (scene titles / numbering / corkboard notes).
+        // Issues #85 and #87.
+        const manuscriptOptions = contentEl.createDiv({ cls: 'storyline-export-options' });
+
+        renderManuscriptOptions = () => {
+            manuscriptOptions.empty();
+            if (this.exportScope !== 'manuscript') return;
+
+            let titlesToggle: any;
+            let numberToggle: any;
+
+            new Setting(manuscriptOptions)
+                .setName('Include scene titles')
+                .setDesc('Show "#### Scene Title" before each scene. Disable for a clean reader copy.')
+                .addToggle(t => {
+                    titlesToggle = t;
+                    t.setValue(this.includeSceneTitles && !this.numberScenesOnExport);
+                    t.onChange(v => {
+                        this.includeSceneTitles = v;
+                        if (v) {
+                            this.numberScenesOnExport = false;
+                            numberToggle?.setValue(false);
+                        }
+                    });
+                });
+
+            new Setting(manuscriptOptions)
+                .setName('Number scenes (1, 2, 3\u2026)')
+                .setDesc('Replace scene titles with sequential numbers in the export.')
+                .addToggle(t => {
+                    numberToggle = t;
+                    t.setValue(this.numberScenesOnExport);
+                    t.onChange(v => {
+                        this.numberScenesOnExport = v;
+                        if (v) {
+                            this.includeSceneTitles = false;
+                            titlesToggle?.setValue(false);
+                        }
+                    });
+                });
+
+            new Setting(manuscriptOptions)
+                .setName('Include corkboard notes')
+                .setDesc('Include sticky / brainstorm notes from the corkboard. Off by default.')
+                .addToggle(t => {
+                    t.setValue(this.includeCorkboardNotes);
+                    t.onChange(v => { this.includeCorkboardNotes = v; });
+                });
+        };
+        renderManuscriptOptions();
+
         const exportBtn = actions.createEl('button', { text: 'Export', cls: 'mod-cta' });
         exportBtn.setAttr('type', 'button');
         exportBtn.addEventListener('click', async () => {
             exportBtn.disabled = true;
             exportBtn.textContent = 'Exporting…';
             try {
+                this.exportService.setExportOptions({
+                    includeSceneTitles: this.includeSceneTitles,
+                    numberScenesOnExport: this.numberScenesOnExport,
+                    includeCorkboardNotes: this.includeCorkboardNotes,
+                });
                 await this.exportService.export(this.format, this.exportScope);
                 this.close();
             } catch (err) {

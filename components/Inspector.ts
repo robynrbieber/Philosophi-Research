@@ -4,6 +4,7 @@ import * as obsidian from 'obsidian';
 import { openConfirmModal } from './ConfirmModal';
 import { SplitSceneModal } from './SplitMergeModals';
 import { isMobile } from './MobileAdapter';
+import { WikilinkSuggest } from './WikilinkSuggest';
 import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
 import { resolveTagColor, getPlotlineHSL, contrastTextColor } from '../settings';
@@ -1166,6 +1167,12 @@ export class InspectorComponent {
             attr: { placeholder: 'Add revision notes or editorial comments…', rows: '4' },
         });
         textarea.value = scene.notes || '';
+
+        // Issue #84 — attach a wikilink autocomplete (`[[…]]`) so users
+        // can quickly link to other notes from the comments field.
+        const suggest = new WikilinkSuggest({ app: this.plugin.app, textareaEl: textarea });
+        // Tear down the dropdown when the inspector re-renders.
+        this.plugin.register(() => suggest.destroy());
 
         // Save on blur (when the user leaves the field) so typing isn't interrupted
         textarea.addEventListener('change', async () => {

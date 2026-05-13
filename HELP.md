@@ -512,7 +512,7 @@ Click any scene card to open the **Inspector Panel** on the right side. It provi
 - **Characters** — add/remove characters with autocomplete and tag-pill inputs.
 - **Codex sections** — any Codex category enabled for the Inspector (via Codex → Manage Categories) appears as a tag-pill input below the Location field. Add or remove linked Codex entries with autocomplete from your category’s entries.
 - **Tags** — manage plotline tags with autocomplete, color-coded tag badges when tag colors are configured.
-- **Notes** — editorial notes field for author comments and reminders.
+- **Notes** — editorial notes field for author comments and reminders. Type `[[` to get an inline wikilink autocomplete *(new in 1.9.9)* — pick a note with **↑/↓ + Enter** (or click) to drop a `[[Note Name]]` link straight into your comment.
 - **Custom Fields** — values for any [Custom Scene Fields](#custom-scene-fields) you've defined for the project. Click the **+** button on the section header to create a new field on the fly, or the pencil button next to a field to edit / delete it.
 - **Snapshots** — save and restore point-in-time versions of the scene.
 - **Word count** — current vs. target with progress indicator.
@@ -695,6 +695,27 @@ Each scene has an optional **notes** field for editorial comments, reminders, an
 - Edit notes in the **Inspector Panel** under the Notes section.
 - Notes are separate from the scene body — they're for author-facing comments that won't appear in the manuscript.
 - Notes are included in **outline exports** (Markdown, JSON, CSV) so you can share them with editors.
+- Type `[[` *(new in 1.9.9)* to get inline wikilink autocomplete — link to characters, locations, research notes, or anything else in your vault directly from the comments field.
+
+---
+
+## Convert Note to Scene *(new in 1.9.9)*
+
+Any markdown file in your vault — a character study, a research note, a stub note that Obsidian created from a broken `[[wikilink]]`, or an idea you wrote in a different app and pasted in — can be promoted to a full StoryLine scene in one click.
+
+Two ways to do it:
+
+- **Command palette** — open the note, run **"Convert note to scene"**.
+- **File explorer** — right-click any `.md` file and pick **"StoryLine: Convert to scene"**.
+
+StoryLine will:
+
+1. Add the required scene frontmatter (`type: scene`, default `status: idea`, today's `created` date).
+2. Assign the next available sequence number (so the new scene appears at the end of the running order).
+3. Move the file into your project's `Scenes/` folder — or `Scenes/Act N/` if the note already declares an act.
+4. Refresh every open view so the scene shows up immediately on the Board, Manuscript, Plot Grid, etc.
+
+Files that are already indexed as scenes are skipped, so the operation is safe to run on anything.
 
 ---
 
@@ -1285,6 +1306,14 @@ Export your project in six formats. Access via the **Export** button in the view
 | **HTML (.html)** | Standalone web page with embedded styles. Works on desktop and mobile |
 | **PDF (.pdf)** | Rendered via the built-in print engine. Desktop only |
 | **DOCX (.docx)** | Word document ready for editors, agents, or print. Works on desktop and mobile |
+
+### Manuscript Options *(new in 1.9.9)*
+
+When **Manuscript** is selected the dialog reveals three extra toggles:
+
+- **Include scene titles** *(default: on)* — turn off to omit the `## Scene Title` headings between scenes. Produces a clean continuous prose document, ideal for publisher/agent submissions where working titles shouldn't be visible.
+- **Number scenes (Scene 1, Scene 2…)** *(default: off)* — replaces titles with simple running numbered headings. Mutually exclusive with *Include scene titles*.
+- **Include corkboard notes** *(default: off)* — visual sticky notes from the Corkboard are normally hidden from every export. Switch this on to include them, e.g. when sharing planning notes with a co-writer.
 
 ### Exported Fields
 

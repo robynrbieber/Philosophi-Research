@@ -468,6 +468,41 @@ export default class SceneCardsPlugin extends Plugin {
             },
         });
 
+        // Issue #83 \u2014 turn an arbitrary markdown note into a scene.
+        this.addCommand({
+            id: 'convert-note-to-scene',
+            name: 'Convert note to scene',
+            checkCallback: (checking: boolean) => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file || file.extension !== 'md') return false;
+                if (!this.sceneManager.activeProject) return false;
+                if (checking) return true;
+                this.sceneManager.convertFileToScene(file.path).then(newPath => {
+                    if (newPath) this.refreshOpenViews();
+                });
+                return true;
+            },
+        });
+
+        // Show "Convert to scene" in the file context menu for markdown files
+        // when a project is active and the file isn't already a real scene.
+        this.registerEvent(
+            this.app.workspace.on('file-menu', (menu, file) => {
+                if (!(file instanceof TFile) || file.extension !== 'md') return;
+                if (!this.sceneManager.activeProject) return;
+                const existing = this.sceneManager.getScene(file.path);
+                if (existing && existing.type === 'scene' && !existing.corkboardNote) return;
+                menu.addItem(item => {
+                    item.setTitle('StoryLine: Convert to scene')
+                        .setIcon('clapperboard')
+                        .onClick(async () => {
+                            const newPath = await this.sceneManager.convertFileToScene(file.path);
+                            if (newPath) this.refreshOpenViews();
+                        });
+                });
+            })
+        );
+
         // Settings tab
         this.addSettingTab(new SceneCardsSettingTab(this.app, this));
 

@@ -13,6 +13,16 @@ import { SLPdfSettings } from './PdfConverter';
 export type ExportFormat = 'md' | 'json' | 'html' | 'csv' | 'docx' | 'pdf';
 export type ExportScope = 'manuscript' | 'outline';
 
+/** Per-export options chosen by the user in the Export dialog. */
+export interface ExportOptions {
+    /** Include `#### Scene Title` headings before each scene (default true). */
+    includeSceneTitles?: boolean;
+    /** Number scenes 1, 2, 3… instead of using their titles. Implies includeSceneTitles. */
+    numberScenesOnExport?: boolean;
+    /** Include corkboard / sticky notes in the export (default false). */
+    includeCorkboardNotes?: boolean;
+}
+
 /**
  * Export service — generates Markdown, JSON, or PDF exports
  * of the active project's scenes.
@@ -25,6 +35,11 @@ export class ExportService {
 
     private docxSettings: SLDocxSettings | null = null;
     private pdfSettings: SLPdfSettings | null = null;
+    private exportOptions: ExportOptions = {
+        includeSceneTitles: true,
+        numberScenesOnExport: false,
+        includeCorkboardNotes: false,
+    };
 
     constructor(app: App, sceneManager: SceneManager, characterManager: CharacterManager, locationManager: LocationManager) {
         this.app = app;
@@ -41,6 +56,23 @@ export class ExportService {
     /** Set PDF export settings (call before exporting to pdf) */
     setPdfSettings(settings: SLPdfSettings): void {
         this.pdfSettings = settings;
+    }
+
+    /** Set per-export options (scene titles, numbering, corkboard notes). */
+    setExportOptions(options: ExportOptions): void {
+        this.exportOptions = { ...this.exportOptions, ...options };
+    }
+
+    /**
+     * Robust check for whether a scene is a corkboard / sticky note.
+     * Handles boolean, string ("true"/"false") and numeric YAML values.
+     */
+    private isCorkboardNoteScene(scene: Scene): boolean {
+        const v: unknown = (scene as any).corkboardNote;
+        if (v === true) return true;
+        if (typeof v === 'string') return v.trim().toLowerCase() === 'true';
+        if (typeof v === 'number') return v === 1;
+        return false;
     }
 
     // ─── Public API ────────────────────────────────────────────
@@ -82,10 +114,15 @@ export class ExportService {
 
     private getSortedScenes(): Scene[] {
         // Spread into a new array so we don't mutate the memoized cache
-        const scenes = [...this.sceneManager.getFilteredScenes(
+        let scenes = [...this.sceneManager.getFilteredScenes(
             undefined,
             { field: 'sequence', direction: 'asc' }
         )];
+        // Issue #87: corkboard / sticky notes should not appear in manuscript
+        // or outline exports unless the user explicitly opts in.
+        if (!this.exportOptions.includeCorkboardNotes) {
+            scenes = scenes.filter(s => !this.isCorkboardNoteScene(s));
+        }
         scenes.sort((a, b) => {
             // Primary: act, then chapter, then sequence.
             // compareActChapter handles missing values (sort last), pure-numeric
@@ -131,6 +168,9 @@ export class ExportService {
     private buildManuscriptMd(lines: string[], scenes: Scene[]): void {
         let currentAct: string | number | undefined;
         let currentChapter: string | number | undefined;
+        let sceneNumber = 0;
+        const includeTitles = this.exportOptions.includeSceneTitles !== false;
+        const numberScenes = this.exportOptions.numberScenesOnExport === true;
 
         for (const scene of scenes) {
             // Act heading
@@ -148,9 +188,15 @@ export class ExportService {
                 lines.push('');
             }
 
-            // Scene heading
-            lines.push(`#### ${scene.title || 'Untitled Scene'}`);
-            lines.push('');
+            // Scene heading (issue #85 — optional)
+            sceneNumber++;
+            if (numberScenes) {
+                lines.push(`#### ${sceneNumber}`);
+                lines.push('');
+            } else if (includeTitles) {
+                lines.push(`#### ${scene.title || 'Untitled Scene'}`);
+                lines.push('');
+            }
 
             // Scene body (strip wikilinks for clean export)
             if (scene.body && scene.body.trim()) {

@@ -2,6 +2,19 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.9
+
+### Bug Fixes
+
+- **Corkboard sticky notes leaking into manuscript exports** *([#87](https://github.com/PixeroJan/obsidian-storyline/issues/87))* — Visual sticky notes from the Corkboard (stored as scene files with `corkboardNote: true`) were being included in every Manuscript / Outline / DOCX / PDF / CSV / JSON export. `ExportService.getSortedScenes()` now filters them out by default via a new `isCorkboardNoteScene()` helper. Users who *want* them in an export — e.g. to share planning notes with a co-writer — can flip the new **Include corkboard notes** toggle in the Export dialog.
+
+### New Features
+
+- **Convert any note into a scene** *([#83](https://github.com/PixeroJan/obsidian-storyline/discussions/83))* — Existing notes (or stub notes auto-created from broken `[[wikilinks]]`) can now be promoted to full StoryLine scenes in one click. New command **"Convert note to scene"** acts on the currently active markdown file, and a matching **"StoryLine: Convert to scene"** entry appears in the file-explorer right-click menu for any `.md` file that isn't already a scene. The new `SceneManager.convertFileToScene()` writes the required scene frontmatter (`type: scene`, default status, today's `created` date), assigns the next sequence number, and moves the file into the project's `Scenes/` (or `Scenes/Act N/`) folder so it shows up in every view.
+- **Manuscript export — title & numbering options** *([#85](https://github.com/PixeroJan/obsidian-storyline/issues/85))* — The Export dialog gained two new mutually-exclusive toggles when **Manuscript** is selected: **Include scene titles** (off ⇒ no `## Title` headings between scenes — clean prose for publisher submissions) and **Number scenes (Scene 1, Scene 2…)** (on ⇒ working titles are replaced with running numbered headings). Implemented via a new `ExportOptions` interface on `ExportService` and an updated `buildManuscriptMd()`.
+- **Wikilink autocomplete in the Scene Inspector's Notes / Comments field** *([#84](https://github.com/PixeroJan/obsidian-storyline/discussions/84))* — Typing `[[` in the editorial-notes textarea now pops up a fuzzy-matched list of vault notes, just like the regular Obsidian editor. Pick one with **Arrow keys + Enter**, **Tab**, or a mouse click and StoryLine inserts the wikilink for you. Powered by a new lightweight `WikilinkSuggest` component attached to the plain `<textarea>` (Obsidian's built-in `EditorSuggest` only works inside CodeMirror editors).
+
+---
 ## Version 1.9.8
 
 ### Bug Fixes
