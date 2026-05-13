@@ -2,6 +2,12 @@
 declare module 'markdown-it-emoji';
 declare module 'markdown-it-mark';
 
+// Allow importing .md files as raw text strings (esbuild text loader)
+declare module '*.md' {
+    const content: string;
+    export default content;
+}
+
 // Ambient declarations for externalized CodeMirror / Lezer packages
 declare module '@codemirror/language' {
     import type { EditorState } from '@codemirror/state';

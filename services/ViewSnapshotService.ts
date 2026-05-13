@@ -1,6 +1,6 @@
-import { normalizePath, Notice } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import type { PlotGridData } from '../models/PlotGridData';
+import { normalizePath } from 'obsidian';
 
 export interface ViewSnapshotMeta {
     id: number;
@@ -35,7 +35,7 @@ interface ActiveState {
 
 export class ViewSnapshotService {
     private _activeId: number | null = null;
-    private _autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+    private _autoSaveTimer: number | null = null;
     /** Suppress auto-save while restoring a snapshot */
     private _restoring = false;
 
@@ -91,8 +91,8 @@ export class ViewSnapshotService {
     scheduleAutoSave(): void {
         if (this._restoring) return;
         if (this._activeId == null) return;
-        if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
-        this._autoSaveTimer = setTimeout(() => {
+        if (this._autoSaveTimer) window.clearTimeout(this._autoSaveTimer);
+        this._autoSaveTimer = window.setTimeout(() => {
             this._autoSaveTimer = null;
             void this.autoSave();
         }, 2000);
@@ -226,7 +226,7 @@ export class ViewSnapshotService {
 
         // Flush any pending changes to the currently active snapshot before switching
         if (this._autoSaveTimer) {
-            clearTimeout(this._autoSaveTimer);
+            window.clearTimeout(this._autoSaveTimer);
             this._autoSaveTimer = null;
         }
         if (this._activeId != null && this._activeId !== id) {

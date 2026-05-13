@@ -5,7 +5,6 @@
  * a force-directed-style graph using simple spring physics.
  */
 
-import * as obsidian from 'obsidian';
 import type { Character } from '../models/Character';
 import { RELATION_BASE_TYPE_BY_CATEGORY, getRoleDisplay } from '../models/Character';
 
@@ -39,7 +38,7 @@ interface GraphEdge {
 
 /** Read a CSS custom property from the body, falling back to the provided default */
 function resolveThemeColor(varName: string, fallback: string): string {
-    const val = getComputedStyle(document.body).getPropertyValue(varName).trim();
+    const val = getComputedStyle(activeDocument.body).getPropertyValue(varName).trim();
     return val || fallback;
 }
 
@@ -113,9 +112,9 @@ export class RelationshipMap {
         for (const [type, color] of Object.entries(edgeColors)) {
             const item = legend.createDiv('relationship-map-legend-item');
             const swatch = item.createEl('span', { cls: 'relationship-map-legend-swatch' });
-            swatch.style.backgroundColor = color;
-            if (type === 'enemy') swatch.style.borderStyle = 'dashed';
-            if (type === 'romantic') swatch.style.borderRadius = '50%';
+            swatch.setCssStyles({ backgroundColor: color });
+            if (type === 'enemy') swatch.setCssStyles({ borderStyle: 'dashed' });
+            if (type === 'romantic') swatch.setCssStyles({ borderRadius: '50%' });
             item.createEl('span', { text: type.charAt(0).toUpperCase() + type.slice(1) });
         }
 
@@ -127,7 +126,7 @@ export class RelationshipMap {
         this.height = Math.max(400, rect.height || 500);
 
         const svgNS = 'http://www.w3.org/2000/svg';
-        this.svg = document.createElementNS(svgNS, 'svg');
+        this.svg = activeDocument.createElementNS(svgNS, 'svg');
         this.svg.setAttribute('width', '100%');
         this.svg.setAttribute('height', '100%');
         this.svg.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
@@ -287,7 +286,6 @@ export class RelationshipMap {
     // ── Simulation & rendering ─────────────────────────
 
     private runSimulation(): void {
-        const svgNS = 'http://www.w3.org/2000/svg';
         let iterations = 0;
         const maxIterations = 300;
 
@@ -313,11 +311,11 @@ export class RelationshipMap {
             this.renderSVG();
 
             if (iterations < maxIterations) {
-                this.animFrame = requestAnimationFrame(tick);
+                this.animFrame = window.requestAnimationFrame(tick);
             }
         };
 
-        this.animFrame = requestAnimationFrame(tick);
+        this.animFrame = window.requestAnimationFrame(tick);
     }
 
     private applyForces(): void {
@@ -379,7 +377,7 @@ export class RelationshipMap {
         const edgeColors = getEdgeColors();
 
         // Transform group for panning + zoom
-        const g = document.createElementNS(svgNS, 'g');
+        const g = activeDocument.createElementNS(svgNS, 'g');
         g.setAttribute('transform', `translate(${this.panX},${this.panY}) scale(${this.zoom})`);
         this.svg.appendChild(g);
 
@@ -389,7 +387,7 @@ export class RelationshipMap {
             const b = this.nodes.find(n => n.id === edge.target);
             if (!a || !b) continue;
 
-            const line = document.createElementNS(svgNS, 'line');
+            const line = activeDocument.createElementNS(svgNS, 'line');
             line.setAttribute('x1', String(a.x));
             line.setAttribute('y1', String(a.y));
             line.setAttribute('x2', String(b.x));
@@ -403,7 +401,7 @@ export class RelationshipMap {
 
             // Edge label at midpoint
             if (edge.label) {
-                const text = document.createElementNS(svgNS, 'text');
+                const text = activeDocument.createElementNS(svgNS, 'text');
                 text.setAttribute('x', String((a.x + b.x) / 2));
                 text.setAttribute('y', String((a.y + b.y) / 2 - 6));
                 text.setAttribute('text-anchor', 'middle');
@@ -417,7 +415,7 @@ export class RelationshipMap {
         // Draw nodes
         for (const node of this.nodes) {
             // Circle
-            const circle = document.createElementNS(svgNS, 'circle');
+            const circle = activeDocument.createElementNS(svgNS, 'circle');
             circle.setAttribute('cx', String(node.x));
             circle.setAttribute('cy', String(node.y));
             circle.setAttribute('r', node.hasProfile ? '18' : '12');
@@ -458,7 +456,7 @@ export class RelationshipMap {
             g.appendChild(circle);
 
             // Label
-            const text = document.createElementNS(svgNS, 'text');
+            const text = activeDocument.createElementNS(svgNS, 'text');
             text.setAttribute('x', String(node.x));
             text.setAttribute('y', String(node.y + (node.hasProfile ? 30 : 24)));
             text.setAttribute('text-anchor', 'middle');
@@ -470,7 +468,7 @@ export class RelationshipMap {
 
             // Role badge
             if (node.role && node.hasProfile) {
-                const badge = document.createElementNS(svgNS, 'text');
+                const badge = activeDocument.createElementNS(svgNS, 'text');
                 badge.setAttribute('x', String(node.x));
                 badge.setAttribute('y', String(node.y - 24));
                 badge.setAttribute('text-anchor', 'middle');

@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { ItemView, WorkspaceLeaf, Modal, Setting, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
@@ -39,7 +48,7 @@ export class CodexView extends ItemView {
     private searchText: string = '';
 
     // ── Auto-save state ────────────────────────────────
-    private _saveTimer: ReturnType<typeof setTimeout> | null = null;
+    private _saveTimer: number | null = null;
     private _lastSaveTime = 0;
     private _pendingDraft: CodexEntry | null = null;
     private _undoSnapshot: CodexEntry | null = null;
@@ -87,7 +96,7 @@ export class CodexView extends ItemView {
 
     async onClose(): Promise<void> {
         await this.flushPendingSave();
-        document.querySelectorAll('.gallery-lightbox-window').forEach(w => w.remove());
+        activeDocument.querySelectorAll('.gallery-lightbox-window').forEach(w => w.remove());
     }
 
     /**
@@ -602,14 +611,14 @@ export class CodexView extends ItemView {
                     cls: 'hidden-fields-toggle-link',
                 });
                 const hiddenContainer = body.createDiv('hidden-fields-container');
-                hiddenContainer.style.display = 'none';
+                hiddenContainer.setCssStyles({ display: 'none' });
                 for (const field of hiddenFieldsInCat) {
                     this.renderField(hiddenContainer, field, draft, catDef);
                 }
                 let showing = false;
                 toggleEl.addEventListener('click', () => {
                     showing = !showing;
-                    hiddenContainer.style.display = showing ? '' : 'none';
+                    hiddenContainer.setCssStyles({ display: showing ? '' : 'none' });
                     toggleEl.querySelector('a')!.textContent = showing
                         ? `Hide ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`
                         : `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`;
@@ -688,13 +697,15 @@ export class CodexView extends ItemView {
                 draft[key] = textarea.value;
                 this.scheduleSave(draft);
                 // Auto-grow
-                textarea.style.height = 'auto';
-                textarea.style.height = textarea.scrollHeight + 'px';
+                textarea.setCssStyles({ height: "auto" });
+
+                textarea.setCssStyles({ height: textarea.scrollHeight + 'px' });
             });
             // Initial auto-grow
-            requestAnimationFrame(() => {
-                textarea.style.height = 'auto';
-                textarea.style.height = textarea.scrollHeight + 'px';
+            window.requestAnimationFrame(() => {
+                textarea.setCssStyles({ height: "auto" });
+
+                textarea.setCssStyles({ height: textarea.scrollHeight + 'px' });
             });
         } else {
             const input = row.createEl('input', {
@@ -791,7 +802,7 @@ export class CodexView extends ItemView {
                 attr: { placeholder: tpl.placeholder || 'Type to add\u2026' },
             });
             const msDropdown = inputRow.createDiv('universal-multi-dropdown');
-            msDropdown.style.display = 'none';
+            msDropdown.setCssStyles({ display: 'none' });
 
             const renderPills = () => {
                 pillsEl.empty();
@@ -814,8 +825,8 @@ export class CodexView extends ItemView {
                 msDropdown.empty();
                 const lf = filter.toLowerCase();
                 const available = allOptions.filter(o => !selected.includes(o) && o.toLowerCase().includes(lf));
-                if (available.length === 0) { msDropdown.style.display = 'none'; return; }
-                msDropdown.style.display = '';
+                if (available.length === 0) { msDropdown.setCssStyles({ display: 'none' }); return; }
+                msDropdown.setCssStyles({ display: '' });
                 for (const opt of available) {
                     const item = msDropdown.createDiv({ cls: 'universal-multi-dropdown-item', text: opt });
                     item.addEventListener('mousedown', (e) => {
@@ -832,7 +843,7 @@ export class CodexView extends ItemView {
 
             msInput.addEventListener('focus', () => updateMsDropdown(msInput.value));
             msInput.addEventListener('input', () => updateMsDropdown(msInput.value));
-            msInput.addEventListener('blur', () => { setTimeout(() => { msDropdown.style.display = 'none'; }, 200); });
+            msInput.addEventListener('blur', () => { window.setTimeout(() => { msDropdown.setCssStyles({ display: 'none' }); }, 200); });
             msInput.addEventListener('keydown', (e: KeyboardEvent) => {
                 if (e.key === 'Enter' && msInput.value.trim()) {
                     e.preventDefault();
@@ -883,10 +894,10 @@ export class CodexView extends ItemView {
             });
             textarea.value = value;
             const autoGrow = () => {
-                textarea.style.height = 'auto';
-                textarea.style.height = Math.max(textarea.scrollHeight, 48) + 'px';
+                textarea.setCssStyles({ height: 'auto' });
+                textarea.setCssStyles({ height: Math.max(textarea.scrollHeight, 48) + 'px' });
             };
-            setTimeout(autoGrow, 0);
+            window.setTimeout(autoGrow, 0);
             textarea.addEventListener('input', () => {
                 draft.universalFields![tpl.id] = textarea.value;
                 this.scheduleSave(draft);
@@ -1073,17 +1084,17 @@ export class CodexView extends ItemView {
         }
 
         const body = wrapper.createDiv('character-gallery-body');
-        if (isCollapsed) body.style.display = 'none';
+        if (isCollapsed) body.setCssStyles({ display: 'none' });
 
         header.addEventListener('click', (e) => {
             if ((e.target as HTMLElement).closest('.character-section-add-field-btn')) return;
             if (this.collapsedSections.has(SECTION_KEY)) {
                 this.collapsedSections.delete(SECTION_KEY);
-                body.style.display = '';
+                body.setCssStyles({ display: '' });
                 obsidian.setIcon(chevron, 'chevron-down');
             } else {
                 this.collapsedSections.add(SECTION_KEY);
-                body.style.display = 'none';
+                body.setCssStyles({ display: 'none' });
                 obsidian.setIcon(chevron, 'chevron-right');
             }
         });
@@ -1104,7 +1115,7 @@ export class CodexView extends ItemView {
                         cls: 'character-gallery-img',
                         attr: { src, alt: entry.caption || 'Gallery image' },
                     });
-                    img.style.cursor = 'pointer';
+                    img.setCssStyles({ cursor: 'pointer' });
                     img.addEventListener('click', () => {
                         const galleryWidth = wrapper.offsetWidth;
                         this.openGalleryLightbox(gallery, activeIndex, galleryWidth);
@@ -1241,7 +1252,7 @@ export class CodexView extends ItemView {
                     }
                 });
                 // Auto-focus
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         new Setting(modal.contentEl)
@@ -1391,12 +1402,14 @@ export class CodexView extends ItemView {
 
             // Sidebar toggle
             const sidebarLabel = row.createEl('label', { cls: 'codex-sidebar-toggle' });
-            sidebarLabel.style.marginLeft = 'auto';
-            sidebarLabel.style.display = 'flex';
-            sidebarLabel.style.alignItems = 'center';
-            sidebarLabel.style.gap = '4px';
-            sidebarLabel.style.fontSize = '11px';
-            sidebarLabel.style.opacity = '0.7';
+            sidebarLabel.setCssStyles({
+                marginLeft: 'auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                opacity: '0.7',
+            });
             const sidebarCheck = sidebarLabel.createEl('input', { attr: { type: 'checkbox' } }) as HTMLInputElement;
             sidebarCheck.checked = sidebarSet.has(cat.id);
             sidebarLabel.createSpan({ text: 'Inspector' });
@@ -1430,12 +1443,14 @@ export class CodexView extends ItemView {
 
                 // Sidebar toggle
                 const sidebarLabel = row.createEl('label', { cls: 'codex-sidebar-toggle' });
-                sidebarLabel.style.marginLeft = 'auto';
-                sidebarLabel.style.display = 'flex';
-                sidebarLabel.style.alignItems = 'center';
-                sidebarLabel.style.gap = '4px';
-                sidebarLabel.style.fontSize = '11px';
-                sidebarLabel.style.opacity = '0.7';
+                sidebarLabel.setCssStyles({
+                    marginLeft: 'auto',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '11px',
+                    opacity: '0.7',
+                });
                 const sidebarCheck = sidebarLabel.createEl('input', { attr: { type: 'checkbox' } }) as HTMLInputElement;
                 sidebarCheck.checked = sidebarSet.has(cc.id);
                 sidebarLabel.createSpan({ text: 'Inspector' });
@@ -1602,8 +1617,8 @@ export class CodexView extends ItemView {
 
     private scheduleSave(draft: CodexEntry): void {
         this._pendingDraft = draft;
-        if (this._saveTimer) clearTimeout(this._saveTimer);
-        this._saveTimer = setTimeout(async () => {
+        if (this._saveTimer) window.clearTimeout(this._saveTimer);
+        this._saveTimer = window.setTimeout(async () => {
             this._saveTimer = null;
             await this.executeSave(draft);
         }, CodexView.SAVE_DEBOUNCE_MS);
@@ -1621,7 +1636,7 @@ export class CodexView extends ItemView {
 
     private async flushPendingSave(): Promise<void> {
         if (this._saveTimer) {
-            clearTimeout(this._saveTimer);
+            window.clearTimeout(this._saveTimer);
             this._saveTimer = null;
         }
         if (this._pendingDraft) {
@@ -1639,15 +1654,17 @@ export class CodexView extends ItemView {
         startIndex: number,
         galleryWidth: number,
     ): void {
-        document.querySelector('.gallery-lightbox-window')?.remove();
+        activeDocument.querySelector('.gallery-lightbox-window')?.remove();
 
         let currentIndex = startIndex;
         const winWidth = Math.min(Math.round(galleryWidth * 2), window.innerWidth - 40);
         const winHeight = Math.round((winWidth * 3) / 4) + 36 + 28;
 
-        const win = document.body.createDiv('gallery-lightbox-window');
-        win.style.width = `${winWidth}px`;
-        win.style.height = `${winHeight}px`;
+        const win = activeDocument.body.createDiv('gallery-lightbox-window');
+        win.setCssStyles({
+            width: `${winWidth}px`,
+            height: `${winHeight}px`,
+        });
 
         const titlebar = win.createDiv('gallery-lightbox-titlebar');
         const titleText = titlebar.createSpan({ cls: 'gallery-lightbox-title' });
@@ -1687,14 +1704,14 @@ export class CodexView extends ItemView {
             imgContainer.empty();
             if (src) {
                 const img = imgContainer.createEl('img', { attr: { src, alt: entry.caption || 'Gallery image' } });
-                img.style.transformOrigin = 'center center';
+                img.setCssStyles({ transformOrigin: 'center center' });
                 const z = getZoom();
-                if (z !== 1) img.style.transform = `scale(${z})`;
+                if (z !== 1) img.setCssStyles({ transform: `scale(${z})` });
             }
             captionEl.textContent = entry.caption || '';
-            captionEl.style.display = entry.caption ? '' : 'none';
-            prevBtn.style.display = gallery.length > 1 ? '' : 'none';
-            nextBtn.style.display = gallery.length > 1 ? '' : 'none';
+            captionEl.setCssStyles({ display: entry.caption ? '' : 'none' });
+            prevBtn.setCssStyles({ display: gallery.length > 1 ? '' : 'none' });
+            nextBtn.setCssStyles({ display: gallery.length > 1 ? '' : 'none' });
         };
         renderContent();
 
@@ -1704,7 +1721,7 @@ export class CodexView extends ItemView {
             const newZoom = Math.max(0.5, Math.min(5, getZoom() + delta));
             setZoom(newZoom);
             const img = imgContainer.querySelector('img');
-            if (img) img.style.transform = `scale(${newZoom})`;
+            if (img) img.setCssStyles({ transform: `scale(${newZoom})` });
         }, { passive: false });
 
         let pinchStartDist = 0;
@@ -1727,7 +1744,7 @@ export class CodexView extends ItemView {
                 const newZoom = Math.max(0.5, Math.min(5, pinchStartZoom * scale));
                 setZoom(newZoom);
                 const img = imgContainer.querySelector('img');
-                if (img) img.style.transform = `scale(${newZoom})`;
+                if (img) img.setCssStyles({ transform: `scale(${newZoom})` });
             }
         }, { passive: false });
 
@@ -1740,16 +1757,20 @@ export class CodexView extends ItemView {
             const rect = win.getBoundingClientRect();
             dragOffsetX = e.clientX - rect.left;
             dragOffsetY = e.clientY - rect.top;
-            win.style.left = `${rect.left}px`;
-            win.style.top = `${rect.top}px`;
-            win.style.transform = 'none';
+            win.setCssStyles({
+                left: `${rect.left}px`,
+                top: `${rect.top}px`,
+                transform: 'none',
+            });
             titlebar.setPointerCapture(e.pointerId);
             e.preventDefault();
         });
         titlebar.addEventListener('pointermove', (e: PointerEvent) => {
             if (!isDragging) return;
-            win.style.left = `${e.clientX - dragOffsetX}px`;
-            win.style.top = `${e.clientY - dragOffsetY}px`;
+            win.setCssStyles({
+                left: `${e.clientX - dragOffsetX}px`,
+                top: `${e.clientY - dragOffsetY}px`,
+            });
         });
         titlebar.addEventListener('pointerup', () => { isDragging = false; });
         titlebar.addEventListener('lostpointercapture', () => { isDragging = false; });
@@ -1773,8 +1794,10 @@ export class CodexView extends ItemView {
             if (!isResizing) return;
             const newW = Math.max(200, startW + (e.clientX - resizeStartX));
             const newH = Math.max(150, startH + (e.clientY - resizeStartY));
-            win.style.width = `${newW}px`;
-            win.style.height = `${newH}px`;
+            win.setCssStyles({
+                width: `${newW}px`,
+                height: `${newH}px`,
+            });
         });
         resizeHandle.addEventListener('pointerup', () => { isResizing = false; });
         resizeHandle.addEventListener('lostpointercapture', () => { isResizing = false; });
@@ -1782,8 +1805,8 @@ export class CodexView extends ItemView {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') { cleanup(); win.remove(); }
         };
-        document.addEventListener('keydown', onKey);
-        const cleanup = () => { document.removeEventListener('keydown', onKey); };
+        activeDocument.addEventListener('keydown', onKey);
+        const cleanup = () => { activeDocument.removeEventListener('keydown', onKey); };
     }
 }
 
@@ -1814,7 +1837,7 @@ class AddCustomFieldModal extends Modal {
                         this.callback(fieldName.trim());
                     }
                 });
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         new Setting(this.contentEl)

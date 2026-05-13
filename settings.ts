@@ -1,12 +1,20 @@
-import { App, PluginSettingTab, Setting, Modal, TextAreaComponent, AbstractInputSuggest, TFolder, normalizePath } from 'obsidian';
-import * as obsidian from 'obsidian';
-import { ColorCodingMode, SceneStatus, ViewType, SceneTemplate, BUILTIN_SCENE_TEMPLATES, CustomStatusDef, getStatusOrder, getStatusConfig, resolveStatusCfg, registerCustomStatuses } from './models/Scene';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import type SceneCardsPlugin from './main';
-import { HELP_VIEW_TYPE } from './constants';
 import { SLDocxSettings, SL_DEFAULT_DOCX_SETTINGS } from './services/DocxConverter';
 import { SLPdfSettings, SL_DEFAULT_PDF_SETTINGS } from './services/PdfConverter';
 import { AddFieldModal } from './components/AddFieldModal';
 import type { UniversalFieldTemplate } from './services/FieldTemplateService';
+import { ColorCodingMode, CustomStatusDef, SceneStatus, SceneTemplate, ViewType, getStatusConfig, getStatusOrder, registerCustomStatuses } from './models/Scene';
+import { App, Modal, Notice, PluginSettingTab, Setting, TFolder, TextAreaComponent, AbstractInputSuggest } from 'obsidian';
+import * as obsidian from 'obsidian';
 
 // ═══════════════════════════════════════════════════════
 //  COLOR PALETTES — Catppuccin + Mood-based
@@ -828,7 +836,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h1', { text: 'StoryLine Settings' });
+        new Setting(containerEl).setName('StoryLine Settings').setHeading();
 
         // --- Documentation link ---
         new Setting(containerEl)
@@ -844,7 +852,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  General
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'General' });
+        new Setting(containerEl).setName('General').setHeading();
 
         new Setting(containerEl)
             .setName('Root folder')
@@ -882,7 +890,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  Scene Defaults & Templates
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Scene Defaults' });
+        new Setting(containerEl).setName('Scene Defaults').setHeading();
 
         new Setting(containerEl)
             .setName('Default status')
@@ -920,8 +928,8 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 }));
 
         // ── Custom Statuses ──
-        containerEl.createEl('h3', { text: 'Custom Statuses' });
-        const customStatusDesc = containerEl.createEl('p', {
+        new Setting(containerEl).setName('Custom Statuses').setHeading();
+        containerEl.createEl('p', {
             cls: 'setting-item-description',
             text: 'Add custom scene statuses after the built-in six (Idea → Final). Useful for editorial workflows like "Sent to Team", "Waiting", "Published", etc.'
         });
@@ -936,17 +944,21 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             for (let i = 0; i < defs.length; i++) {
                 const def = defs[i];
                 const row = customStatusList.createDiv('sl-custom-status-row');
-                row.style.display = 'flex';
-                row.style.alignItems = 'center';
-                row.style.gap = '8px';
-                row.style.marginBottom = '4px';
+                row.setCssStyles({
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '4px',
+                });
 
                 const colorSwatch = row.createEl('input', { type: 'color' });
                 colorSwatch.value = def.color;
-                colorSwatch.style.width = '32px';
-                colorSwatch.style.height = '28px';
-                colorSwatch.style.border = 'none';
-                colorSwatch.style.cursor = 'pointer';
+                colorSwatch.setCssStyles({
+                    width: '32px',
+                    height: '28px',
+                    border: 'none',
+                    cursor: 'pointer',
+                });
                 colorSwatch.addEventListener('change', async () => {
                     def.color = colorSwatch.value;
                     registerCustomStatuses(this.plugin.settings.customStatuses);
@@ -955,7 +967,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
                 const labelInput = row.createEl('input', { type: 'text', value: def.label });
                 labelInput.placeholder = 'Label';
-                labelInput.style.flex = '1';
+                labelInput.setCssStyles({ flex: '1' });
                 labelInput.addEventListener('change', async () => {
                     def.label = labelInput.value.trim() || def.id;
                     registerCustomStatuses(this.plugin.settings.customStatuses);
@@ -1009,7 +1021,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  Display Options
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Display Options' });
+        new Setting(containerEl).setName('Display Options').setHeading();
 
         new Setting(containerEl)
             .setName('Default view')
@@ -1116,7 +1128,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const imageDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
         imageDetails.createEl('summary', { text: 'Image & frame sizes' });
         const imageBody = imageDetails.createDiv();
-        imageBody.style.padding = '8px 0';
+        imageBody.setCssStyles({ padding: '8px 0' });
 
         const numberSetting = (
             parent: HTMLElement,
@@ -1217,13 +1229,13 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  Custom Location Types
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Custom Location Types' });
+        new Setting(containerEl).setName('Custom Location Types').setHeading();
 
         const locTypesDesc = containerEl.createEl('p', {
             cls: 'setting-item-description',
             text: 'Add your own location types (e.g. Planet, Star System, Galaxy, Dimension) — they appear in the Type dropdown alongside the built-in options.',
         });
-        locTypesDesc.style.marginBottom = '8px';
+        locTypesDesc.setCssStyles({ marginBottom: '8px' });
 
         const renderCustomTypes = () => {
             // Remove any previously rendered list (when re-rendering after add/remove)
@@ -1275,7 +1287,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  Writing Goals & Focus
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Writing Goals' });
+        new Setting(containerEl).setName('Writing Goals').setHeading();
 
         new Setting(containerEl)
             .setName('Daily word goal')
@@ -1393,17 +1405,19 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     });
                 ta.inputEl.rows = 4;
-                ta.inputEl.style.width = '100%';
-                ta.inputEl.style.fontFamily = 'var(--font-monospace)';
+                ta.inputEl.setCssStyles({
+                    width: '100%',
+                    fontFamily: 'var(--font-monospace)',
+                });
             });
 
         const focusDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
         focusDetails.createEl('summary', { text: 'Focus Mode Settings' });
         const focusBody = focusDetails.createDiv();
-        focusBody.style.padding = '12px 16px';
+        focusBody.setCssStyles({ padding: '12px 16px' });
 
         const focusDesc = focusBody.createDiv({ cls: 'setting-item-description' });
-        focusDesc.style.marginBottom = '16px';
+        focusDesc.setCssStyles({ marginBottom: '16px' });
         focusDesc.setText('Control how the UI changes when Focus mode is enabled in Manuscript view.');
 
         const createFocusSlider = (
@@ -1418,14 +1432,18 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             onChange: (v: number) => void,
         ) => {
             const row = parent.createDiv();
-            row.style.display = 'flex';
-            row.style.alignItems = 'center';
-            row.style.gap = '8px';
-            row.style.marginBottom = '6px';
+            row.setCssStyles({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '6px',
+            });
 
             const lbl = row.createSpan();
-            lbl.style.fontSize = '12px';
-            lbl.style.minWidth = '90px';
+            lbl.setCssStyles({
+                fontSize: '12px',
+                minWidth: '90px',
+            });
             lbl.textContent = label;
             lbl.title = desc;
 
@@ -1434,21 +1452,23 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 attr: { min: String(min), max: String(max), step: String(step) },
             });
             slider.value = String(value);
-            slider.style.flex = '1';
+            slider.setCssStyles({ flex: '1' });
 
             const valEl = row.createSpan();
-            valEl.style.fontSize = '11px';
-            valEl.style.minWidth = '36px';
-            valEl.style.textAlign = 'right';
+            valEl.setCssStyles({
+                fontSize: '11px',
+                minWidth: '36px',
+                textAlign: 'right',
+            });
             valEl.textContent = `${value}${unit}`;
 
-            let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+            let debounceTimer: number | null = null;
             slider.addEventListener('input', () => {
                 const v = Number.parseFloat(slider.value);
                 valEl.textContent = `${v}${unit}`;
                 onChange(v);
-                if (debounceTimer) clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
+                if (debounceTimer) window.clearTimeout(debounceTimer);
+                debounceTimer = window.setTimeout(() => {
                     this.plugin.saveSettings();
                     this.plugin.refreshOpenViews();
                 }, 300);
@@ -1475,10 +1495,12 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
         // Reset
         const focusResetRow = focusBody.createDiv();
-        focusResetRow.style.marginTop = '8px';
+        focusResetRow.setCssStyles({ marginTop: '8px' });
         const focusResetBtn = focusResetRow.createEl('button', { text: 'Reset to defaults' });
-        focusResetBtn.style.fontSize = '11px';
-        focusResetBtn.style.padding = '2px 10px';
+        focusResetBtn.setCssStyles({
+            fontSize: '11px',
+            padding: '2px 10px',
+        });
         focusResetBtn.addEventListener('click', async () => {
             this.plugin.settings.focusDarkenAmount = 40;
             this.plugin.settings.focusBlurAmount = 1;
@@ -1491,7 +1513,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const tlDetails = containerEl.createEl('details', { cls: 'story-line-timeline-scroll-section' });
         tlDetails.createEl('summary', { text: 'Timeline Drag-Scroll' });
         const tlBody = tlDetails.createDiv();
-        tlBody.style.padding = '8px 0';
+        tlBody.setCssStyles({ padding: '8px 0' });
 
         new Setting(tlBody)
             .setName('Scroll speed')
@@ -1522,14 +1544,14 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  Colors
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Colors' });
+        new Setting(containerEl).setName('Colors').setHeading();
 
         // --- Tag / Plotline Colors (collapsible) ---
         const colorDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
         colorDetails.createEl('summary', { text: 'Plotline Color Scheme' });
 
         const colorBody = colorDetails.createDiv();
-        colorBody.style.padding = '8px 0';
+        colorBody.setCssStyles({ padding: '8px 0' });
 
         // Per-project colour override toggle
         const projName = this.plugin.sceneManager?.activeProject?.title;
@@ -1579,21 +1601,25 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             for (const group of SCHEME_GROUPS) {
                 if (group.label) {
                     const groupLabel = schemeContainer.createDiv();
-                    groupLabel.style.fontSize = '11px';
-                    groupLabel.style.fontWeight = '600';
-                    groupLabel.style.color = 'var(--text-muted)';
-                    groupLabel.style.textTransform = 'uppercase';
-                    groupLabel.style.letterSpacing = '0.05em';
-                    groupLabel.style.marginTop = '10px';
-                    groupLabel.style.marginBottom = '6px';
+                    groupLabel.setCssStyles({
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginTop: '10px',
+                        marginBottom: '6px',
+                    });
                     groupLabel.textContent = group.label;
                 }
 
                 const schemeRow = schemeContainer.createDiv();
-                schemeRow.style.display = 'flex';
-                schemeRow.style.gap = '8px';
-                schemeRow.style.flexWrap = 'wrap';
-                schemeRow.style.marginBottom = '8px';
+                schemeRow.setCssStyles({
+                    display: 'flex',
+                    gap: '8px',
+                    flexWrap: 'wrap',
+                    marginBottom: '8px',
+                });
 
                 for (const scheme of group.schemes) {
                     const label = COLOR_SCHEME_LABELS[scheme];
@@ -1601,53 +1627,67 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     const palette = getSchemeColors(scheme);
 
                     const card = schemeRow.createDiv();
-                    card.style.cursor = 'pointer';
-                    card.style.padding = '6px 10px';
-                    card.style.borderRadius = '8px';
-                    card.style.border = scheme === current
+                    card.setCssStyles({
+                        cursor: 'pointer',
+                        padding: '6px 10px',
+                        borderRadius: '8px',
+                    });
+                    card.setCssStyles({ border: scheme === current
                         ? '2px solid var(--interactive-accent)'
-                        : '2px solid var(--background-modifier-border)';
-                    card.style.background = scheme === current
+                        : '2px solid var(--background-modifier-border)' });
+                    card.setCssStyles({ background: scheme === current
                         ? 'var(--background-modifier-hover)'
-                        : 'transparent';
-                    card.style.minWidth = '100px';
-                    card.style.textAlign = 'center';
-                    card.style.transition = 'border-color 0.15s';
+                        : 'transparent' });
+                    card.setCssStyles({
+                        minWidth: '100px',
+                        textAlign: 'center',
+                        transition: 'border-color 0.15s',
+                    });
 
                     // Label
                     const nameEl = card.createDiv();
-                    nameEl.style.fontSize = '11px';
-                    nameEl.style.fontWeight = '600';
-                    nameEl.style.marginBottom = '4px';
+                    nameEl.setCssStyles({
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        marginBottom: '4px',
+                    });
                     nameEl.textContent = label;
 
                     // Mood hint
                     const hint = card.createDiv();
-                    hint.style.fontSize = '9px';
-                    hint.style.color = 'var(--text-faint)';
-                    hint.style.marginBottom = '4px';
+                    hint.setCssStyles({
+                        fontSize: '9px',
+                        color: 'var(--text-faint)',
+                        marginBottom: '4px',
+                    });
                     hint.textContent = hintText;
 
                     // Swatches
                     if (palette) {
                         const swatchRow = card.createDiv();
-                        swatchRow.style.display = 'flex';
-                        swatchRow.style.gap = '2px';
-                        swatchRow.style.justifyContent = 'center';
-                        swatchRow.style.flexWrap = 'wrap';
+                        swatchRow.setCssStyles({
+                            display: 'flex',
+                            gap: '2px',
+                            justifyContent: 'center',
+                            flexWrap: 'wrap',
+                        });
                         for (let i = 0; i < Math.min(7, palette.length); i++) {
                             const dot = swatchRow.createDiv();
-                            dot.style.width = '10px';
-                            dot.style.height = '10px';
-                            dot.style.borderRadius = '50%';
-                            dot.style.background = palette[i];
+                            dot.setCssStyles({
+                                width: '10px',
+                                height: '10px',
+                                borderRadius: '50%',
+                                background: palette[i],
+                            });
                         }
                     } else {
                         const iconEl = card.createDiv();
-                        iconEl.style.display = 'flex';
-                        iconEl.style.justifyContent = 'center';
+                        iconEl.setCssStyles({
+                            display: 'flex',
+                            justifyContent: 'center',
+                        });
                         obsidian.setIcon(iconEl, 'palette');
-                        iconEl.style.color = 'var(--text-muted)';
+                        iconEl.setCssStyles({ color: 'var(--text-muted)' });
                     }
 
                     card.addEventListener('click', async () => {
@@ -1666,26 +1706,30 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const helpText = colorBody.createEl('p', {
             cls: 'setting-item-description',
         });
-        helpText.style.marginTop = '8px';
+        helpText.setCssStyles({ marginTop: '8px' });
         helpText.textContent = 'Colors are auto-assigned to plotline tags. To override a specific tag color, use the color picker in the Plotlines view.';
 
         // ── Plotline HSL sliders ──
         const plotSliderLabel = colorBody.createDiv();
-        plotSliderLabel.style.fontSize = '11px';
-        plotSliderLabel.style.fontWeight = '600';
-        plotSliderLabel.style.color = 'var(--text-muted)';
-        plotSliderLabel.style.textTransform = 'uppercase';
-        plotSliderLabel.style.letterSpacing = '0.05em';
-        plotSliderLabel.style.marginTop = '12px';
-        plotSliderLabel.style.marginBottom = '6px';
+        plotSliderLabel.setCssStyles({
+            fontSize: '11px',
+            fontWeight: '600',
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginTop: '12px',
+            marginBottom: '6px',
+        });
         plotSliderLabel.textContent = 'Global Adjustments';
 
         // Preview swatch row
         const plotPreviewRow = colorBody.createDiv();
-        plotPreviewRow.style.display = 'flex';
-        plotPreviewRow.style.gap = '4px';
-        plotPreviewRow.style.flexWrap = 'wrap';
-        plotPreviewRow.style.marginBottom = '8px';
+        plotPreviewRow.setCssStyles({
+            display: 'flex',
+            gap: '4px',
+            flexWrap: 'wrap',
+            marginBottom: '8px',
+        });
 
         const updatePlotPreview = () => {
             plotPreviewRow.empty();
@@ -1696,11 +1740,13 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             for (let ci = 0; ci < Math.min(palette.length, 14); ci++) {
                 const col = hasAdj ? adjustHSL(palette[ci], adj.hue, adj.sat, adj.light) : palette[ci];
                 const dot = plotPreviewRow.createDiv();
-                dot.style.width = '20px';
-                dot.style.height = '20px';
-                dot.style.borderRadius = '4px';
-                dot.style.background = col;
-                dot.style.border = '1px solid var(--background-modifier-border)';
+                dot.setCssStyles({
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '4px',
+                    background: col,
+                    border: '1px solid var(--background-modifier-border)',
+                });
             }
         };
         updatePlotPreview();
@@ -1713,14 +1759,18 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             onChange: (v: number) => void,
         ) => {
             const row = colorBody.createDiv();
-            row.style.display = 'flex';
-            row.style.alignItems = 'center';
-            row.style.gap = '8px';
-            row.style.marginBottom = '6px';
+            row.setCssStyles({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '6px',
+            });
 
             const lbl = row.createSpan();
-            lbl.style.fontSize = '12px';
-            lbl.style.minWidth = '75px';
+            lbl.setCssStyles({
+                fontSize: '12px',
+                minWidth: '75px',
+            });
             lbl.textContent = label;
 
             const slider = row.createEl('input', {
@@ -1728,22 +1778,24 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 attr: { min: String(min), max: String(max), step: '1' },
             });
             slider.value = String(value);
-            slider.style.flex = '1';
+            slider.setCssStyles({ flex: '1' });
 
             const valEl = row.createSpan();
-            valEl.style.fontSize = '11px';
-            valEl.style.minWidth = '30px';
-            valEl.style.textAlign = 'right';
+            valEl.setCssStyles({
+                fontSize: '11px',
+                minWidth: '30px',
+                textAlign: 'right',
+            });
             valEl.textContent = String(value);
 
-            let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+            let debounceTimer: number | null = null;
             slider.addEventListener('input', () => {
                 const v = Number.parseInt(slider.value, 10);
                 valEl.textContent = String(v);
                 onChange(v);
                 updatePlotPreview();
-                if (debounceTimer) clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
+                if (debounceTimer) window.clearTimeout(debounceTimer);
+                debounceTimer = window.setTimeout(() => {
                     this.plugin.saveSettings();
                     this.plugin.refreshOpenViews();
                 }, 300);
@@ -1756,10 +1808,12 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         createPlotSlider('Lightness', ps.plotlineLightness, -30, 30, (v) => { ps.plotlineLightness = v; });
 
         const plotResetRow = colorBody.createDiv();
-        plotResetRow.style.marginBottom = '12px';
+        plotResetRow.setCssStyles({ marginBottom: '12px' });
         const plotResetBtn = plotResetRow.createEl('button', { text: 'Reset adjustments' });
-        plotResetBtn.style.fontSize = '11px';
-        plotResetBtn.style.padding = '2px 10px';
+        plotResetBtn.setCssStyles({
+            fontSize: '11px',
+            padding: '2px 10px',
+        });
         plotResetBtn.addEventListener('click', async () => {
             ps.plotlineHue = 0;
             ps.plotlineSaturation = 0;
@@ -1773,17 +1827,21 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const overrides = Object.entries(this.plugin.settings.tagColors || {});
         if (overrides.length > 0) {
             const overrideSection = colorBody.createDiv();
-            overrideSection.style.marginTop = '10px';
+            overrideSection.setCssStyles({ marginTop: '10px' });
             const overrideHeader = overrideSection.createDiv();
-            overrideHeader.style.display = 'flex';
-            overrideHeader.style.alignItems = 'center';
-            overrideHeader.style.gap = '8px';
-            overrideHeader.style.marginBottom = '6px';
+            overrideHeader.setCssStyles({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '6px',
+            });
             overrideHeader.createSpan({ text: 'Custom overrides', cls: 'setting-item-name' });
 
             const clearBtn = overrideHeader.createEl('button', { text: 'Clear all' });
-            clearBtn.style.fontSize = '11px';
-            clearBtn.style.padding = '2px 8px';
+            clearBtn.setCssStyles({
+                fontSize: '11px',
+                padding: '2px 8px',
+            });
             clearBtn.addEventListener('click', async () => {
                 this.plugin.settings.tagColors = {};
                 await this.plugin.saveSettings();
@@ -1792,17 +1850,21 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             });
 
             const chipRow = overrideSection.createDiv();
-            chipRow.style.display = 'flex';
-            chipRow.style.gap = '4px';
-            chipRow.style.flexWrap = 'wrap';
+            chipRow.setCssStyles({
+                display: 'flex',
+                gap: '4px',
+                flexWrap: 'wrap',
+            });
             for (const [tag, color] of overrides) {
                 const chip = chipRow.createSpan();
-                chip.style.padding = '2px 8px';
-                chip.style.borderRadius = '10px';
-                chip.style.fontSize = '11px';
-                chip.style.background = color;
-                chip.style.color = contrastTextColor(color);
-                chip.style.cursor = 'pointer';
+                chip.setCssStyles({
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '11px',
+                    background: color,
+                    color: contrastTextColor(color),
+                    cursor: 'pointer',
+                });
                 chip.textContent = tag;
                 chip.setAttribute('title', `${tag}: ${color} — click to remove`);
                 chip.addEventListener('click', async () => {
@@ -1818,13 +1880,13 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const noteColorDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
         noteColorDetails.createEl('summary', { text: 'Sticky Note Colors' });
         const noteColorBody = noteColorDetails.createDiv();
-        noteColorBody.style.padding = '8px 0';
+        noteColorBody.setCssStyles({ padding: '8px 0' });
         this.renderStickyNoteSettings(noteColorBody);
 
         // ═══════════════════════════════════════════
         //  Project Management
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Project Management' });
+        new Setting(containerEl).setName('Project Management').setHeading();
 
         const activeProject = this.plugin.sceneManager.activeProject;
 
@@ -1860,7 +1922,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  Scene Templates
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Scene Templates' });
+        new Setting(containerEl).setName('Scene Templates').setHeading();
         containerEl.createEl('p', {
             text: 'Custom templates pre-fill fields and body text when creating new scenes. Built-in templates are always available.',
             cls: 'setting-item-description',
@@ -1885,7 +1947,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  Custom Scene Fields
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Custom Scene Fields' });
+        new Setting(containerEl).setName('Custom Scene Fields').setHeading();
         containerEl.createEl('p', {
             text: 'Define your own metadata fields that appear on every scene\u2019s Inspector. Useful for Story Grid functions, Truby aspects, beat-sheet labels, genre conventions, and any other scene tagging your method requires. Dropdown and multi-select fields can also be used to filter and group scenes on the Board.',
             cls: 'setting-item-description',
@@ -1918,7 +1980,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ═══════════════════════════════════════════
         //  Export & Import
         // ═══════════════════════════════════════════
-        containerEl.createEl('h2', { text: 'Export & Import' });
+        new Setting(containerEl).setName('Export & Import').setHeading();
 
         // --- DOCX Export Settings (collapsible) ---
         this.renderDocxSettings(containerEl);
@@ -1960,15 +2022,17 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const extraDetails = advancedBody.createEl('details', { cls: 'story-line-color-section' });
         extraDetails.createEl('summary', { text: 'Additional Source Folders (Experimental)' });
         const extraBody = extraDetails.createDiv();
-        extraBody.style.padding = '8px 0';
+        extraBody.setCssStyles({ padding: '8px 0' });
 
         const extraWarn = extraBody.createDiv({ cls: 'setting-item-description' });
-        extraWarn.style.color = 'var(--text-warning, orange)';
-        extraWarn.style.marginBottom = '12px';
+        extraWarn.setCssStyles({
+            color: 'var(--text-warning, orange)',
+            marginBottom: '12px',
+        });
         extraWarn.setText('⚠ Experimental — back up your files before linking external folders. Files in linked folders may be modified when you edit entities in StoryLine.');
 
         const extraDesc = extraBody.createDiv({ cls: 'setting-item-description' });
-        extraDesc.style.marginBottom = '12px';
+        extraDesc.setCssStyles({ marginBottom: '12px' });
         extraDesc.setText('Point StoryLine to any folder in your vault. All .md files inside will be scanned and automatically sorted by their frontmatter type: field.');
 
         // Render the current list of folders
@@ -1978,19 +2042,25 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             const folders = this.plugin.settings.extraFolders || [];
             for (let i = 0; i < folders.length; i++) {
                 const row = listContainer.createDiv();
-                row.style.display = 'flex';
-                row.style.alignItems = 'center';
-                row.style.gap = '6px';
-                row.style.marginBottom = '4px';
+                row.setCssStyles({
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginBottom: '4px',
+                });
 
                 const label = row.createSpan({ text: folders[i] });
-                label.style.flex = '1';
-                label.style.fontFamily = 'var(--font-monospace)';
-                label.style.fontSize = '12px';
+                label.setCssStyles({
+                    flex: '1',
+                    fontFamily: 'var(--font-monospace)',
+                    fontSize: '12px',
+                });
 
                 const removeBtn = row.createEl('button', { text: '×', cls: 'clickable-icon' });
-                removeBtn.style.color = 'var(--text-error)';
-                removeBtn.style.fontSize = '16px';
+                removeBtn.setCssStyles({
+                    color: 'var(--text-error)',
+                    fontSize: '16px',
+                });
                 removeBtn.addEventListener('click', async () => {
                     this.plugin.settings.extraFolders.splice(i, 1);
                     await this.plugin.saveSettings();
@@ -2002,20 +2072,22 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
         // Add-folder row with folder suggest
         const addRow = extraBody.createDiv();
-        addRow.style.display = 'flex';
-        addRow.style.alignItems = 'center';
-        addRow.style.gap = '6px';
-        addRow.style.marginTop = '8px';
+        addRow.setCssStyles({
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginTop: '8px',
+        });
 
         const folderInput = addRow.createEl('input', { type: 'text', placeholder: 'Type or browse for a folder...' });
-        folderInput.style.flex = '1';
+        folderInput.setCssStyles({ flex: '1' });
         folderInput.addClass('sl-folder-suggest-input');
 
         // Attach folder autocomplete
         new FolderSuggest(this.app, folderInput);
 
         const addBtn = addRow.createEl('button', { text: 'Add', cls: 'mod-cta' });
-        addBtn.style.flexShrink = '0';
+        addBtn.setCssStyles({ flexShrink: '0' });
         addBtn.addEventListener('click', async () => {
             const val = folderInput.value.trim();
             if (!val) return;
@@ -2073,14 +2145,16 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             // Color swatch before the name
             const nameEl = s.nameEl;
             const swatch = nameEl.createSpan();
-            swatch.style.display = 'inline-block';
-            swatch.style.width = '14px';
-            swatch.style.height = '14px';
-            swatch.style.borderRadius = '4px';
-            swatch.style.background = effectiveColor;
-            swatch.style.marginRight = '8px';
-            swatch.style.verticalAlign = 'middle';
-            swatch.style.border = '1px solid var(--background-modifier-border)';
+            swatch.setCssStyles({
+                display: 'inline-block',
+                width: '14px',
+                height: '14px',
+                borderRadius: '4px',
+                background: effectiveColor,
+                marginRight: '8px',
+                verticalAlign: 'middle',
+                border: '1px solid var(--background-modifier-border)',
+            });
             nameEl.createSpan({ text: tag });
 
             if (isOverridden) {
@@ -2097,7 +2171,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 picker.onChange(async (value) => {
                     this.plugin.settings.tagColors[tag] = value;
                     s.setDesc(`Custom: ${value}`);
-                    swatch.style.background = value;
+                    swatch.setCssStyles({ background: value });
                     await this.plugin.saveSettings();
                     this.plugin.refreshOpenViews();
                 });
@@ -2173,61 +2247,77 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
         // ── Theme picker — card grid ──
         const themeLabel = container.createDiv();
-        themeLabel.style.fontSize = '11px';
-        themeLabel.style.fontWeight = '600';
-        themeLabel.style.color = 'var(--text-muted)';
-        themeLabel.style.textTransform = 'uppercase';
-        themeLabel.style.letterSpacing = '0.05em';
-        themeLabel.style.marginBottom = '6px';
+        themeLabel.setCssStyles({
+            fontSize: '11px',
+            fontWeight: '600',
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginBottom: '6px',
+        });
         themeLabel.textContent = 'Theme';
 
         const themeRow = container.createDiv();
-        themeRow.style.display = 'flex';
-        themeRow.style.gap = '8px';
-        themeRow.style.flexWrap = 'wrap';
-        themeRow.style.marginBottom = '12px';
+        themeRow.setCssStyles({
+            display: 'flex',
+            gap: '8px',
+            flexWrap: 'wrap',
+            marginBottom: '12px',
+        });
 
         const themeIds: StickyNoteThemeId[] = ['classic', 'pastel', 'warm', 'cool', 'earth', 'vivid'];
         for (const tid of themeIds) {
             const card = themeRow.createDiv();
-            card.style.cursor = 'pointer';
-            card.style.padding = '6px 10px';
-            card.style.borderRadius = '8px';
-            card.style.border = tid === settings.stickyNoteTheme
+            card.setCssStyles({
+                cursor: 'pointer',
+                padding: '6px 10px',
+                borderRadius: '8px',
+            });
+            card.setCssStyles({ border: tid === settings.stickyNoteTheme
                 ? '2px solid var(--interactive-accent)'
-                : '2px solid var(--background-modifier-border)';
-            card.style.background = tid === settings.stickyNoteTheme
+                : '2px solid var(--background-modifier-border)' });
+            card.setCssStyles({ background: tid === settings.stickyNoteTheme
                 ? 'var(--background-modifier-hover)'
-                : 'transparent';
-            card.style.minWidth = '90px';
-            card.style.textAlign = 'center';
-            card.style.transition = 'border-color 0.15s';
+                : 'transparent' });
+            card.setCssStyles({
+                minWidth: '90px',
+                textAlign: 'center',
+                transition: 'border-color 0.15s',
+            });
 
             const nameEl = card.createDiv();
-            nameEl.style.fontSize = '11px';
-            nameEl.style.fontWeight = '600';
-            nameEl.style.marginBottom = '2px';
+            nameEl.setCssStyles({
+                fontSize: '11px',
+                fontWeight: '600',
+                marginBottom: '2px',
+            });
             nameEl.textContent = STICKY_NOTE_THEME_LABELS[tid];
 
             const hint = card.createDiv();
-            hint.style.fontSize = '9px';
-            hint.style.color = 'var(--text-faint)';
-            hint.style.marginBottom = '4px';
+            hint.setCssStyles({
+                fontSize: '9px',
+                color: 'var(--text-faint)',
+                marginBottom: '4px',
+            });
             hint.textContent = STICKY_NOTE_THEME_HINTS[tid];
 
             // Mini swatches
             const swatchRow = card.createDiv();
-            swatchRow.style.display = 'flex';
-            swatchRow.style.gap = '2px';
-            swatchRow.style.justifyContent = 'center';
-            swatchRow.style.flexWrap = 'wrap';
+            swatchRow.setCssStyles({
+                display: 'flex',
+                gap: '2px',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+            });
             const themeColors = STICKY_NOTE_THEMES[tid];
             for (let i = 0; i < 7; i++) {
                 const dot = swatchRow.createDiv();
-                dot.style.width = '10px';
-                dot.style.height = '10px';
-                dot.style.borderRadius = '50%';
-                dot.style.background = themeColors[i];
+                dot.setCssStyles({
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: themeColors[i],
+                });
             }
 
             card.addEventListener('click', async () => {
@@ -2245,13 +2335,15 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
         // ── Global HSL sliders ──
         const sliderLabel = container.createDiv();
-        sliderLabel.style.fontSize = '11px';
-        sliderLabel.style.fontWeight = '600';
-        sliderLabel.style.color = 'var(--text-muted)';
-        sliderLabel.style.textTransform = 'uppercase';
-        sliderLabel.style.letterSpacing = '0.05em';
-        sliderLabel.style.marginTop = '8px';
-        sliderLabel.style.marginBottom = '6px';
+        sliderLabel.setCssStyles({
+            fontSize: '11px',
+            fontWeight: '600',
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginTop: '8px',
+            marginBottom: '6px',
+        });
         sliderLabel.textContent = 'Global Adjustments';
 
         const createSlider = (
@@ -2262,14 +2354,18 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             onChange: (v: number) => void,
         ) => {
             const row = container.createDiv();
-            row.style.display = 'flex';
-            row.style.alignItems = 'center';
-            row.style.gap = '8px';
-            row.style.marginBottom = '6px';
+            row.setCssStyles({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '6px',
+            });
 
             const lbl = row.createSpan();
-            lbl.style.fontSize = '12px';
-            lbl.style.minWidth = '75px';
+            lbl.setCssStyles({
+                fontSize: '12px',
+                minWidth: '75px',
+            });
             lbl.textContent = label;
 
             const slider = row.createEl('input', {
@@ -2277,15 +2373,17 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 attr: { min: String(min), max: String(max), step: '1' },
             });
             slider.value = String(value);
-            slider.style.flex = '1';
+            slider.setCssStyles({ flex: '1' });
 
             const valEl = row.createSpan();
-            valEl.style.fontSize = '11px';
-            valEl.style.minWidth = '30px';
-            valEl.style.textAlign = 'right';
+            valEl.setCssStyles({
+                fontSize: '11px',
+                minWidth: '30px',
+                textAlign: 'right',
+            });
             valEl.textContent = String(value);
 
-            let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+            let debounceTimer: number | null = null;
             slider.addEventListener('input', () => {
                 const v = Number.parseInt(slider.value, 10);
                 valEl.textContent = String(v);
@@ -2293,8 +2391,8 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 // Instant swatch preview
                 updateSwatches();
                 // Debounce the heavier save + view refresh
-                if (debounceTimer) clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(async () => {
+                if (debounceTimer) window.clearTimeout(debounceTimer);
+                debounceTimer = window.setTimeout(async () => {
                     await migrateAndUpdate();
                     await this.plugin.saveSettings();
                     this.plugin.refreshOpenViews();
@@ -2308,10 +2406,12 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
         // Reset sliders button
         const resetRow = container.createDiv();
-        resetRow.style.marginBottom = '12px';
+        resetRow.setCssStyles({ marginBottom: '12px' });
         const resetBtn = resetRow.createEl('button', { text: 'Reset adjustments' });
-        resetBtn.style.fontSize = '11px';
-        resetBtn.style.padding = '2px 10px';
+        resetBtn.setCssStyles({
+            fontSize: '11px',
+            padding: '2px 10px',
+        });
         resetBtn.addEventListener('click', async () => {
             const oldPresets = presetsSnapshot;
             settings.stickyNoteHue = 0;
@@ -2325,19 +2425,23 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
         // ── Colour swatches with per-colour overrides ──
         const swatchLabel = container.createDiv();
-        swatchLabel.style.fontSize = '11px';
-        swatchLabel.style.fontWeight = '600';
-        swatchLabel.style.color = 'var(--text-muted)';
-        swatchLabel.style.textTransform = 'uppercase';
-        swatchLabel.style.letterSpacing = '0.05em';
-        swatchLabel.style.marginBottom = '6px';
+        swatchLabel.setCssStyles({
+            fontSize: '11px',
+            fontWeight: '600',
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginBottom: '6px',
+        });
         swatchLabel.textContent = 'Preview & Individual Overrides';
 
         const swatchGrid = container.createDiv();
-        swatchGrid.style.display = 'flex';
-        swatchGrid.style.gap = '6px';
-        swatchGrid.style.flexWrap = 'wrap';
-        swatchGrid.style.marginBottom = '8px';
+        swatchGrid.setCssStyles({
+            display: 'flex',
+            gap: '6px',
+            flexWrap: 'wrap',
+            marginBottom: '8px',
+        });
 
         const updateSwatches = () => {
             swatchGrid.empty();
@@ -2347,21 +2451,25 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 const isOverridden = settings.stickyNoteOverrides[i] !== undefined;
 
                 const cell = swatchGrid.createDiv();
-                cell.style.display = 'flex';
-                cell.style.flexDirection = 'column';
-                cell.style.alignItems = 'center';
-                cell.style.gap = '2px';
-                cell.style.width = '52px';
+                cell.setCssStyles({
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '2px',
+                    width: '52px',
+                });
 
                 const dot = cell.createDiv();
-                dot.style.width = '32px';
-                dot.style.height = '32px';
-                dot.style.borderRadius = '6px';
-                dot.style.background = color;
-                dot.style.border = isOverridden
+                dot.setCssStyles({
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '6px',
+                    background: color,
+                });
+                dot.setCssStyles({ border: isOverridden
                     ? '2px solid var(--interactive-accent)'
-                    : '1px solid var(--background-modifier-border)';
-                dot.style.cursor = 'pointer';
+                    : '1px solid var(--background-modifier-border)' });
+                dot.setCssStyles({ cursor: 'pointer' });
                 dot.title = `${label}: ${color}${isOverridden ? ' (custom)' : ''}\nClick to change`;
 
                 // Hidden colour picker
@@ -2369,18 +2477,22 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     type: 'color',
                     attr: { value: color },
                 });
-                picker.style.position = 'absolute';
-                picker.style.opacity = '0';
-                picker.style.pointerEvents = 'none';
-                picker.style.width = '0';
-                picker.style.height = '0';
+                picker.setCssStyles({
+                    position: 'absolute',
+                    opacity: '0',
+                    pointerEvents: 'none',
+                    width: '0',
+                    height: '0',
+                });
 
                 dot.addEventListener('click', () => picker.click());
                 picker.addEventListener('input', async () => {
                     const oldPresets = presetsSnapshot;
                     settings.stickyNoteOverrides[i] = picker.value.toUpperCase();
-                    dot.style.background = picker.value;
-                    dot.style.border = '2px solid var(--interactive-accent)';
+                    dot.setCssStyles({
+                        background: picker.value,
+                        border: '2px solid var(--interactive-accent)',
+                    });
                     const newPresets = resolveStickyNoteColors(settings);
                     await this.migrateCorkboardNoteColors(oldPresets, newPresets);
                     presetsSnapshot = newPresets;
@@ -2404,26 +2516,30 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 });
 
                 const nameEl = cell.createDiv();
-                nameEl.style.fontSize = '9px';
-                nameEl.style.color = 'var(--text-muted)';
-                nameEl.style.textAlign = 'center';
-                nameEl.style.lineHeight = '1.1';
+                nameEl.setCssStyles({
+                    fontSize: '9px',
+                    color: 'var(--text-muted)',
+                    textAlign: 'center',
+                    lineHeight: '1.1',
+                });
                 nameEl.textContent = label;
             }
         };
         updateSwatches();
 
         const helpText = container.createEl('p', { cls: 'setting-item-description' });
-        helpText.style.marginTop = '4px';
+        helpText.setCssStyles({ marginTop: '4px' });
         helpText.textContent = 'Click a swatch to override that colour. Right-click to reset it. Sliders tint all 14 colours at once.';
 
         // Clear all overrides
         if (Object.keys(settings.stickyNoteOverrides).length > 0) {
             const clearRow = container.createDiv();
-            clearRow.style.marginTop = '4px';
+            clearRow.setCssStyles({ marginTop: '4px' });
             const clearBtn = clearRow.createEl('button', { text: 'Clear all colour overrides' });
-            clearBtn.style.fontSize = '11px';
-            clearBtn.style.padding = '2px 10px';
+            clearBtn.setCssStyles({
+                fontSize: '11px',
+                padding: '2px 10px',
+            });
             clearBtn.addEventListener('click', async () => {
                 const oldPresets = presetsSnapshot;
                 settings.stickyNoteOverrides = {};
@@ -2899,7 +3015,7 @@ class TemplateEditorModal extends Modal {
 
     onOpen(): void {
         const { contentEl } = this;
-        contentEl.createEl('h3', { text: this.template.name ? 'Edit Template' : 'New Template' });
+        new Setting(contentEl).setName(this.template.name ? 'Edit Template' : 'New Template').setHeading();
 
         new Setting(contentEl)
             .setName('Template name')
@@ -2969,8 +3085,10 @@ class TemplateEditorModal extends Modal {
         bodyArea.setValue(this.template.bodyTemplate);
         bodyArea.onChange(v => this.template.bodyTemplate = v);
         bodyArea.inputEl.rows = 10;
-        bodyArea.inputEl.style.width = '100%';
-        bodyArea.inputEl.style.fontFamily = 'var(--font-monospace)';
+        bodyArea.inputEl.setCssStyles({
+            width: '100%',
+            fontFamily: 'var(--font-monospace)',
+        });
 
         const btnRow = contentEl.createDiv({ cls: 'story-line-button-row' });
         const cancelBtn = btnRow.createEl('button', { text: 'Cancel' });

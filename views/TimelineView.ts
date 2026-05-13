@@ -1,6 +1,12 @@
-import { ItemView, WorkspaceLeaf, TFile, Modal, Setting, Notice, Menu } from 'obsidian';
-import * as obsidian from 'obsidian';
-import { Scene, SceneFilter, SortConfig, STATUS_CONFIG, SceneStatus, BUILTIN_BEAT_SHEETS, BeatSheetTemplate, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TIMELINE_MODES, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { openConfirmModal } from '../components/ConfirmModal';
 import { SceneManager } from '../services/SceneManager';
 import { SceneCardComponent } from '../components/SceneCard';
@@ -13,6 +19,9 @@ import type SceneCardsPlugin from '../main';
 import { TIMELINE_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
 import { attachTooltip } from '../components/Tooltip';
+import { ItemView, Menu, Modal, Notice, Setting, TFile, WorkspaceLeaf } from 'obsidian';
+import * as obsidian from 'obsidian';
+import { BUILTIN_BEAT_SHEETS, Scene, TIMELINE_MODES, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 
 /**
  * Timeline ordering mode
@@ -30,12 +39,12 @@ type SwimlaneGroupBy = 'pov' | 'location' | 'tag';
 export class TimelineView extends ItemView {
     private plugin: SceneCardsPlugin;
     private sceneManager: SceneManager;
-    private cardComponent: SceneCardComponent;
     private inspectorComponent: InspectorComponent | null = null;
     private selectedScene: Scene | null = null;
     private zoomLevel = 1;
     private rootContainer: HTMLElement | null = null;
     private _pendingRefresh: number | null = null;
+    private cardComponent: SceneCardComponent;
     private _lastCacheVersion = -1;
     /** When true, display multi-lane swimlane view instead of single-column */
     private swimlaneMode = false;
@@ -79,10 +88,10 @@ export class TimelineView extends ItemView {
     async onClose(): Promise<void> {}
 
     private isNoteScene(scene: Scene): boolean {
-        const value = (scene as Scene & { corkboardNote?: unknown }).corkboardNote;
+        const value: unknown = (scene as Scene & { corkboardNote?: unknown }).corkboardNote;
         if (value === true) return true;
         if (value === false || value === undefined || value === null) return false;
-        if (typeof value === 'string') return value.trim().toLowerCase() === 'true';
+        if (typeof value === 'string') return (value as string).trim().toLowerCase() === 'true';
         if (typeof value === 'number') return value === 1;
         return false;
     }
@@ -219,7 +228,7 @@ export class TimelineView extends ItemView {
 
         // Inspector sidebar
         const inspectorEl = mainArea.createDiv('story-line-inspector-panel');
-        inspectorEl.style.display = 'none';
+        inspectorEl.setCssStyles({ display: 'none' });
         this.inspectorComponent = new InspectorComponent(
             inspectorEl,
             this.plugin,
@@ -243,7 +252,7 @@ export class TimelineView extends ItemView {
 
         const timelineEl = container.createDiv('story-line-timeline');
         const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
-        const scenes = this.sceneManager.getFilteredScenes(
+        const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: sortField, direction: 'asc' }
         ).filter(scene => !this.isNoteScene(scene));
@@ -311,7 +320,6 @@ export class TimelineView extends ItemView {
         // ── Vertical timeline with scene cards ──
         const track = timelineEl.createDiv('timeline-track');
 
-        let lastAct: string | undefined = undefined;
 
         // For drag & drop
         let dragIndex: number | null = null;
@@ -337,9 +345,9 @@ export class TimelineView extends ItemView {
                     autoScrollRAF = null;
                     return;
                 }
-                autoScrollRAF = requestAnimationFrame(loop);
+                autoScrollRAF = window.requestAnimationFrame(loop);
             };
-            autoScrollRAF = requestAnimationFrame(loop);
+            autoScrollRAF = window.requestAnimationFrame(loop);
         };
         const stopAutoScroll = () => {
             if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; }
@@ -382,7 +390,7 @@ export class TimelineView extends ItemView {
             this.refresh();
 
             // Restore scroll position after DOM rebuild
-            requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
                 if (scrollEl) scrollEl.scrollTop = savedScroll;
             });
         };
@@ -496,7 +504,7 @@ export class TimelineView extends ItemView {
             let cursor = INITIAL_BATCH;
             const scheduleChunk = () => {
                 if (cursor >= total || !track.isConnected) return;
-                requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
                     if (!track.isConnected) return;
                     const end = Math.min(cursor + CHUNK_SIZE, total);
                     for (let i = cursor; i < end; i++) renderTLItem(tlItems[i]);
@@ -524,7 +532,7 @@ export class TimelineView extends ItemView {
         const timelineEl = container.createDiv('story-line-timeline swimlane-timeline');
         enableDragToPan(timelineEl);
         const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
-        const scenes = this.sceneManager.getFilteredScenes(
+        const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: sortField, direction: 'asc' }
         ).filter(scene => !this.isNoteScene(scene));
@@ -575,7 +583,7 @@ export class TimelineView extends ItemView {
         const grid = timelineEl.createDiv('swimlane-grid');
         //    CSS grid: first column = sequence axis, then one column per lane
         const colTemplate = `80px repeat(${laneKeys.length}, minmax(180px, 1fr))`;
-        grid.style.gridTemplateColumns = colTemplate;
+        grid.setCssStyles({ gridTemplateColumns: colTemplate });
 
         // 4. Sticky header row
         // Corner cell (sequence axis header)
@@ -594,8 +602,7 @@ export class TimelineView extends ItemView {
             if (row.type === 'act-divider') {
                 // Act divider spans the full width
                 const divider = grid.createDiv('swimlane-act-divider');
-                divider.style.gridColumn = `1 / -1`;
-                const label = divider.createSpan({ cls: 'timeline-act-label', text: row.actLabel || '' });
+                divider.setCssStyles({ gridColumn: `1 / -1` });
                 if (row.actNum !== undefined) {
                     const addBtn = divider.createEl('button', {
                         cls: 'timeline-act-add-btn clickable-icon',
@@ -721,7 +728,7 @@ export class TimelineView extends ItemView {
         const footer = card.createDiv('timeline-card-footer');
         const statusCfg = resolveStatusCfg(scene.status || 'idea');
         const statusBadge = footer.createSpan({ cls: 'timeline-card-status', text: statusCfg.label });
-        statusBadge.style.color = statusCfg.color;
+        statusBadge.setCssStyles({ color: statusCfg.color });
 
         if (scene.wordcount) {
             footer.createSpan({ cls: 'timeline-card-wc', text: `${scene.wordcount} words` });
@@ -742,8 +749,10 @@ export class TimelineView extends ItemView {
             this.showContextMenu(scene, e);
         });
 
-        card.style.transform = `scale(${this.zoomLevel})`;
-        card.style.transformOrigin = 'left top';
+        card.setCssStyles({
+            transform: `scale(${this.zoomLevel})`,
+            transformOrigin: 'left top',
+        });
     }
 
     /**
@@ -753,9 +762,9 @@ export class TimelineView extends ItemView {
         track: HTMLElement,
         scene: Scene,
         i: number,
-        scenes: Scene[],
-        dragIndex: number | null,
-        dropIndex: number | null,
+        _scenes: Scene[],
+        _dragIndex: number | null,
+        _dropIndex: number | null,
         refreshDropIndicators: () => void,
         handleDrop: (from: number, to: number) => Promise<void>,
         setDragIndex: (v: number | null) => void,
@@ -917,7 +926,7 @@ export class TimelineView extends ItemView {
             cls: 'timeline-card-status',
             text: statusCfg.label,
         });
-        statusBadge.style.color = statusCfg.color;
+        statusBadge.setCssStyles({ color: statusCfg.color });
 
         if (scene.wordcount) {
             footer.createSpan({
@@ -951,49 +960,10 @@ export class TimelineView extends ItemView {
             this.showContextMenu(scene, e);
         });
 
-        card.style.transform = `scale(${this.zoomLevel})`;
-        card.style.transformOrigin = 'left center';
-    }
-
-    /**
-     * Try to produce a numeric timestamp for a scene based on storyDate/storyTime or "Day N" style strings.
-     * Returns null when no reliable timestamp can be derived.
-     */
-    private parseSceneTimestamp(scene: Scene): number | null {
-        try {
-            const datePart = scene.storyDate?.trim();
-            const timePart = scene.storyTime?.trim();
-
-            if (datePart || timePart) {
-                const dtStr = [datePart || '', timePart || ''].join(' ').trim();
-                const parsed = Date.parse(dtStr);
-                if (!isNaN(parsed)) return parsed;
-
-                // Try some common variants (e.g. "Day 1") by extracting numbers
-                const dayMatch = (datePart || '').match(/dag\s*(\d+)/i) || (scene.timeline || '').match(/dag\s*(\d+)/i);
-                if (dayMatch) {
-                    const dayNum = parseInt(dayMatch[1], 10);
-                    if (!isNaN(dayNum)) return dayNum * 24 * 60 * 60 * 1000;
-                }
-
-                // If only a time like 14:30 is provided, parse it relative to epoch
-                if (!datePart && timePart) {
-                    const t = Date.parse('1970-01-01 ' + timePart);
-                    if (!isNaN(t)) return t;
-                }
-            }
-
-            // Fallback: try timeline field for Day N
-            const tl = scene.timeline || '';
-            const tlMatch = tl.match(/dag\s*(\d+)/i) || tl.match(/day\s*(\d+)/i);
-            if (tlMatch) {
-                const n = parseInt(tlMatch[1], 10);
-                if (!isNaN(n)) return n * 24 * 60 * 60 * 1000;
-            }
-        } catch (e) {
-            // ignore
-        }
-        return null;
+        card.setCssStyles({
+            transform: `scale(${this.zoomLevel})`,
+            transformOrigin: 'left center',
+        });
     }
 
     /**
@@ -1050,29 +1020,6 @@ export class TimelineView extends ItemView {
         }
         return null;
     }
-
-    /**
-     * Compare two scenes by their parsed timestamp. Returns -1 if a < b, 1 if a > b, 0 if equal or unknown.
-     */
-    private compareSceneOrder(a: Scene, b: Scene): number {
-        const ta = this.parseSceneTimestamp(a);
-        const tb = this.parseSceneTimestamp(b);
-        if (ta !== null && tb !== null) {
-            if (ta < tb) return -1;
-            if (ta > tb) return 1;
-            return 0;
-        }
-        return 0;
-    }
-
-    private formatSceneTime(scene: Scene): string {
-        const d = scene.storyDate ? scene.storyDate : '';
-        const t = scene.storyTime ? (' ' + scene.storyTime) : '';
-        if (d || t) return (d + t).trim();
-        if (scene.timeline) return scene.timeline;
-        return '—';
-    }
-
     /**
      * Select a scene and show it in the inspector
      */
@@ -1193,7 +1140,7 @@ export class TimelineView extends ItemView {
                 const file = await this.sceneManager.createScene(sceneData);
                 this.refresh();
                 // Scroll to the newly created scene card
-                requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
                     const newEntry = this.rootContainer?.querySelector(
                         `[data-path="${CSS.escape(file.path)}"]`
                     );
@@ -1319,8 +1266,8 @@ export class TimelineView extends ItemView {
                     // Create inline edit
                     const labelSpan = row.querySelector('.structure-label') as HTMLElement;
                     if (!labelSpan) return;
-                    labelSpan.style.display = 'none';
-                    const editInput = document.createElement('input');
+                    labelSpan.setCssStyles({ display: 'none' });
+                    const editInput = activeDocument.createElement('input');
                     editInput.type = 'text';
                     editInput.value = label || '';
                     editInput.placeholder = 'e.g. Setup, Confrontation…';
@@ -1334,7 +1281,7 @@ export class TimelineView extends ItemView {
                     editInput.addEventListener('blur', commitEdit);
                     editInput.addEventListener('keydown', (e: KeyboardEvent) => {
                         if (e.key === 'Enter') { e.preventDefault(); editInput.blur(); }
-                        if (e.key === 'Escape') { labelSpan.style.display = ''; editInput.remove(); }
+                        if (e.key === 'Escape') { labelSpan.setCssStyles({ display: '' }); editInput.remove(); }
                     });
                 });
 
@@ -1354,21 +1301,23 @@ export class TimelineView extends ItemView {
                     attr: { placeholder: 'Description / notes for this act…', rows: '2' }
                 });
                 descArea.value = desc;
-                let descCommitTimer: ReturnType<typeof setTimeout> | null = null;
+                let descCommitTimer: number | null = null;
                 descArea.addEventListener('input', () => {
                     // Auto-grow
-                    descArea.style.height = 'auto';
-                    descArea.style.height = descArea.scrollHeight + 'px';
+                    descArea.setCssStyles({ height: "auto" });
+
+                    descArea.setCssStyles({ height: descArea.scrollHeight + 'px' });
                     // Debounced save
-                    if (descCommitTimer) clearTimeout(descCommitTimer);
-                    descCommitTimer = setTimeout(async () => {
+                    if (descCommitTimer) window.clearTimeout(descCommitTimer);
+                    descCommitTimer = window.setTimeout(async () => {
                         await this.sceneManager.setActDescription(act, descArea.value);
                     }, 600);
                 });
                 // Initial auto-grow
-                setTimeout(() => {
-                    descArea.style.height = 'auto';
-                    descArea.style.height = descArea.scrollHeight + 'px';
+                window.setTimeout(() => {
+                    descArea.setCssStyles({ height: "auto" });
+
+                    descArea.setCssStyles({ height: descArea.scrollHeight + 'px' });
                 }, 0);
             }
         };
@@ -1445,8 +1394,8 @@ export class TimelineView extends ItemView {
                     if (input) { input.focus(); return; }
                     const labelSpan = row.querySelector('.structure-label') as HTMLElement;
                     if (!labelSpan) return;
-                    labelSpan.style.display = 'none';
-                    const editInput = document.createElement('input');
+                    labelSpan.setCssStyles({ display: 'none' });
+                    const editInput = activeDocument.createElement('input');
                     editInput.type = 'text';
                     editInput.value = label || '';
                     editInput.placeholder = 'e.g. The Journey Begins…';
@@ -1460,7 +1409,7 @@ export class TimelineView extends ItemView {
                     editInput.addEventListener('blur', commitEdit);
                     editInput.addEventListener('keydown', (e: KeyboardEvent) => {
                         if (e.key === 'Enter') { e.preventDefault(); editInput.blur(); }
-                        if (e.key === 'Escape') { labelSpan.style.display = ''; editInput.remove(); }
+                        if (e.key === 'Escape') { labelSpan.setCssStyles({ display: '' }); editInput.remove(); }
                     });
                 });
 
@@ -1480,18 +1429,20 @@ export class TimelineView extends ItemView {
                     attr: { placeholder: 'Description / notes for this chapter…', rows: '2' }
                 });
                 descArea.value = desc;
-                let descCommitTimer: ReturnType<typeof setTimeout> | null = null;
+                let descCommitTimer: number | null = null;
                 descArea.addEventListener('input', () => {
-                    descArea.style.height = 'auto';
-                    descArea.style.height = descArea.scrollHeight + 'px';
-                    if (descCommitTimer) clearTimeout(descCommitTimer);
-                    descCommitTimer = setTimeout(async () => {
+                    descArea.setCssStyles({ height: "auto" });
+
+                    descArea.setCssStyles({ height: descArea.scrollHeight + 'px' });
+                    if (descCommitTimer) window.clearTimeout(descCommitTimer);
+                    descCommitTimer = window.setTimeout(async () => {
                         await this.sceneManager.setChapterDescription(ch, descArea.value);
                     }, 600);
                 });
-                setTimeout(() => {
-                    descArea.style.height = 'auto';
-                    descArea.style.height = descArea.scrollHeight + 'px';
+                window.setTimeout(() => {
+                    descArea.setCssStyles({ height: "auto" });
+
+                    descArea.setCssStyles({ height: descArea.scrollHeight + 'px' });
                 }, 0);
             }
         };
@@ -1640,8 +1591,7 @@ export class TimelineView extends ItemView {
                 dd.onChange((v: string) => {
                     timelineMode = v as TimelineMode;
                     // Show/hide strand field based on mode
-                    strandSetting.settingEl.style.display =
-                        (v === 'parallel' || v === 'frame') ? '' : 'none';
+                    strandSetting.settingEl.setCssStyles({ display: (v === 'parallel' || v === 'frame') ? '' : 'none' });
                 });
             });
 
@@ -1655,8 +1605,7 @@ export class TimelineView extends ItemView {
                     .onChange((v: string) => (timelineStrand = v));
             });
         // Only show strand field for parallel/frame modes
-        strandSetting.settingEl.style.display =
-            (timelineMode === 'parallel' || timelineMode === 'frame') ? '' : 'none';
+        strandSetting.settingEl.setCssStyles({ display: (timelineMode === 'parallel' || timelineMode === 'frame') ? '' : 'none' });
 
         new Setting(modal.contentEl)
             .addButton((btn: any) => {
@@ -1702,7 +1651,7 @@ export class TimelineView extends ItemView {
         if (this._pendingRefresh) {
             cancelAnimationFrame(this._pendingRefresh);
         }
-        this._pendingRefresh = requestAnimationFrame(() => {
+        this._pendingRefresh = window.requestAnimationFrame(() => {
             this._pendingRefresh = null;
             if (!this.rootContainer) return;
             this._lastCacheVersion = this.sceneManager.cacheVersion;

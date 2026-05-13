@@ -18,7 +18,7 @@ import * as obsidian from 'obsidian';
 import type { Scene } from '../models/Scene';
 import type { Character } from '../models/Character';
 import { RELATION_BASE_TYPE_BY_CATEGORY, extractCharacterProps, extractCharacterLocationTags } from '../models/Character';
-import type { LinkScanResult, DetectedLink } from '../services/LinkScanner';
+import type { LinkScanResult } from '../services/LinkScanner';
 
 // ── Types ─────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ interface StoryGraphEdge {
 // ── Colours ───────────────────────────────────────────
 
 function resolveColor(varName: string, fallback: string): string {
-    const val = getComputedStyle(document.body).getPropertyValue(varName).trim();
+    const val = getComputedStyle(activeDocument.body).getPropertyValue(varName).trim();
     return val || fallback;
 }
 
@@ -70,7 +70,7 @@ function getEdgeColor(kind: EdgeKind): string {
         case 'romantic': return resolveColor('--sl-rel-romantic', '#E91E63');
         case 'mentor': return resolveColor('--sl-rel-mentor', '#9C27B0');
         case 'other-rel': return resolveColor('--sl-rel-other', '#9E9E9E');
-        default: return getEntityColors()[kind as EntityType] || '#999';
+        default: return getEntityColors()[kind] || '#999';
     }
 }
 
@@ -160,7 +160,7 @@ export class StoryGraph {
         this.height = Math.max(450, rect.height || 600);
 
         const svgNS = 'http://www.w3.org/2000/svg';
-        this.svg = document.createElementNS(svgNS, 'svg');
+        this.svg = activeDocument.createElementNS(svgNS, 'svg');
         this.svg.setAttribute('width', '100%');
         this.svg.setAttribute('height', '100%');
         this.svg.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
@@ -268,10 +268,10 @@ export class StoryGraph {
             ['Prop', 'tag', 'prop'],
             ['Other', 'file-text', 'other'],
         ];
-        for (const [label, icon, type] of items) {
+        for (const [label, _icon, type] of items) {
             const item = legend.createDiv('story-graph-legend-item');
             const swatch = item.createSpan({ cls: 'story-graph-legend-swatch' });
-            swatch.style.backgroundColor = colors[type];
+            swatch.setCssStyles({ backgroundColor: colors[type] });
             item.createSpan({ text: label });
         }
         // Relationship edge legend
@@ -286,7 +286,7 @@ export class StoryGraph {
         for (const [label, color] of relItems) {
             const item = legend.createDiv('story-graph-legend-item');
             const swatch = item.createSpan({ cls: 'story-graph-legend-swatch story-graph-legend-line' });
-            swatch.style.borderBottomColor = color;
+            swatch.setCssStyles({ borderBottomColor: color });
             item.createSpan({ text: label });
         }
     }
@@ -481,11 +481,11 @@ export class StoryGraph {
             this.renderSVG();
 
             if (iterations < maxIterations) {
-                this.animFrame = requestAnimationFrame(tick);
+                this.animFrame = window.requestAnimationFrame(tick);
             }
         };
 
-        this.animFrame = requestAnimationFrame(tick);
+        this.animFrame = window.requestAnimationFrame(tick);
     }
 
     private applyForces(): void {
@@ -547,7 +547,7 @@ export class StoryGraph {
 
         const colors = getEntityColors();
 
-        const g = document.createElementNS(svgNS, 'g');
+        const g = activeDocument.createElementNS(svgNS, 'g');
         g.setAttribute('transform', `translate(${this.panX},${this.panY}) scale(${this.zoom})`);
         this.svg.appendChild(g);
 
@@ -557,7 +557,7 @@ export class StoryGraph {
             const b = this.nodes.find(n => n.id === edge.target);
             if (!a || !b) continue;
 
-            const line = document.createElementNS(svgNS, 'line');
+            const line = activeDocument.createElementNS(svgNS, 'line');
             line.setAttribute('x1', String(a.x));
             line.setAttribute('y1', String(a.y));
             line.setAttribute('x2', String(b.x));
@@ -579,7 +579,7 @@ export class StoryGraph {
 
             if (node.entityType === 'scene') {
                 // Rectangle for scenes
-                const rect = document.createElementNS(svgNS, 'rect');
+                const rect = activeDocument.createElementNS(svgNS, 'rect');
                 const rw = radius * 2.4;
                 const rh = radius * 1.6;
                 rect.setAttribute('x', String(node.x - rw / 2));
@@ -597,7 +597,7 @@ export class StoryGraph {
             } else if (node.entityType === 'location') {
                 // Diamond for locations
                 const r = radius;
-                const diamond = document.createElementNS(svgNS, 'polygon');
+                const diamond = activeDocument.createElementNS(svgNS, 'polygon');
                 diamond.setAttribute('points', [
                     `${node.x},${node.y - r}`,
                     `${node.x + r},${node.y}`,
@@ -614,7 +614,7 @@ export class StoryGraph {
             } else if (node.entityType === 'prop') {
                 // Hexagon for props
                 const r = radius * 0.9;
-                const hex = document.createElementNS(svgNS, 'polygon');
+                const hex = activeDocument.createElementNS(svgNS, 'polygon');
                 const pts: string[] = [];
                 for (let i = 0; i < 6; i++) {
                     const angle = (Math.PI / 3) * i - Math.PI / 6;
@@ -630,7 +630,7 @@ export class StoryGraph {
                 g.appendChild(hex);
             } else {
                 // Circle for characters and other
-                const circle = document.createElementNS(svgNS, 'circle');
+                const circle = activeDocument.createElementNS(svgNS, 'circle');
                 circle.setAttribute('cx', String(node.x));
                 circle.setAttribute('cy', String(node.y));
                 circle.setAttribute('r', String(radius));
@@ -644,7 +644,7 @@ export class StoryGraph {
             }
 
             // Label
-            const text = document.createElementNS(svgNS, 'text');
+            const text = activeDocument.createElementNS(svgNS, 'text');
             const labelY = node.entityType === 'scene'
                 ? node.y + this.nodeRadius(node) * 1.6 / 2 + 14
                 : node.y + this.nodeRadius(node) + 14;
@@ -697,6 +697,6 @@ export class StoryGraph {
             });
         }
 
-        el.style.cursor = 'grab';
+        el.setCssStyles({ cursor: 'grab' });
     }
 }

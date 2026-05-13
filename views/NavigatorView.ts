@@ -1,13 +1,13 @@
 import { ItemView, WorkspaceLeaf, Menu, TFile, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
-import { SceneManager } from '../services/SceneManager';
-import { Scene, SceneStatus, STATUS_CONFIG, getStatusOrder, resolveStatusCfg } from '../models/Scene';
-import { NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE, MANUSCRIPT_VIEW_TYPE } from '../constants';
 import { ManuscriptView } from './ManuscriptView';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import { SceneCardComponent } from '../components/SceneCard';
 import { compareActChapter } from '../utils/actChapter';
+import { SceneManager } from '../services/SceneManager';
+import { MANUSCRIPT_VIEW_TYPE, NAVIGATOR_VIEW_TYPE } from '../constants';
+import { Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 
 /**
  * Sort modes available in the navigator.
@@ -147,11 +147,11 @@ export class NavigatorView extends ItemView {
             this.chipsExpanded = !this.chipsExpanded;
             toggleIcon.textContent = this.chipsExpanded ? '▾' : '▸';
             if (this.chipRow) {
-                this.chipRow.style.display = this.chipsExpanded ? '' : 'none';
+                this.chipRow.setCssStyles({ display: this.chipsExpanded ? '' : 'none' });
             }
         });
         this.chipRow = this.chipSection.createDiv('sl-nav-plotline-list');
-        this.chipRow.style.display = 'none';
+        this.chipRow.setCssStyles({ display: 'none' });
 
         // ── Scene list ──
         this.listEl = container.createDiv('sl-nav-list');
@@ -186,14 +186,14 @@ export class NavigatorView extends ItemView {
         if (!this.chipRow || !this.chipSection || !this.chipToggle) return;
         this.chipRow.empty();
 
-        const tags = this.sceneManager.getAllTags().sort();
+        const tags = this.sceneManager.queryService.getAllTags().sort();
 
         // Hide entire section if no tags
         if (tags.length === 0) {
-            this.chipSection.style.display = 'none';
+            this.chipSection.setCssStyles({ display: 'none' });
             return;
         }
-        this.chipSection.style.display = '';
+        this.chipSection.setCssStyles({ display: '' });
 
         // Update toggle label to show active filter + tag count
         const toggleLabel = this.chipToggle.querySelector('.sl-nav-chip-toggle-label');
@@ -218,7 +218,7 @@ export class NavigatorView extends ItemView {
         const allRow = this.chipRow.createDiv('sl-nav-plotline-item');
         if (!this.plotlineFilter) allRow.addClass('is-active');
         const allDot = allRow.createSpan('sl-nav-plotline-dot');
-        allDot.style.background = 'var(--text-faint)';
+        allDot.setCssStyles({ background: 'var(--text-faint)' });
         allRow.createSpan({ text: 'All', cls: 'sl-nav-plotline-name' });
         allRow.addEventListener('click', () => {
             this.plotlineFilter = null;
@@ -234,7 +234,7 @@ export class NavigatorView extends ItemView {
             if (this.plotlineFilter === tag) row.addClass('is-active');
 
             const dot = row.createSpan('sl-nav-plotline-dot');
-            dot.style.background = color;
+            dot.setCssStyles({ background: color });
 
             row.createSpan({ text: tag, cls: 'sl-nav-plotline-name' });
 
@@ -347,7 +347,7 @@ export class NavigatorView extends ItemView {
         // Status dot
         const dot = row.createSpan('sl-nav-status-dot');
         const statusCfg = resolveStatusCfg(scene.status || 'idea');
-        dot.style.background = statusCfg.color;
+        dot.setCssStyles({ background: statusCfg.color });
         dot.setAttribute('aria-label', statusCfg.label);
 
         // Sequence number (if available)
@@ -521,18 +521,18 @@ export class NavigatorView extends ItemView {
     private renderProgress(): void {
         if (!this.progressBar || !this.progressLabel) return;
 
-        const stats = this.sceneManager.getStatistics();
+        const stats = this.sceneManager.queryService.getStatistics();
         const totalWords = stats.totalWords;
         const targetWords = stats.totalTargetWords;
 
         if (targetWords > 0) {
             const pct = Math.min(100, Math.round((totalWords / targetWords) * 100));
             const fill = this.progressBar.querySelector('.sl-nav-progress-fill') as HTMLElement;
-            if (fill) fill.style.width = `${pct}%`;
+            if (fill) fill.setCssStyles({ width: `${pct}%` });
             this.progressLabel.textContent = `${this.formatWords(totalWords)} / ${this.formatWords(targetWords)} (${pct}%)`;
         } else {
             const fill = this.progressBar.querySelector('.sl-nav-progress-fill') as HTMLElement;
-            if (fill) fill.style.width = '0%';
+            if (fill) fill.setCssStyles({ width: '0%' });
             const totalScenes = this.sceneManager.getAllScenes().filter(s => !s.corkboardNote).length;
             this.progressLabel.textContent = `${this.formatWords(totalWords)} words · ${totalScenes} scenes`;
         }

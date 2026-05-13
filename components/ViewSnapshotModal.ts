@@ -1,6 +1,6 @@
-import { Modal, App, Setting, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
 import type { ViewSnapshotService, ViewSnapshotMeta } from '../services/ViewSnapshotService';
+import { App, Modal, Notice } from 'obsidian';
 
 /* ─── Manage Snapshots Modal ──────────────────────────────── */
 
@@ -67,9 +67,7 @@ class ManageSnapshotsModal extends Modal {
         const titleLine = info.createDiv({ cls: 'sl-snapshot-title-line' });
         titleLine.createEl('span', { text: `#${meta.id}`, cls: 'sl-snapshot-id' });
 
-        const nameEl = titleLine.createEl('span', { text: meta.name, cls: 'sl-snapshot-name' });
         if (isActive) {
-            const badge = titleLine.createEl('span', { text: 'active', cls: 'sl-snapshot-badge' });
         }
 
         const dateStr = new Date(meta.modified ?? meta.created).toLocaleString();
@@ -138,6 +136,6 @@ class ManageSnapshotsModal extends Modal {
         obsidian.setIcon(cancelDiv, 'x');
         cancelDiv.addEventListener('click', () => this.renderList());
 
-        setTimeout(() => nameInput.focus(), 30);
+        window.setTimeout(() => nameInput.focus(), 30);
     }
 }

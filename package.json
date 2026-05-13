@@ -1,6 +1,6 @@
 {
   "name": "obsidian-storyline",
-  "version": "1.9.9",
+  "version": "1.10.0",
   "description": "Transform your vault into a powerful book planning and writingtool with StoryLine",
   "main": "main.js",
   "scripts": {
@@ -19,6 +19,10 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@codemirror/commands": "^6.0.0",
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.11.0",
     "esbuild": "^0.20.0",

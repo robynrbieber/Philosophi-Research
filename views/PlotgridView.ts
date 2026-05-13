@@ -1,9 +1,16 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { ItemView, WorkspaceLeaf, Menu, Modal, TFile, Notice, MarkdownRenderer, Component } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { CellData, ColumnMeta, RowMeta, PlotGridData } from '../models/PlotGridData';
 import { LocationManager } from '../services/LocationManager';
-import { openConfirmModal } from '../components/ConfirmModal';
-import { Scene, SceneStatus, STATUS_CONFIG, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import type { SceneFilter, SortConfig } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
@@ -21,6 +28,8 @@ import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors, contrastTextC
 import { compareActChapter } from '../utils/actChapter';
 import { attachTooltip } from '../components/Tooltip';
 import type SceneCardsPlugin from '../main';
+import { Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+import { openConfirmModal } from '../components/ConfirmModal';
 
 // Use the shared view-type constant from `constants.ts` so the ViewSwitcher
 // can correctly detect and style the active tab.
@@ -192,15 +201,17 @@ export class PlotgridView extends ItemView {
 
     private buildLayout(container: HTMLElement) {
         this.wrapperEl = container.createDiv('plot-grid-wrapper');
-        this.wrapperEl.style.display = 'flex';
-        this.wrapperEl.style.flexDirection = 'column';
-        this.wrapperEl.style.height = '100%';
+        this.wrapperEl.setCssStyles({
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+        });
         // make focusable for keyboard navigation
         this.wrapperEl.tabIndex = 0;
         this.wrapperEl.addEventListener('keydown', (e) => this.onKeyDown(e as KeyboardEvent));
 
         const toolbar = this.wrapperEl.createDiv('story-line-toolbar plot-grid-toolbar');
-        toolbar.style.flex = '0 0 auto';
+        toolbar.setCssStyles({ flex: '0 0 auto' });
 
         // Filter bar (shared component, same as Board/Timeline)
         const filterContainer = this.wrapperEl.createDiv('story-line-filters-container');
@@ -220,20 +231,24 @@ export class PlotgridView extends ItemView {
         }
 
         this.scrollAreaEl = this.wrapperEl.createDiv('plot-grid-scroll-area');
-        this.scrollAreaEl.style.flex = '1 1 auto';
-        this.scrollAreaEl.style.overflow = 'auto';
-        this.scrollAreaEl.style.position = 'relative';
+        this.scrollAreaEl.setCssStyles({
+            flex: '1 1 auto',
+            overflow: 'auto',
+            position: 'relative',
+        });
         enableDragToPan(this.scrollAreaEl);
 
         this.canvasEl = this.scrollAreaEl.createDiv('plot-grid-canvas');
-        this.canvasEl.style.position = 'relative';
+        this.canvasEl.setCssStyles({ position: 'relative' });
         // Use CSS zoom instead of transform: scale() — transforms break position: sticky
-        this.canvasEl.style.width = '100%';
-        this.canvasEl.style.boxSizing = 'border-box';
+        this.canvasEl.setCssStyles({
+            width: '100%',
+            boxSizing: 'border-box',
+        });
 
         // Inspector sidebar (same pattern as BoardView)
         this.inspectorEl = this.wrapperEl.createDiv('story-line-inspector-panel');
-        this.inspectorEl.style.display = 'none';
+        this.inspectorEl.setCssStyles({ display: 'none' });
         const sceneManager = this.plugin?.sceneManager as SceneManager | undefined;
         if (sceneManager && this.plugin) {
             this.inspectorComponent = new InspectorComponent(
@@ -273,35 +288,23 @@ export class PlotgridView extends ItemView {
 
         const controls = toolbar.createDiv('story-line-toolbar-controls');
         // add a small left margin so there's a bit more space between the view switcher and action buttons
-        controls.style.marginLeft = '24px';
+        controls.setCssStyles({ marginLeft: '24px' });
 
         const left = controls.createDiv('plot-grid-toolbar-left');
-        left.style.display = 'flex';
-        left.style.alignItems = 'center';
-        left.style.gap = '2px';
+        left.setCssStyles({
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+        });
 
         const actions = controls.createDiv('plot-grid-toolbar-actions');
-        actions.style.display = 'flex';
-        actions.style.gap = '2px';
-        actions.style.marginLeft = 'auto';
+        actions.setCssStyles({
+            display: 'flex',
+            gap: '2px',
+            marginLeft: 'auto',
+        });
 
-        // Ensure toolbar icon styles (size, no edges, hover/active states)
-        try {
-            if (!document.getElementById('storyline-plotgrid-toolbar-style')) {
-                const st = document.createElement('style');
-                st.id = 'storyline-plotgrid-toolbar-style';
-                st.textContent = `
-                /* Apply identical toolbar icon styling to both icon-button and clickable-icon */
-                .plot-grid-toolbar .icon-button, .plot-grid-toolbar .clickable-icon { background: transparent !important; border: none !important; box-shadow: none !important; outline: none !important; padding: 2px !important; min-width: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }
-                .plot-grid-toolbar .icon-button:focus, .plot-grid-toolbar .clickable-icon:focus { outline: none !important; box-shadow: none !important; }
-                /* Do not force explicit icon pixel sizes here — inherit the application's default icon sizing (use BoardView sizing as reference). */
-                .plot-grid-toolbar .icon-button i[data-lucide], .plot-grid-toolbar .icon-button svg, .plot-grid-toolbar .clickable-icon i[data-lucide], .plot-grid-toolbar .clickable-icon svg { display: inline-flex !important; align-items: center !important; justify-content: center !important; }
-                .plot-grid-toolbar .icon-button:hover, .plot-grid-toolbar .clickable-icon:hover { background-color: var(--sl-hover-overlay2) !important; border-radius: 6px !important; }
-                .plot-grid-toolbar .icon-button:active i, .plot-grid-toolbar .icon-button:active svg, .plot-grid-toolbar .clickable-icon:active i, .plot-grid-toolbar .clickable-icon:active svg { transform: scale(0.96) !important; }
-                `;
-                document.head.appendChild(st);
-            }
-        } catch (e) { /* safe no-op */ }
+        // Toolbar icon styling lives in styles.css under `.plot-grid-toolbar`.
 
         // Sync from Scenes button
         const syncBtn = left.createEl('button', { cls: 'clickable-icon' });
@@ -311,29 +314,21 @@ export class PlotgridView extends ItemView {
 
         // Separator between Sync and Add Row/Column
         const syncSep = left.createDiv();
-        syncSep.style.width = '1px';
-        syncSep.style.height = '18px';
-        syncSep.style.background = 'var(--background-modifier-border)';
-        syncSep.style.margin = '0 4px';
+        syncSep.setCssStyles({
+            width: '1px',
+            height: '18px',
+            background: 'var(--background-modifier-border)',
+            margin: '0 4px',
+        });
 
         // Add Row / Add Column buttons
         const addRowBtn = left.createEl('button', { cls: 'clickable-icon' });
-
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(addRowBtn, 'rows-3');
-        } else {
-            addRowBtn.innerHTML = '<i data-lucide="rows-3" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(addRowBtn, 'rows-3');
         attachTooltip(addRowBtn, 'Add Row');
         addRowBtn.addEventListener('click', () => { this.addRow(); });
 
         const addColBtn = left.createEl('button', { cls: 'clickable-icon' });
-
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(addColBtn, 'columns-3');
-        } else {
-            addColBtn.innerHTML = '<i data-lucide="columns-3" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(addColBtn, 'columns-3');
         attachTooltip(addColBtn, 'Add Column');
         addColBtn.addEventListener('click', () => { this.addColumn(); });
 
@@ -358,7 +353,7 @@ export class PlotgridView extends ItemView {
             obsidian.setIcon(autoNoteBtn, 'sticky-note');
             attachTooltip(autoNoteBtn, autoNoteLabel);
             if (this.plugin.settings.plotgridAutoNote) {
-                autoNoteBtn.style.color = 'var(--interactive-accent)';
+                autoNoteBtn.setCssStyles({ color: 'var(--interactive-accent)' });
             }
             autoNoteBtn.addEventListener('click', async () => {
                 this.plugin!.settings.plotgridAutoNote = !this.plugin!.settings.plotgridAutoNote;
@@ -369,51 +364,34 @@ export class PlotgridView extends ItemView {
 
         // Formatting controls (moved to the right actions area so B/I move right)
         const fmtGroup = actions.createDiv('plot-grid-formatting-group');
-        fmtGroup.style.display = 'flex';
-        fmtGroup.style.gap = '2px';
+        fmtGroup.setCssStyles({
+            display: 'flex',
+            gap: '2px',
+        });
 
         const boldBtn = fmtGroup.createEl('button', { cls: 'clickable-icon' });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(boldBtn, 'bold');
-        } else {
-            boldBtn.innerHTML = '<i data-lucide="bold" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(boldBtn, 'bold');
         attachTooltip(boldBtn, 'Bold');
         boldBtn.addEventListener('click', () => this.toggleBoldSelected());
 
         const italicBtn = fmtGroup.createEl('button', { cls: 'clickable-icon' });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(italicBtn, 'italic');
-        } else {
-            italicBtn.innerHTML = '<i data-lucide="italic" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(italicBtn, 'italic');
         attachTooltip(italicBtn, 'Italic');
         italicBtn.addEventListener('click', () => this.toggleItalicSelected());
 
         const alignSelect = fmtGroup.createEl('select');
-        const optL = alignSelect.createEl('option', { text: 'Left', value: 'left' });
-        const optC = alignSelect.createEl('option', { text: 'Center', value: 'center' });
-        const optR = alignSelect.createEl('option', { text: 'Right', value: 'right' });
         alignSelect.title = 'Alignment for selection';
         alignSelect.addEventListener('change', () => this.setAlignSelected(alignSelect.value as 'left' | 'center' | 'right'));
         // default to centered
         alignSelect.value = 'center';
 
         const bgColorBtn = fmtGroup.createEl('button', { cls: 'clickable-icon' });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(bgColorBtn, 'palette');
-        } else {
-            bgColorBtn.innerHTML = '<i data-lucide="palette" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(bgColorBtn, 'palette');
         attachTooltip(bgColorBtn, 'Background color');
         bgColorBtn.addEventListener('click', () => this.setCellBgColorSelected());
 
         const textColorBtn = fmtGroup.createEl('button', { cls: 'clickable-icon' });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(textColorBtn, 'paintbrush');
-        } else {
-            textColorBtn.innerHTML = '<i data-lucide="paintbrush" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(textColorBtn, 'paintbrush');
         attachTooltip(textColorBtn, 'Text color');
         textColorBtn.addEventListener('click', () => this.setCellTextColorSelected());
 
@@ -425,29 +403,27 @@ export class PlotgridView extends ItemView {
         // Add Row / Add Column created above in the left controls (they replace B/I position)
 
         const zoomOut = actions.createEl('button', { cls: 'clickable-icon' });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(zoomOut, 'zoom-out');
-        } else {
-            zoomOut.innerHTML = '<i data-lucide="zoom-out" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(zoomOut, 'zoom-out');
         attachTooltip(zoomOut, 'Zoom out');
         zoomOut.addEventListener('click', () => this.setZoom(Math.max(0.3, this.data.zoom - 0.1)));
 
         const zoomLabel = actions.createEl('span', { cls: 'plot-grid-zoom-label', text: Math.round(this.data.zoom * 100) + '%' });
         // Keep the label fixed width so the control doesn't jump when digits change (e.g. 100% -> 99%)
-        zoomLabel.style.display = 'inline-block';
-        zoomLabel.style.width = '40px';
-        zoomLabel.style.minWidth = '40px';
-        zoomLabel.style.textAlign = 'center';
-        zoomLabel.style.alignSelf = 'center';
-        zoomLabel.style.cursor = 'text';
+        zoomLabel.setCssStyles({
+            display: 'inline-block',
+            width: '40px',
+            minWidth: '40px',
+            textAlign: 'center',
+            alignSelf: 'center',
+            cursor: 'text',
+        });
         zoomLabel.title = 'Click to edit zoom %';
         zoomLabel.addEventListener('click', (ev) => {
             ev.stopPropagation();
-            const inp = document.createElement('input');
+            const inp = activeDocument.createElement('input');
             inp.type = 'text';
             inp.value = Math.round(this.data.zoom * 100).toString();
-            inp.style.width = '56px';
+            inp.setCssStyles({ width: '56px' });
             inp.addEventListener('keydown', (ke) => {
                 if (ke.key === 'Enter') {
                     const v = Number(inp.value);
@@ -462,20 +438,12 @@ export class PlotgridView extends ItemView {
         });
 
         const resetZoomBtn = actions.createEl('button', { cls: 'clickable-icon' });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(resetZoomBtn, 'maximize-2');
-        } else {
-            resetZoomBtn.innerHTML = '<i data-lucide="maximize-2" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(resetZoomBtn, 'maximize-2');
         attachTooltip(resetZoomBtn, 'Reset zoom');
         resetZoomBtn.addEventListener('click', () => this.setZoom(1));
 
         const zoomIn = actions.createEl('button', { cls: 'clickable-icon' });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(zoomIn, 'zoom-in');
-        } else {
-            zoomIn.innerHTML = '<i data-lucide="zoom-in" aria-hidden="true"></i>';
-        }
+        obsidian.setIcon(zoomIn, 'zoom-in');
         attachTooltip(zoomIn, 'Zoom in');
         zoomIn.addEventListener('click', () => this.setZoom(Math.min(2.0, this.data.zoom + 0.1)));
 
@@ -505,61 +473,69 @@ export class PlotgridView extends ItemView {
             const btns = toolbar.querySelectorAll('.icon-button');
             btns.forEach((b) => {
                 const btn = b as HTMLElement;
-                btn.style.background = 'transparent';
-                btn.style.backgroundColor = 'transparent';
-                btn.style.backgroundImage = 'none';
-                btn.style.border = 'none';
-                btn.style.boxShadow = 'none';
-                btn.style.outline = 'none';
-                btn.style.minWidth = '0';
-                btn.style.width = 'auto';
-                btn.style.height = 'auto';
-                btn.style.padding = '2px';
-                btn.style.borderRadius = '0';
+                btn.setCssStyles({
+                    background: 'transparent',
+                    backgroundColor: 'transparent',
+                    backgroundImage: 'none',
+                    border: 'none',
+                    boxShadow: 'none',
+                    outline: 'none',
+                    minWidth: '0',
+                    width: 'auto',
+                    height: 'auto',
+                    padding: '2px',
+                    borderRadius: '0',
+                });
                 // set the inner lucide holder and svg size
                 const holder = btn.querySelector('i[data-lucide]') as HTMLElement | null;
                 if (holder) {
-                    holder.style.display = 'inline-flex';
-                    holder.style.alignItems = 'center';
-                    holder.style.justifyContent = 'center';
-                    holder.style.background = 'transparent';
-                    holder.style.transition = 'transform 120ms ease, background-color 120ms ease, opacity 120ms ease';
+                    holder.setCssStyles({
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: 'transparent',
+                        transition: 'transform 120ms ease, background-color 120ms ease, opacity 120ms ease',
+                    });
                     const svg = holder.querySelector('svg') as SVGElement | null;
                     if (svg) {
                         // Do not hard-set width/height — allow the app's icon sizing to control pixel dimensions so it matches BoardView
-                        (svg as any).style.transition = 'transform 120ms ease, opacity 120ms ease';
-                        (svg as any).style.opacity = '0.95';
-                        (svg as any).style.display = 'block';
+                        (svg as any).setCssStyles({ transition: 'transform 120ms ease, opacity 120ms ease' });
+                        (svg as any).setCssStyles({ opacity: '0.95' });
+                        (svg as any).setCssStyles({ display: 'block' });
                     }
                 }
                 // add hover and active feedback for each button
                 btn.addEventListener('mouseenter', () => {
                     try {
-                        btn.style.backgroundColor = 'var(--sl-hover-overlay)';
-                        btn.style.borderRadius = '6px';
+                        btn.setCssStyles({
+                            backgroundColor: 'var(--sl-hover-overlay)',
+                            borderRadius: '6px',
+                        });
                         const holder = btn.querySelector('i[data-lucide]') as HTMLElement | null;
-                        if (holder) holder.style.transform = 'scale(1.08)';
+                        if (holder) holder.setCssStyles({ transform: 'scale(1.08)' });
                     } catch (e) { /* cosmetic, safe to ignore */ }
                 });
                 btn.addEventListener('mouseleave', () => {
                     try {
-                        btn.style.background = 'transparent';
-                        btn.style.backgroundColor = 'transparent';
-                        btn.style.borderRadius = '0';
+                        btn.setCssStyles({
+                            background: 'transparent',
+                            backgroundColor: 'transparent',
+                            borderRadius: '0',
+                        });
                         const holder = btn.querySelector('i[data-lucide]') as HTMLElement | null;
-                        if (holder) holder.style.transform = '';
+                        if (holder) holder.setCssStyles({ transform: '' });
                     } catch (e) { /* cosmetic, safe to ignore */ }
                 });
                 btn.addEventListener('mousedown', () => {
                     try {
                         const holder = btn.querySelector('i[data-lucide]') as HTMLElement | null;
-                        if (holder) holder.style.transform = 'scale(0.96)';
+                        if (holder) holder.setCssStyles({ transform: 'scale(0.96)' });
                     } catch (e) { /* cosmetic, safe to ignore */ }
                 });
-                document.addEventListener('mouseup', () => {
+                activeDocument.addEventListener('mouseup', () => {
                     try {
                         const holder = btn.querySelector('i[data-lucide]') as HTMLElement | null;
-                        if (holder) holder.style.transform = '';
+                        if (holder) holder.setCssStyles({ transform: '' });
                     } catch (e) { /* cosmetic, safe to ignore */ }
                 });
             });
@@ -572,7 +548,7 @@ export class PlotgridView extends ItemView {
             // Use CSS zoom instead of transform: scale() to preserve position: sticky
             (this.canvasEl.style as any).zoom = String(z);
             const totalWidth = this.computeTotalWidth();
-            this.canvasEl.style.width = totalWidth + 'px';
+            this.canvasEl.setCssStyles({ width: totalWidth + 'px' });
         }
         this.scheduleSave();
         const toolbar = this.wrapperEl?.querySelector('.plot-grid-toolbar') || this.wrapperEl?.querySelector('.story-line-toolbar');
@@ -606,7 +582,7 @@ export class PlotgridView extends ItemView {
         let filteredPaths: Set<string> | null = null;
         if (hasFilter && sceneManager) {
             filteredPaths = new Set(
-                sceneManager.getFilteredScenes(this.currentFilter, undefined).map(s => s.filePath)
+                sceneManager.queryService.getFilteredScenes(this.currentFilter, undefined).map(s => s.filePath)
             );
         }
 
@@ -703,21 +679,25 @@ export class PlotgridView extends ItemView {
         if (this.data.columns.length === 0) colTemplate = '1fr';
         if (this.data.rows.length === 0) rowTemplate = '1fr';
 
-        this.canvasEl.style.display = 'grid';
-        this.canvasEl.style.gridTemplateColumns = colTemplate;
-        this.canvasEl.style.gridTemplateRows = rowTemplate;
+        this.canvasEl.setCssStyles({
+            display: 'grid',
+            gridTemplateColumns: colTemplate,
+            gridTemplateRows: rowTemplate,
+        });
         // If there are no columns, allow the canvas to stretch to the container width.
-        if (this.data.columns.length === 0) this.canvasEl.style.width = '100%';
-        else this.canvasEl.style.width = this.computeTotalWidth() + 'px';
+        if (this.data.columns.length === 0) this.canvasEl.setCssStyles({ width: '100%' });
+        else this.canvasEl.setCssStyles({ width: this.computeTotalWidth() + 'px' });
 
         const corner = this.canvasEl.createDiv('plot-grid-corner');
         corner.setAttr('data-type', 'corner');
-        corner.style.position = (this.data.stickyHeaders === false) ? 'relative' : 'sticky';
-        corner.style.top = '0';
-        corner.style.left = '0';
-        corner.style.zIndex = '11';
-        corner.style.background = 'var(--background-modifier-hover)';
-        corner.style.border = '1px solid var(--sl-border-subtle)';
+        corner.setCssStyles({
+            position: (this.data.stickyHeaders === false) ? 'relative' : 'sticky',
+            top: '0',
+            left: '0',
+            zIndex: '11',
+            background: 'var(--background-modifier-hover)',
+            border: '1px solid var(--sl-border-subtle)',
+        });
 
         // corner context menu (Reset grid moved here)
         corner.addEventListener('contextmenu', (evt) => {
@@ -747,29 +727,33 @@ export class PlotgridView extends ItemView {
         for (let ci = 0; ci < this.data.columns.length; ci++) {
             const col = this.data.columns[ci];
             const el = this.canvasEl.createDiv('plot-grid-col-header');
-            el.style.position = (this.data.stickyHeaders === false) ? 'relative' : 'sticky';
-            el.style.top = '0';
-            el.style.zIndex = '10';
-            el.style.background = col.headerBgColor || col.bgColor || 'var(--background-secondary)';
-            el.style.display = 'flex';
-            el.style.alignItems = 'center';
-            el.style.justifyContent = 'center';
-            el.style.border = '1px solid var(--sl-border-subtle)';
-            el.style.userSelect = 'none';
+            el.setCssStyles({
+                position: (this.data.stickyHeaders === false) ? 'relative' : 'sticky',
+                top: '0',
+                zIndex: '10',
+                background: col.headerBgColor || col.bgColor || 'var(--background-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid var(--sl-border-subtle)',
+                userSelect: 'none',
+            });
             el.textContent = col.label;
-            if (col.textColor) el.style.color = col.textColor;
-            else { const _bg = col.headerBgColor || col.bgColor; if (_bg && _bg.startsWith('#')) el.style.color = contrastTextColor(_bg); }
-            if (col.bold) el.style.fontWeight = '600';
-            if (col.italic) el.style.fontStyle = 'italic';
+            if (col.textColor) el.setCssStyles({ color: col.textColor });
+            else { const _bg = col.headerBgColor || col.bgColor; if (_bg && _bg.startsWith('#')) el.setCssStyles({ color: contrastTextColor(_bg) }); }
+            if (col.bold) el.setCssStyles({ fontWeight: '600' });
+            if (col.italic) el.setCssStyles({ fontStyle: 'italic' });
 
             // allow naming like cells: double-click to edit label
             el.addEventListener('dblclick', (ev) => {
                 ev.stopPropagation();
-                const inp = document.createElement('input');
+                const inp = activeDocument.createElement('input');
                 inp.type = 'text';
                 inp.value = col.label;
-                inp.style.width = '100%';
-                inp.style.boxSizing = 'border-box';
+                inp.setCssStyles({
+                    width: '100%',
+                    boxSizing: 'border-box',
+                });
                 el.empty();
                 el.appendChild(inp);
                 inp.focus();
@@ -789,7 +773,7 @@ export class PlotgridView extends ItemView {
             });
             if (col.sourceType === 'auto' && col.sourceKind && col.sourceKind !== 'tags') {
                 el.title = `${col.label} (click to open)`;
-                el.style.cursor = 'pointer';
+                el.setCssStyles({ cursor: 'pointer' });
             }
 
             // enable drag-to-reorder for columns
@@ -811,12 +795,14 @@ export class PlotgridView extends ItemView {
 
             // resize handle for column
             const colHandle = el.createDiv('plot-col-resize-handle');
-            colHandle.style.position = 'absolute';
-            colHandle.style.right = '0';
-            colHandle.style.top = '0';
-            colHandle.style.bottom = '0';
-            colHandle.style.width = '6px';
-            colHandle.style.cursor = 'col-resize';
+            colHandle.setCssStyles({
+                position: 'absolute',
+                right: '0',
+                top: '0',
+                bottom: '0',
+                width: '6px',
+                cursor: 'col-resize',
+            });
             colHandle.draggable = false;
             colHandle.addEventListener('mousedown', (ev) => { ev.stopPropagation(); this.startColResize(ev as MouseEvent, ci); });
 
@@ -828,7 +814,7 @@ export class PlotgridView extends ItemView {
                     const modal = new Modal(this.app);
                     modal.titleEl.setText('Rename Column');
                     const inp = modal.contentEl.createEl('input', { type: 'text', cls: 'plot-grid-rename-input' });
-                    inp.style.width = '100%';
+                    inp.setCssStyles({ width: '100%' });
                     inp.value = col.label;
                     const commitRename = () => {
                         const liveCol = this.data.columns[ci];
@@ -837,7 +823,7 @@ export class PlotgridView extends ItemView {
                     };
                     inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') commitRename(); });
                     const btn = modal.contentEl.createEl('button', { text: 'OK', cls: 'mod-cta' });
-                    btn.style.marginTop = '8px';
+                    btn.setCssStyles({ marginTop: '8px' });
                     btn.addEventListener('click', () => commitRename());
                     modal.open();
                     inp.focus();
@@ -850,19 +836,19 @@ export class PlotgridView extends ItemView {
                     for (let ri = 0; ri < this.data.rows.length; ri++) { const e = this.getCellElement(ri, ci); if (e) els.push(e); }
                     const prevs = els.map(e => e.style.background);
                     const prevHeaderBg = header ? header.style.background : null;
-                    this.chooseColor(this.data.columns[ci].bgColor || this.defaultBgColor(), (c) => { if (c === null) { els.forEach((e,i) => e.style.background = prevs[i]); if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; return; } this.data.columns[ci].bgColor = c || ''; this.scheduleSave(); this.renderGrid(); for (let ri=0; ri<this.data.rows.length; ri++) this.flashElement(this.getCellElement(ri, ci)); }, (preview) => { if (preview === null) { els.forEach((e,i) => e.style.background = prevs[i]); if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; } else { els.forEach(e => e.style.background = preview); if (header) header.style.background = preview; } });
+                    this.chooseColor(this.data.columns[ci].bgColor || this.defaultBgColor(), (c) => { if (c === null) { els.forEach((e,i) => e.setCssStyles({ background: prevs[i] })); if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); return; } this.data.columns[ci].bgColor = c || ''; this.scheduleSave(); this.renderGrid(); for (let ri=0; ri<this.data.rows.length; ri++) this.flashElement(this.getCellElement(ri, ci)); }, (preview) => { if (preview === null) { els.forEach((e,i) => e.setCssStyles({ background: prevs[i] })); if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); } else { els.forEach(e => e.setCssStyles({ background: preview })); if (header) header.setCssStyles({ background: preview }); } });
                 }));
                 menu.addItem((item) => item.setTitle('Set Header Colour…').onClick(() => {
                     const header = this.canvasEl?.querySelectorAll('.plot-grid-col-header')[ci] as HTMLElement | undefined;
                     const prevHeaderBg = header ? header.style.background : null;
                     this.chooseColor(this.data.columns[ci].headerBgColor || this.data.columns[ci].bgColor || this.defaultBgColor(), (c) => {
-                        if (c === null) { if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; return; }
+                        if (c === null) { if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); return; }
                         this.data.columns[ci].headerBgColor = c || '';
                         this.scheduleSave(); this.renderGrid();
                         if (header) this.flashElement(header);
                     }, (preview) => {
-                        if (preview === null) { if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; }
-                        else { if (header) header.style.background = preview; }
+                        if (preview === null) { if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); }
+                        else { if (header) header.setCssStyles({ background: preview }); }
                     });
                 }));
                 menu.addSeparator();
@@ -882,10 +868,12 @@ export class PlotgridView extends ItemView {
                 const colCount = this.data.columns.length + 1;
                 for (const d of divs) {
                     const divEl = this.canvasEl.createDiv(`plot-grid-divider plot-grid-divider-${d.type}`);
-                    divEl.style.gridColumn = `1 / ${colCount + 1}`;
-                    divEl.style.position = (this.data.stickyHeaders === false) ? 'relative' : 'sticky';
-                    divEl.style.left = '0';
-                    divEl.style.zIndex = '8';
+                    divEl.setCssStyles({
+                        gridColumn: `1 / ${colCount + 1}`,
+                        position: (this.data.stickyHeaders === false) ? 'relative' : 'sticky',
+                        left: '0',
+                        zIndex: '8',
+                    });
                     const icon = divEl.createSpan('plot-grid-divider-icon');
                     obsidian.setIcon(icon, d.type === 'act' ? 'bookmark' : 'hash');
                     divEl.createSpan({ text: d.label, cls: 'plot-grid-divider-label' });
@@ -894,27 +882,29 @@ export class PlotgridView extends ItemView {
 
             const row = this.data.rows[ri];
             const rowEl = this.canvasEl.createDiv('plot-grid-row-header');
-            rowEl.style.position = (this.data.stickyHeaders === false) ? 'relative' : 'sticky';
-            rowEl.style.left = '0';
-            rowEl.style.zIndex = '9';
-            rowEl.style.background = row.headerBgColor || row.bgColor || 'var(--background-secondary)';
-            rowEl.style.display = 'flex';
-            rowEl.style.alignItems = 'center';
-            rowEl.style.justifyContent = 'center';
-            rowEl.style.border = '1px solid var(--sl-border-subtle)';
-            rowEl.style.userSelect = 'none';
+            rowEl.setCssStyles({
+                position: (this.data.stickyHeaders === false) ? 'relative' : 'sticky',
+                left: '0',
+                zIndex: '9',
+                background: row.headerBgColor || row.bgColor || 'var(--background-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid var(--sl-border-subtle)',
+                userSelect: 'none',
+            });
             rowEl.textContent = row.label;
-            if (row.textColor) rowEl.style.color = row.textColor;
-            else { const _bg = row.headerBgColor || row.bgColor; if (_bg && _bg.startsWith('#')) rowEl.style.color = contrastTextColor(_bg); }
-            if (row.bold) rowEl.style.fontWeight = '600';
-            if (row.italic) rowEl.style.fontStyle = 'italic';
+            if (row.textColor) rowEl.setCssStyles({ color: row.textColor });
+            else { const _bg = row.headerBgColor || row.bgColor; if (_bg && _bg.startsWith('#')) rowEl.setCssStyles({ color: contrastTextColor(_bg) }); }
+            if (row.bold) rowEl.setCssStyles({ fontWeight: '600' });
+            if (row.italic) rowEl.setCssStyles({ fontStyle: 'italic' });
 
             // Status color indicator on left border
             if (row.sourceType === 'auto' && row.sourceId && sceneManager) {
                 const rowScene = sceneManager.getScene(row.sourceId);
                 if (rowScene) {
                     const statusCfg = resolveStatusCfg(rowScene.status || 'idea');
-                    rowEl.style.borderLeft = `4px solid ${statusCfg.color}`;
+                    rowEl.setCssStyles({ borderLeft: `4px solid ${statusCfg.color}` });
                 }
             }
 
@@ -922,11 +912,13 @@ export class PlotgridView extends ItemView {
             rowEl.addEventListener('dblclick', (ev) => {
                 ev.stopPropagation();
                 rowEl.draggable = false;
-                const inp = document.createElement('input');
+                const inp = activeDocument.createElement('input');
                 inp.type = 'text';
                 inp.value = row.label;
-                inp.style.width = '100%';
-                inp.style.boxSizing = 'border-box';
+                inp.setCssStyles({
+                    width: '100%',
+                    boxSizing: 'border-box',
+                });
                 rowEl.empty();
                 rowEl.appendChild(inp);
                 inp.focus();
@@ -938,12 +930,12 @@ export class PlotgridView extends ItemView {
 
             // click opens scene file for synced rows; Ctrl/Cmd+click selects
             // Use a small delay so double-click (edit label) doesn't also open the file
-            let clickTimer: ReturnType<typeof setTimeout> | null = null;
+            let clickTimer: number | null = null;
             rowEl.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 if (row.sourceType === 'auto' && row.sourceId && !(ev.ctrlKey || ev.metaKey)) {
-                    if (clickTimer) clearTimeout(clickTimer);
-                    clickTimer = setTimeout(() => {
+                    if (clickTimer) window.clearTimeout(clickTimer);
+                    clickTimer = window.setTimeout(() => {
                         clickTimer = null;
                         const file = this.app.vault.getAbstractFileByPath(row.sourceId!) as TFile | null;
                         if (file) this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
@@ -953,11 +945,11 @@ export class PlotgridView extends ItemView {
                 this.selectRowHeader(ri);
             });
             rowEl.addEventListener('dblclick', () => {
-                if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+                if (clickTimer) { window.clearTimeout(clickTimer); clickTimer = null; }
             });
             if (row.sourceType === 'auto' && row.sourceId) {
                 rowEl.title = `${row.label} (click to open)`;
-                rowEl.style.cursor = 'pointer';
+                rowEl.setCssStyles({ cursor: 'pointer' });
             }
 
             // enable drag-to-reorder for rows
@@ -979,12 +971,14 @@ export class PlotgridView extends ItemView {
 
             // resize handle for row
             const rowHandle = rowEl.createDiv('plot-row-resize-handle');
-            rowHandle.style.position = 'absolute';
-            rowHandle.style.left = '0';
-            rowHandle.style.right = '0';
-            rowHandle.style.bottom = '0';
-            rowHandle.style.height = '6px';
-            rowHandle.style.cursor = 'row-resize';
+            rowHandle.setCssStyles({
+                position: 'absolute',
+                left: '0',
+                right: '0',
+                bottom: '0',
+                height: '6px',
+                cursor: 'row-resize',
+            });
             rowHandle.draggable = false;
             rowHandle.addEventListener('mousedown', (ev) => { ev.stopPropagation(); this.startRowResize(ev as MouseEvent, ri); });
 
@@ -996,7 +990,7 @@ export class PlotgridView extends ItemView {
                     const modal = new Modal(this.app);
                     modal.titleEl.setText('Rename Row');
                     const inp = modal.contentEl.createEl('input', { type: 'text', cls: 'plot-grid-rename-input' });
-                    inp.style.width = '100%';
+                    inp.setCssStyles({ width: '100%' });
                     inp.value = row.label;
                     const commitRename = () => {
                         const liveRow = this.data.rows[ri];
@@ -1005,7 +999,7 @@ export class PlotgridView extends ItemView {
                     };
                     inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') commitRename(); });
                     const btn = modal.contentEl.createEl('button', { text: 'OK', cls: 'mod-cta' });
-                    btn.style.marginTop = '8px';
+                    btn.setCssStyles({ marginTop: '8px' });
                     btn.addEventListener('click', () => commitRename());
                     modal.open();
                     inp.focus();
@@ -1018,19 +1012,19 @@ export class PlotgridView extends ItemView {
                     const prevs = els.map(e => e.style.background);
                     const header = this.canvasEl?.querySelectorAll('.plot-grid-row-header')[ri] as HTMLElement | undefined;
                     const prevHeaderBg = header ? header.style.background : null;
-                    this.chooseColor(this.data.rows[ri].bgColor || this.defaultBgColor(), (c) => { if (c === null) { els.forEach((e,i) => e.style.background = prevs[i]); if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; return; } this.data.rows[ri].bgColor = c || ''; this.scheduleSave(); this.renderGrid(); for (let ci=0; ci<this.data.columns.length; ci++) this.flashElement(this.getCellElement(ri, ci)); }, (preview) => { if (preview === null) { els.forEach((e,i) => e.style.background = prevs[i]); if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; } else { els.forEach(e => e.style.background = preview); if (header) header.style.background = preview; } });
+                    this.chooseColor(this.data.rows[ri].bgColor || this.defaultBgColor(), (c) => { if (c === null) { els.forEach((e,i) => e.setCssStyles({ background: prevs[i] })); if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); return; } this.data.rows[ri].bgColor = c || ''; this.scheduleSave(); this.renderGrid(); for (let ci=0; ci<this.data.columns.length; ci++) this.flashElement(this.getCellElement(ri, ci)); }, (preview) => { if (preview === null) { els.forEach((e,i) => e.setCssStyles({ background: prevs[i] })); if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); } else { els.forEach(e => e.setCssStyles({ background: preview })); if (header) header.setCssStyles({ background: preview }); } });
                 }));
                 menu.addItem((item) => item.setTitle('Set Header Colour…').onClick(() => {
                     const header = this.canvasEl?.querySelectorAll('.plot-grid-row-header')[ri] as HTMLElement | undefined;
                     const prevHeaderBg = header ? header.style.background : null;
                     this.chooseColor(this.data.rows[ri].headerBgColor || this.data.rows[ri].bgColor || this.defaultBgColor(), (c) => {
-                        if (c === null) { if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; return; }
+                        if (c === null) { if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); return; }
                         this.data.rows[ri].headerBgColor = c || '';
                         this.scheduleSave(); this.renderGrid();
                         if (header) this.flashElement(header);
                     }, (preview) => {
-                        if (preview === null) { if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; }
-                        else { if (header) header.style.background = preview; }
+                        if (preview === null) { if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); }
+                        else { if (header) header.setCssStyles({ background: preview }); }
                     });
                 }));
                 menu.addSeparator();
@@ -1064,32 +1058,34 @@ export class PlotgridView extends ItemView {
                 // expose coordinates
                 cellEl.setAttr('data-row', String(ri));
                 cellEl.setAttr('data-col', String(ci));
-                cellEl.style.minHeight = row.height + 'px';
-                cellEl.style.border = '1px solid var(--sl-grid-border)';
-                cellEl.style.padding = '6px 8px';
-                cellEl.style.boxSizing = 'border-box';
-                cellEl.style.whiteSpace = 'pre-wrap';
-                cellEl.style.overflow = 'hidden';
-                cellEl.style.cursor = 'default';
-                cellEl.style.display = 'flex';
-                cellEl.style.flexDirection = 'column';
-                cellEl.style.justifyContent = 'center';
+                cellEl.setCssStyles({
+                    minHeight: row.height + 'px',
+                    border: '1px solid var(--sl-grid-border)',
+                    padding: '6px 8px',
+                    boxSizing: 'border-box',
+                    whiteSpace: 'pre-wrap',
+                    overflow: 'hidden',
+                    cursor: 'default',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                });
 
                 const bg = cell.bgColor || row.bgColor || col.bgColor || '';
                 if (bg) {
-                    cellEl.style.background = bg;
+                    cellEl.setCssStyles({ background: bg });
                     // Auto-contrast text when no explicit textColor is set
                     if (!cell.textColor && bg.startsWith('#')) {
-                        cellEl.style.color = contrastTextColor(bg);
+                        cellEl.setCssStyles({ color: contrastTextColor(bg) });
                     }
                 }
-                if (cell.textColor) cellEl.style.color = cell.textColor;
-                if (cell.bold) cellEl.style.fontWeight = '600';
-                if (cell.italic) cellEl.style.fontStyle = 'italic';
-                cellEl.style.textAlign = cell.align;
+                if (cell.textColor) cellEl.setCssStyles({ color: cell.textColor });
+                if (cell.bold) cellEl.setCssStyles({ fontWeight: '600' });
+                if (cell.italic) cellEl.setCssStyles({ fontStyle: 'italic' });
+                cellEl.setCssStyles({ textAlign: cell.align });
 
                 const contentEl = cellEl.createDiv({ cls: 'markdown-rendered' });
-                contentEl.style.flex = '1 1 auto';
+                contentEl.setCssStyles({ flex: '1 1 auto' });
                 if (cell.content) {
                     const cellComp = new Component(); cellComp.load();
                     void MarkdownRenderer.render(this.app, cell.content, contentEl, '', cellComp);
@@ -1098,8 +1094,10 @@ export class PlotgridView extends ItemView {
                 // Make plain-text cells (no linked scene) draggable
                 if (cell.content && !cell.linkedSceneId) {
                     cellEl.draggable = true;
-                    cellEl.style.cursor = 'grab';
-                    cellEl.style.userSelect = 'none';
+                    cellEl.setCssStyles({
+                        cursor: 'grab',
+                        userSelect: 'none',
+                    });
                     cellEl.addEventListener('dragstart', (ev) => {
                         ev.dataTransfer?.setData('text/cell-source', key);
                         cellEl.addClass('dragging');
@@ -1131,12 +1129,14 @@ export class PlotgridView extends ItemView {
                             }
 
                             // Apply note bg to the entire cell
-                            cellEl.style.background = noteBg;
-                            cellEl.style.color = '#2b2510';
+                            cellEl.setCssStyles({
+                                background: noteBg,
+                                color: '#2b2510',
+                            });
                             cellEl.addClass('pg-cell-note');
 
                             // Hide standard content div — replace with note body
-                            contentEl.style.display = 'none';
+                            contentEl.setCssStyles({ display: 'none' });
 
                             // "Note" label + optional origin so it's visually distinct from plain cell text
                             const noteLabel = cellEl.createDiv('pg-cell-note-label');
@@ -1157,8 +1157,10 @@ export class PlotgridView extends ItemView {
 
                             // Make the note draggable so it can be moved between cells
                             cellEl.draggable = true;
-                            cellEl.style.cursor = 'grab';
-                            cellEl.style.userSelect = 'none';
+                            cellEl.setCssStyles({
+                                cursor: 'grab',
+                                userSelect: 'none',
+                            });
                             cellEl.addEventListener('dragstart', (ev) => {
                                 ev.dataTransfer?.setData('text/scene-path', scene.filePath);
                                 ev.dataTransfer?.setData('text/cell-source', key);
@@ -1194,11 +1196,13 @@ export class PlotgridView extends ItemView {
 
                         // Keep cell content below if there's text
                         if (cell.content) {
-                            contentEl.style.marginTop = '4px';
-                            contentEl.style.fontSize = '11px';
-                            contentEl.style.color = 'var(--text-muted)';
+                            contentEl.setCssStyles({
+                                marginTop: '4px',
+                                fontSize: '11px',
+                                color: 'var(--text-muted)',
+                            });
                         } else {
-                            contentEl.style.display = 'none';
+                            contentEl.setCssStyles({ display: 'none' });
                         }
 
                         // Make the mini card draggable so it can be moved between cells
@@ -1217,10 +1221,12 @@ export class PlotgridView extends ItemView {
                         const badge = cellEl.createDiv('plot-grid-linked-badge');
                         badge.textContent = '🔗';
                         badge.title = cell.linkedSceneId;
-                        badge.style.position = 'absolute';
-                        badge.style.top = '4px';
-                        badge.style.right = '6px';
-                        badge.style.cursor = 'pointer';
+                        badge.setCssStyles({
+                            position: 'absolute',
+                            top: '4px',
+                            right: '6px',
+                            cursor: 'pointer',
+                        });
                         badge.addEventListener('click', (ev) => {
                             ev.stopPropagation();
                             const f = this.app.vault.getAbstractFileByPath(cell.linkedSceneId as string) as TFile | null;
@@ -1229,8 +1235,10 @@ export class PlotgridView extends ItemView {
                         });
                         const sub = cellEl.createDiv('plot-grid-linked-subtitle');
                         sub.textContent = (cell.linkedSceneId.split('/').pop()?.replace('.md', '')) || '';
-                        sub.style.fontSize = '11px';
-                        sub.style.color = 'var(--text-muted)';
+                        sub.setCssStyles({
+                            fontSize: '11px',
+                            color: 'var(--text-muted)',
+                        });
                     }
                 }
 
@@ -1306,12 +1314,13 @@ export class PlotgridView extends ItemView {
 
                     if (linkedScene && linkedScene.corkboardNote) {
                         // ── Corkboard Note actions ──
-                        const notePresets = resolveStickyNoteColors(this.plugin.settings);
+                        const note = linkedScene;
+                        const notePresets = resolveStickyNoteColors(this.plugin!.settings);
                         notePresets.forEach((preset) => {
                             menu.addItem(item => item
                                 .setTitle(`Color: ${preset.label}`)
                                 .setIcon('palette')
-                                .onClick(() => { void this.setNoteColor(linkedScene, preset.color, key); }));
+                                .onClick(() => { void this.setNoteColor(note, preset.color, key); }));
                         });
                         menu.addItem(item => item
                             .setTitle('Color: Custom…')
@@ -1467,15 +1476,17 @@ export class PlotgridView extends ItemView {
 
         if (this.data.rows.length === 0 && this.data.columns.length === 0) {
             const msg = this.canvasEl.createDiv('plot-grid-empty');
-            msg.style.position = 'relative';
-            msg.style.width = '100%';
-            msg.style.display = 'flex';
-            msg.style.alignItems = 'center';
-            msg.style.justifyContent = 'center';
-            msg.style.padding = '24px';
-            msg.style.boxSizing = 'border-box';
-            msg.style.maxWidth = '100%';
-            msg.style.textAlign = 'left';
+            msg.setCssStyles({
+                position: 'relative',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '24px',
+                boxSizing: 'border-box',
+                maxWidth: '100%',
+                textAlign: 'left',
+            });
             msg.textContent = "Use 'Add Row' and 'Add Column' to begin building your plot grid.";
         }
 
@@ -1483,7 +1494,7 @@ export class PlotgridView extends ItemView {
         this.applySelectionVisuals();
 
         // Restore scroll position after DOM rebuild
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             if (this.scrollAreaEl) {
                 this.scrollAreaEl.scrollTop = prevScrollTop;
                 this.scrollAreaEl.scrollLeft = prevScrollLeft;
@@ -1511,37 +1522,37 @@ export class PlotgridView extends ItemView {
     private applySelectionVisuals() {
         if (!this.canvasEl) return;
         // clear any previous visual marks
-        this.canvasEl.querySelectorAll('.plot-grid-cell').forEach(n => (n as HTMLElement).style.outline = '');
-        this.canvasEl.querySelectorAll('.plot-grid-row-header, .plot-grid-col-header').forEach(n => (n as HTMLElement).style.boxShadow = '');
+        this.canvasEl.querySelectorAll('.plot-grid-cell').forEach(n => (n as HTMLElement).setCssStyles({ outline: '' }));
+        this.canvasEl.querySelectorAll('.plot-grid-row-header, .plot-grid-col-header').forEach(n => (n as HTMLElement).setCssStyles({ boxShadow: '' }));
 
         if (this.selectedRow !== null && this.selectedCol !== null) {
             const el = this.getCellElement(this.selectedRow, this.selectedCol);
-            if (el) el.style.outline = '2px solid var(--interactive-accent)';
+            if (el) el.setCssStyles({ outline: '2px solid var(--interactive-accent)' });
         }
 
         if (this.selectedRow !== null) {
             const header = this.canvasEl.querySelectorAll('.plot-grid-row-header')[this.selectedRow] as HTMLElement | undefined;
-            if (header) header.style.boxShadow = 'inset 4px 0 0 var(--interactive-accent)';
+            if (header) header.setCssStyles({ boxShadow: 'inset 4px 0 0 var(--interactive-accent)' });
         }
 
         if (this.selectedCol !== null) {
             const header = this.canvasEl.querySelectorAll('.plot-grid-col-header')[this.selectedCol] as HTMLElement | undefined;
-            if (header) header.style.boxShadow = 'inset 0 4px 0 var(--interactive-accent)';
+            if (header) header.setCssStyles({ boxShadow: 'inset 0 4px 0 var(--interactive-accent)' });
         }
     }
 
     private flashElement(el: HTMLElement | null) {
         if (!el) return;
         const orig = el.style.transition || '';
-        el.style.transition = 'background-color 160ms ease';
+        el.setCssStyles({ transition: 'background-color 160ms ease' });
         const prevBg = el.style.background;
-        el.style.background = 'var(--sl-grid-flash)';
-        setTimeout(() => { el.style.background = prevBg; setTimeout(() => { el.style.transition = orig; }, 200); }, 180);
+        el.setCssStyles({ background: 'var(--sl-grid-flash)' });
+        window.setTimeout(() => { el.setCssStyles({ background: prevBg }); window.setTimeout(() => { el.setCssStyles({ transition: orig }); }, 200); }, 180);
     }
 
     private selectCell(el: HTMLElement) {
                 const prev = this.canvasEl?.querySelector('.plot-grid-cell.selected');
-                if (prev) { prev.classList.remove('selected'); (prev as HTMLElement).style.outline = ''; }
+                if (prev) { prev.classList.remove('selected'); (prev as HTMLElement).setCssStyles({ outline: '' }); }
                 el.classList.add('selected');
                 const r = el.getAttribute('data-row');
                 const c = el.getAttribute('data-col');
@@ -1550,7 +1561,7 @@ export class PlotgridView extends ItemView {
                 // ensure visible
                 el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
                 // visual
-                el.style.outline = '2px solid var(--interactive-accent)';
+                el.setCssStyles({ outline: '2px solid var(--interactive-accent)' });
                 this.applySelectionVisuals();
     }
 
@@ -1668,7 +1679,7 @@ export class PlotgridView extends ItemView {
 
     /** Resolve a CSS custom property to its computed hex value */
     private resolveThemeColor(varName: string, fallback: string): string {
-        const val = getComputedStyle(document.body).getPropertyValue(varName).trim();
+        const val = getComputedStyle(activeDocument.body).getPropertyValue(varName).trim();
         return val || fallback;
     }
 
@@ -1713,115 +1724,133 @@ export class PlotgridView extends ItemView {
             onOpen() {
                 const { contentEl } = this;
                 const titleEl = contentEl.createEl('h3', { text: 'Choose color' });
-                titleEl.style.margin = '4px 0 8px 0';
+                titleEl.setCssStyles({ margin: '4px 0 8px 0' });
                 const row = contentEl.createDiv();
                 this.inputEl = row.createEl('input') as HTMLInputElement;
                 this.inputEl.type = 'color';
                 // avoid assigning an empty string to a color input (invalid)
-                const defaultColor = (this.initVal && /^#?[0-9a-fA-F]{6}$/.test(this.initVal)) ? (this.initVal.startsWith('#') ? this.initVal : `#${this.initVal}`) : getComputedStyle(document.body).getPropertyValue('--background-primary').trim() || '#ffffff';
+                const defaultColor = (this.initVal && /^#?[0-9a-fA-F]{6}$/.test(this.initVal)) ? (this.initVal.startsWith('#') ? this.initVal : `#${this.initVal}`) : getComputedStyle(activeDocument.body).getPropertyValue('--background-primary').trim() || '#ffffff';
                 this.inputEl.value = defaultColor;
-                this.inputEl.style.width = '48px';
-                this.inputEl.style.height = '32px';
-                this.inputEl.style.marginRight = '8px';
+                this.inputEl.setCssStyles({
+                    width: '48px',
+                    height: '32px',
+                    marginRight: '8px',
+                });
 
                 this.hexEl = row.createEl('input') as HTMLInputElement;
                 this.hexEl.type = 'text';
                 this.hexEl.value = this.initVal && this.initVal !== '' ? (this.initVal.startsWith('#') ? this.initVal : `#${this.initVal}`) : '';
-                this.hexEl.style.width = '120px';
-                this.hexEl.style.marginRight = '8px';
+                this.hexEl.setCssStyles({
+                    width: '120px',
+                    marginRight: '8px',
+                });
 
                 const previewSwatch = row.createDiv('color-preview');
-                previewSwatch.style.width = '36px';
-                previewSwatch.style.height = '36px';
-                previewSwatch.style.border = '1px solid var(--background-modifier-border)';
-                previewSwatch.style.background = this.inputEl.value;
-                previewSwatch.style.marginRight = '10px';
-                previewSwatch.style.borderRadius = '6px';
+                previewSwatch.setCssStyles({
+                    width: '36px',
+                    height: '36px',
+                    border: '1px solid var(--background-modifier-border)',
+                    background: this.inputEl.value,
+                    marginRight: '10px',
+                    borderRadius: '6px',
+                });
 
                 // track the currently selected color separately from the color input value
                 let selectedColor: string | '' = (this.initVal && this.initVal !== '') ? (this.initVal.startsWith('#') ? this.initVal : `#${this.initVal}`) : '';
 
                 // preset palette swatches (resolved from theme)
                 const swatchRow = contentEl.createDiv('color-swatch-row');
-                swatchRow.style.display = 'flex';
-                swatchRow.style.flexWrap = 'wrap';
-                swatchRow.style.gap = '6px';
-                swatchRow.style.marginTop = '6px';
+                swatchRow.setCssStyles({
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                    marginTop: '6px',
+                });
                 for (const col of palette) {
                     const s = swatchRow.createDiv('palette-swatch');
-                    s.style.width = '20px';
-                    s.style.height = '20px';
-                    s.style.borderRadius = '4px';
-                    s.style.border = '1px solid var(--background-modifier-border)';
-                    s.style.cursor = 'pointer';
+                    s.setCssStyles({
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--background-modifier-border)',
+                        cursor: 'pointer',
+                    });
                     s.title = col || 'No color';
-                    s.style.background = col || 'transparent';
-                    if (!col) { s.style.backgroundImage = `linear-gradient(45deg,${checkerLight} 25%, ${checkerDark} 25%, ${checkerDark} 50%, ${checkerLight} 50%, ${checkerLight} 75%, ${checkerDark} 75%, ${checkerDark} 100%)`; s.style.backgroundSize = '8px 8px'; }
+                    s.setCssStyles({ background: col || 'transparent' });
+                    if (!col) { s.setCssStyles({ backgroundImage: `linear-gradient(45deg,${checkerLight} 25%, ${checkerDark} 25%, ${checkerDark} 50%, ${checkerLight} 50%, ${checkerLight} 75%, ${checkerDark} 75%, ${checkerDark} 100%)` }); s.setCssStyles({ backgroundSize: '8px 8px' }); }
                     s.addEventListener('click', () => {
                         if (col) {
                             selectedColor = col;
                             // update inputs where valid
                             try { this.inputEl!.value = col; } catch (e) { /* input may not exist */ }
                             if (this.hexEl) this.hexEl.value = col;
-                            previewSwatch.style.background = col;
+                            previewSwatch.setCssStyles({ background: col });
                             if (this.onPreview) this.onPreview(col);
                         } else {
                             // select explicit "no color"
                             selectedColor = '';
                             // do not try to write an empty value to the color input (invalid)
                             if (this.hexEl) this.hexEl.value = '';
-                            previewSwatch.style.background = 'transparent';
+                            previewSwatch.setCssStyles({ background: 'transparent' });
                             if (this.onPreview) this.onPreview('');
                         }
                     });
                 }
 
                 // tighten modal layout and reduce top spacing; also set modal container size
-                contentEl.style.maxWidth = '90vw';
-                contentEl.style.padding = '8px 12px';
-                contentEl.style.marginTop = '0';
+                contentEl.setCssStyles({
+                    maxWidth: '90vw',
+                    padding: '8px 12px',
+                    marginTop: '0',
+                });
                 const modalEl = (this as any).modalEl as HTMLElement;
                 if (modalEl) {
-                    modalEl.style.width = '300px';
-                    modalEl.style.maxWidth = '90vw';
+                    modalEl.setCssStyles({
+                        width: '300px',
+                        maxWidth: '90vw',
+                    });
                     // center and move the modal slightly higher; nudge left to better center in the app
-                    modalEl.style.left = '50%';
-                    modalEl.style.top = '4%';
-                    modalEl.style.transform = 'translate(-52%, -6%)';
-                    modalEl.style.right = 'auto';
-                    modalEl.style.boxSizing = 'border-box';
-                    modalEl.style.margin = '0';
+                    modalEl.setCssStyles({
+                        left: '50%',
+                        top: '4%',
+                        transform: 'translate(-52%, -6%)',
+                        right: 'auto',
+                        boxSizing: 'border-box',
+                        margin: '0',
+                    });
                 }
 
                 this.inputEl.addEventListener('input', () => {
                     const val = this.inputEl!.value;
                     selectedColor = val;
                     if (this.hexEl) this.hexEl.value = val;
-                    previewSwatch.style.background = val;
+                    previewSwatch.setCssStyles({ background: val });
                     if (this.onPreview) this.onPreview(val);
                 });
                 this.hexEl.addEventListener('input', () => {
                     const v = this.hexEl!.value;
                     if (v === '') {
                         selectedColor = '';
-                        previewSwatch.style.background = 'transparent';
+                        previewSwatch.setCssStyles({ background: 'transparent' });
                         if (this.onPreview) this.onPreview('');
                     } else if (/^#?[0-9a-fA-F]{6}$/.test(v)) {
                         const norm = v.startsWith('#') ? v : `#${v}`;
                         selectedColor = norm;
                         try { this.inputEl!.value = norm; } catch (e) { /* input may not exist */ }
-                        previewSwatch.style.background = norm;
+                        previewSwatch.setCssStyles({ background: norm });
                         if (this.onPreview) this.onPreview(norm);
                     }
                 });
 
                 const btns = contentEl.createDiv();
-                btns.style.marginTop = '8px';
-                btns.style.display = 'flex';
-                btns.style.width = '100%';
-                btns.style.justifyContent = 'flex-end';
-                btns.style.gap = '12px';
-                btns.style.paddingRight = '6px';
+                btns.setCssStyles({
+                    marginTop: '8px',
+                    display: 'flex',
+                    width: '100%',
+                    justifyContent: 'flex-end',
+                    gap: '12px',
+                    paddingRight: '6px',
+                });
 
                 const ok = btns.createEl('button', { text: 'OK' });
                 ok.addEventListener('click', () => { this.onChoose(selectedColor === '' ? '' : selectedColor); this.close(); });
@@ -1831,7 +1860,7 @@ export class PlotgridView extends ItemView {
                 // Make the modal draggable by its header
                 const headerEl = contentEl.querySelector('h3');
                 if (modalEl && headerEl) {
-                    headerEl.style.cursor = 'move';
+                    headerEl.setCssStyles({ cursor: 'move' });
                     let dragging = false;
                     let startX = 0, startY = 0, origLeft = 0, origTop = 0;
                     const onDown = (ev: MouseEvent) => {
@@ -1840,24 +1869,28 @@ export class PlotgridView extends ItemView {
                         const rect = modalEl.getBoundingClientRect();
                         startX = ev.clientX; startY = ev.clientY;
                         origLeft = rect.left; origTop = rect.top;
-                        modalEl.style.position = 'fixed';
-                        modalEl.style.left = origLeft + 'px';
-                        modalEl.style.top = origTop + 'px';
-                        modalEl.style.transform = '';
-                        document.addEventListener('mousemove', onMove);
-                        document.addEventListener('mouseup', onUp);
+                        modalEl.setCssStyles({
+                            position: 'fixed',
+                            left: origLeft + 'px',
+                            top: origTop + 'px',
+                            transform: '',
+                        });
+                        activeDocument.addEventListener('mousemove', onMove);
+                        activeDocument.addEventListener('mouseup', onUp);
                     };
                     const onMove = (ev: MouseEvent) => {
                         if (!dragging) return;
                         const dx = ev.clientX - startX;
                         const dy = ev.clientY - startY;
-                        modalEl.style.left = (origLeft + dx) + 'px';
-                        modalEl.style.top = (origTop + dy) + 'px';
+                        modalEl.setCssStyles({
+                            left: (origLeft + dx) + 'px',
+                            top: (origTop + dy) + 'px',
+                        });
                     };
                     const onUp = () => {
                         dragging = false;
-                        document.removeEventListener('mousemove', onMove);
-                        document.removeEventListener('mouseup', onUp);
+                        activeDocument.removeEventListener('mousemove', onMove);
+                        activeDocument.removeEventListener('mouseup', onUp);
                     };
                     // allow dragging by header text
                     headerEl.addEventListener('mousedown', onDown);
@@ -1880,12 +1913,12 @@ export class PlotgridView extends ItemView {
                         const rect = modalEl.getBoundingClientRect();
                         const y = ev.clientY - rect.top;
                         if (y >= 0 && y <= 56 && !target.closest('input') && !target.closest('button') && !target.closest('.color-swatch-row')) {
-                            modalEl.style.cursor = 'move';
+                            modalEl.setCssStyles({ cursor: 'move' });
                         } else {
-                            modalEl.style.cursor = '';
+                            modalEl.setCssStyles({ cursor: '' });
                         }
                     });
-                    modalEl.addEventListener('mouseleave', () => { modalEl.style.cursor = ''; });
+                    modalEl.addEventListener('mouseleave', () => { modalEl.setCssStyles({ cursor: '' }); });
                 }
             }
         }
@@ -1988,13 +2021,13 @@ export class PlotgridView extends ItemView {
             const el = s.el;
             const prev = el.style.background;
             this.chooseColor(s.cell.bgColor || this.defaultBgColor(), (c) => {
-                if (c === null) { el.style.background = prev; return; }
+                if (c === null) { el.setCssStyles({ background: prev }); return; }
                 const cur = this.data.cells[cellKey];
                 if (cur) cur.bgColor = c || '';
                 this.scheduleSave(); this.renderGrid();
                 const freshEl = this.getCellElement(selRow, selCol);
                 if (freshEl) this.flashElement(freshEl);
-            }, (preview) => { if (preview === null) el.style.background = prev; else el.style.background = preview; });
+            }, (preview) => { if (preview === null) el.setCssStyles({ background: prev }); else el.setCssStyles({ background: preview }); });
         } else if (selRow !== null) {
             // preview for whole row + header
             const els: HTMLElement[] = [];
@@ -2004,8 +2037,8 @@ export class PlotgridView extends ItemView {
             const prevHeaderBg = header ? header.style.background : null;
             this.chooseColor(this.data.rows[selRow].bgColor || this.defaultBgColor(), (c) => {
                 if (c === null) {
-                    els.forEach((e,i) => e.style.background = prevs[i]);
-                    if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg;
+                    els.forEach((e,i) => e.setCssStyles({ background: prevs[i] }));
+                    if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg });
                     return;
                 }
                 // set row meta
@@ -2019,7 +2052,7 @@ export class PlotgridView extends ItemView {
                 this.scheduleSave();
                 this.renderGrid();
                 for (let ci = 0; ci < this.data.columns.length; ci++) this.flashElement(this.getCellElement(selRow, ci));
-            }, (preview) => { if (preview === null) { els.forEach((e,i) => e.style.background = prevs[i]); if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; } else { els.forEach(e => e.style.background = preview); if (header) header.style.background = preview; } });
+            }, (preview) => { if (preview === null) { els.forEach((e,i) => e.setCssStyles({ background: prevs[i] })); if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); } else { els.forEach(e => e.setCssStyles({ background: preview })); if (header) header.setCssStyles({ background: preview }); } });
         } else if (selCol !== null) {
             // preview for whole column + header
             const els: HTMLElement[] = [];
@@ -2029,8 +2062,8 @@ export class PlotgridView extends ItemView {
             const prevHeaderBg = header ? header.style.background : null;
             this.chooseColor(this.data.columns[selCol].bgColor || this.defaultBgColor(), (c) => {
                 if (c === null) {
-                    els.forEach((e,i) => e.style.background = prevs[i]);
-                    if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg;
+                    els.forEach((e,i) => e.setCssStyles({ background: prevs[i] }));
+                    if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg });
                     return;
                 }
                 // set column meta
@@ -2044,7 +2077,7 @@ export class PlotgridView extends ItemView {
                 this.scheduleSave();
                 this.renderGrid();
                 for (let ri = 0; ri < this.data.rows.length; ri++) this.flashElement(this.getCellElement(ri, selCol));
-            }, (preview) => { if (preview === null) { els.forEach((e,i) => e.style.background = prevs[i]); if (header && prevHeaderBg !== null) header.style.background = prevHeaderBg; } else { els.forEach(e => e.style.background = preview); if (header) header.style.background = preview; } });
+            }, (preview) => { if (preview === null) { els.forEach((e,i) => e.setCssStyles({ background: prevs[i] })); if (header && prevHeaderBg !== null) header.setCssStyles({ background: prevHeaderBg }); } else { els.forEach(e => e.setCssStyles({ background: preview })); if (header) header.setCssStyles({ background: preview }); } });
         } else { new Notice('Select a cell, row, or column first'); return; }
     }
 
@@ -2059,19 +2092,19 @@ export class PlotgridView extends ItemView {
             const el = s.el;
             const prev = el.style.color;
             this.chooseColor(s.cell.textColor || this.defaultTextColor(), (c) => {
-                if (c === null) { el.style.color = prev; return; }
+                if (c === null) { el.setCssStyles({ color: prev }); return; }
                 const cur = this.data.cells[cellKey];
                 if (cur) cur.textColor = c || '';
                 this.scheduleSave(); this.renderGrid();
                 const freshEl = this.getCellElement(selRow, selCol);
                 if (freshEl) this.flashElement(freshEl);
-            }, (preview) => { if (preview === null) el.style.color = prev; else el.style.color = preview; });
+            }, (preview) => { if (preview === null) el.setCssStyles({ color: prev }); else el.setCssStyles({ color: preview }); });
         } else if (selRow !== null) {
             const header = this.canvasEl?.querySelectorAll('.plot-grid-row-header')[selRow] as HTMLElement | undefined;
             const prevHeaderColor = header ? header.style.color : null;
             this.chooseColor(this.data.rows[selRow].textColor || this.defaultTextColor(), (c) => {
                 if (c === null) {
-                    if (header && prevHeaderColor !== null) header.style.color = prevHeaderColor;
+                    if (header && prevHeaderColor !== null) header.setCssStyles({ color: prevHeaderColor });
                     return;
                 }
                 this.data.rows[selRow].textColor = c || '';
@@ -2080,9 +2113,9 @@ export class PlotgridView extends ItemView {
                 if (header) this.flashElement(header);
             }, (preview) => {
                 if (preview === null) {
-                    if (header && prevHeaderColor !== null) header.style.color = prevHeaderColor;
+                    if (header && prevHeaderColor !== null) header.setCssStyles({ color: prevHeaderColor });
                 } else {
-                    if (header) header.style.color = preview;
+                    if (header) header.setCssStyles({ color: preview });
                 }
             });
         } else if (selCol !== null) {
@@ -2090,7 +2123,7 @@ export class PlotgridView extends ItemView {
             const prevHeaderColor = header ? header.style.color : null;
             this.chooseColor(this.data.columns[selCol].textColor || this.defaultTextColor(), (c) => {
                 if (c === null) {
-                    if (header && prevHeaderColor !== null) header.style.color = prevHeaderColor;
+                    if (header && prevHeaderColor !== null) header.setCssStyles({ color: prevHeaderColor });
                     return;
                 }
                 this.data.columns[selCol].textColor = c || '';
@@ -2099,9 +2132,9 @@ export class PlotgridView extends ItemView {
                 if (header) this.flashElement(header);
             }, (preview) => {
                 if (preview === null) {
-                    if (header && prevHeaderColor !== null) header.style.color = prevHeaderColor;
+                    if (header && prevHeaderColor !== null) header.setCssStyles({ color: prevHeaderColor });
                 } else {
-                    if (header) header.style.color = preview;
+                    if (header) header.setCssStyles({ color: preview });
                 }
             });
         } else { new Notice('Select a cell, row, or column first'); return; }
@@ -2193,21 +2226,23 @@ export class PlotgridView extends ItemView {
         modal.open();
     }
 
-    private enterEditMode(cellEl: HTMLElement, cell: CellData, contentEl: HTMLElement) {
+    private enterEditMode(cellEl: HTMLElement, cell: CellData, _contentEl: HTMLElement) {
         cellEl.classList.add('editing');
         cellEl.empty();
         const ta = cellEl.createEl('textarea');
         ta.value = cell.content || '';
-        ta.style.width = '100%';
-        ta.style.height = '100%';
-        ta.style.border = 'none';
-        ta.style.padding = '6px 8px';
-        ta.style.boxSizing = 'border-box';
-        ta.style.resize = 'none';
-        ta.style.background = 'transparent';
-        ta.style.color = 'inherit';
-        ta.style.font = 'inherit';
-        ta.style.outline = 'none';
+        ta.setCssStyles({
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            padding: '6px 8px',
+            boxSizing: 'border-box',
+            resize: 'none',
+            background: 'transparent',
+            color: 'inherit',
+            font: 'inherit',
+            outline: 'none',
+        });
         // Prevent clicks inside textarea from propagating to cell/wrapper
         ta.addEventListener('mousedown', (e) => e.stopPropagation());
         ta.addEventListener('click', (e) => e.stopPropagation());
@@ -2240,7 +2275,7 @@ export class PlotgridView extends ItemView {
         };
 
         // Use requestAnimationFrame + focus to guarantee it happens after the current event cycle
-        requestAnimationFrame(() => { ta.focus(); });
+        window.requestAnimationFrame(() => { ta.focus(); });
 
         ta.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
@@ -2255,7 +2290,7 @@ export class PlotgridView extends ItemView {
                 let nc = curC + (e.shiftKey ? -1 : 1);
                 if (nc >= this.data.columns.length) { nc = 0; nr = Math.min(this.data.rows.length - 1, curR + 1); }
                 if (nc < 0) { nc = Math.max(0, this.data.columns.length - 1); nr = Math.max(0, curR - 1); }
-                setTimeout(() => {
+                window.setTimeout(() => {
                     const newEl = this.getCellElement(nr, nc);
                     const key = `${this.data.rows[nr].id}-${this.data.columns[nc].id}`;
                     const newCell = this.data.cells[key];
@@ -2287,7 +2322,7 @@ export class PlotgridView extends ItemView {
         return undefined;
     }
 
-    private async setNoteColor(scene: Scene, color: string | undefined, cellKey: string): Promise<void> {
+    private async setNoteColor(scene: Scene, color: string | undefined, _cellKey: string): Promise<void> {
         const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
         const normalized = this.normalizeHexColor(color);
         await scMgr?.updateScene(scene.filePath, { corkboardNoteColor: normalized });
@@ -2383,11 +2418,13 @@ export class PlotgridView extends ItemView {
                 contentEl.createEl('h3', { text: 'Link Scene Card' });
                 this.inputEl = contentEl.createEl('input');
                 this.inputEl.placeholder = 'Search files...';
-                this.inputEl.style.width = '100%';
+                this.inputEl.setCssStyles({ width: '100%' });
                 this.inputEl.addEventListener('input', () => this.renderList());
                 this.listEl = contentEl.createDiv('scene-link-list');
-                this.listEl.style.maxHeight = '300px';
-                this.listEl.style.overflow = 'auto';
+                this.listEl.setCssStyles({
+                    maxHeight: '300px',
+                    overflow: 'auto',
+                });
                 this.renderList();
             }
             renderList() {
@@ -2397,8 +2434,10 @@ export class PlotgridView extends ItemView {
                 const files = this.app.vault.getMarkdownFiles().filter((f: TFile) => f.path.toLowerCase().includes(q) || f.basename.toLowerCase().includes(q));
                 for (const f of files) {
                     const row = this.listEl.createDiv('scene-link-row');
-                    row.style.padding = '6px 8px';
-                    row.style.cursor = 'pointer';
+                    row.setCssStyles({
+                        padding: '6px 8px',
+                        cursor: 'pointer',
+                    });
                     row.setText(f.path);
                     row.addEventListener('click', () => {
                         this.onChoose(f.path);
@@ -2434,14 +2473,18 @@ export class PlotgridView extends ItemView {
 
                 // Column source selector
                 const colSourceLabel = contentEl.createEl('label', { text: 'Columns from:' });
-                colSourceLabel.style.display = 'block';
-                colSourceLabel.style.marginTop = '12px';
-                colSourceLabel.style.marginBottom = '4px';
-                colSourceLabel.style.fontWeight = '600';
+                colSourceLabel.setCssStyles({
+                    display: 'block',
+                    marginTop: '12px',
+                    marginBottom: '4px',
+                    fontWeight: '600',
+                });
 
                 const colSourceSelect = contentEl.createEl('select');
-                colSourceSelect.style.width = '100%';
-                colSourceSelect.style.marginBottom = '12px';
+                colSourceSelect.setCssStyles({
+                    width: '100%',
+                    marginBottom: '12px',
+                });
                 colSourceSelect.createEl('option', { text: 'Characters', value: 'characters' });
                 colSourceSelect.createEl('option', { text: 'Plotlines (tags)', value: 'tags' });
                 colSourceSelect.createEl('option', { text: 'Locations', value: 'locations' });
@@ -2462,24 +2505,30 @@ export class PlotgridView extends ItemView {
                     text: 'Rows will be ordered by Act → Chapter → Sequence.',
                     cls: 'setting-item-description',
                 });
-                sortInfo.style.marginBottom = '12px';
+                sortInfo.setCssStyles({ marginBottom: '12px' });
 
                 // How to handle existing data
                 const modeLabel = contentEl.createEl('label', { text: 'Merge mode:' });
-                modeLabel.style.display = 'block';
-                modeLabel.style.marginBottom = '4px';
-                modeLabel.style.fontWeight = '600';
+                modeLabel.setCssStyles({
+                    display: 'block',
+                    marginBottom: '4px',
+                    fontWeight: '600',
+                });
 
                 const modeSelect = contentEl.createEl('select');
-                modeSelect.style.width = '100%';
-                modeSelect.style.marginBottom = '16px';
+                modeSelect.setCssStyles({
+                    width: '100%',
+                    marginBottom: '16px',
+                });
                 modeSelect.createEl('option', { text: 'Merge — keep manual rows/columns, add missing', value: 'merge' });
                 modeSelect.createEl('option', { text: 'Replace — rebuild from scenes (manual data cleared)', value: 'replace' });
 
                 const btns = contentEl.createDiv();
-                btns.style.display = 'flex';
-                btns.style.justifyContent = 'flex-end';
-                btns.style.gap = '8px';
+                btns.setCssStyles({
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '8px',
+                });
 
                 const cancelBtn = btns.createEl('button', { text: 'Cancel' });
                 cancelBtn.addEventListener('click', () => this.close());
@@ -2789,7 +2838,7 @@ export class PlotgridView extends ItemView {
         e.preventDefault();
         const startX = e.clientX;
         const origWidth = this.data.columns[colIndex].width;
-        document.body.style.cursor = 'col-resize';
+        activeDocument.body.setCssStyles({ cursor: 'col-resize' });
 
         const onMove = (ev: MouseEvent) => {
             const delta = ev.clientX - startX;
@@ -2798,29 +2847,29 @@ export class PlotgridView extends ItemView {
             // update grid template for live feedback
             if (this.canvasEl) {
                 const colTemplate = [ROW_HEADER_WIDTH + 'px', ...this.data.columns.map((c) => c.width + 'px')].join(' ');
-                this.canvasEl.style.gridTemplateColumns = colTemplate;
+                this.canvasEl.setCssStyles({ gridTemplateColumns: colTemplate });
                 const totalWidth = this.computeTotalWidth();
-                this.canvasEl.style.width = totalWidth / this.data.zoom + 'px';
+                this.canvasEl.setCssStyles({ width: totalWidth / this.data.zoom + 'px' });
             }
         };
 
         const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-            document.body.style.cursor = '';
+            activeDocument.removeEventListener('mousemove', onMove);
+            activeDocument.removeEventListener('mouseup', onUp);
+            activeDocument.body.setCssStyles({ cursor: '' });
             this.scheduleSave();
             this.renderGrid();
         };
 
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
+        activeDocument.addEventListener('mousemove', onMove);
+        activeDocument.addEventListener('mouseup', onUp);
     }
 
     private startRowResize(e: MouseEvent, rowIndex: number) {
         e.preventDefault();
         const startY = e.clientY;
         const origH = this.data.rows[rowIndex].height;
-        document.body.style.cursor = 'row-resize';
+        activeDocument.body.setCssStyles({ cursor: 'row-resize' });
 
         const onMove = (ev: MouseEvent) => {
             const delta = ev.clientY - startY;
@@ -2828,20 +2877,20 @@ export class PlotgridView extends ItemView {
             this.data.rows[rowIndex].height = newH;
             if (this.canvasEl) {
                 const rowTemplate = [COL_HEADER_HEIGHT + 'px', ...this.data.rows.map((r) => r.height + 'px')].join(' ');
-                this.canvasEl.style.gridTemplateRows = rowTemplate;
+                this.canvasEl.setCssStyles({ gridTemplateRows: rowTemplate });
             }
         };
 
         const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-            document.body.style.cursor = '';
+            activeDocument.removeEventListener('mousemove', onMove);
+            activeDocument.removeEventListener('mouseup', onUp);
+            activeDocument.body.setCssStyles({ cursor: '' });
             this.scheduleSave();
             this.renderGrid();
         };
 
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
+        activeDocument.addEventListener('mousemove', onMove);
+        activeDocument.addEventListener('mouseup', onUp);
     }
 
     // ────────────────────────────────────────────────────
@@ -2857,7 +2906,7 @@ export class PlotgridView extends ItemView {
 
         const el = this.inspectorEl;
         el.empty();
-        el.style.display = 'block';
+        el.setCssStyles({ display: 'block' });
         el.addClass('story-line-inspector');
 
         const row = this.data.rows[rowIndex];
@@ -2892,19 +2941,19 @@ export class PlotgridView extends ItemView {
 
             cellBody = el.createDiv('sl-cell-tab-body');
             sceneBody = el.createDiv('sl-cell-tab-body');
-            sceneBody.style.display = 'none';
+            sceneBody.setCssStyles({ display: 'none' });
 
             const switchTab = (active: 'cell' | 'scene') => {
                 if (active === 'cell') {
                     cellTab.addClass('sl-cell-tab-active');
                     sceneTab.removeClass('sl-cell-tab-active');
-                    cellBody.style.display = '';
-                    sceneBody!.style.display = 'none';
+                    cellBody.setCssStyles({ display: '' });
+                    sceneBody!.setCssStyles({ display: 'none' });
                 } else {
                     cellTab.removeClass('sl-cell-tab-active');
                     sceneTab.addClass('sl-cell-tab-active');
-                    cellBody.style.display = 'none';
-                    sceneBody!.style.display = '';
+                    cellBody.setCssStyles({ display: 'none' });
+                    sceneBody!.setCssStyles({ display: '' });
                     // Lazy-render scene inspector on first switch
                     if (!cellInspectorInstance && scMgr && this.plugin) {
                         cellInspectorInstance = new InspectorComponent(
@@ -2948,16 +2997,18 @@ export class PlotgridView extends ItemView {
         const textArea = textSection.createEl('textarea', { cls: 'inspector-cell-textarea' });
         textArea.value = cell.content || '';
         textArea.rows = 8;
-        textArea.style.width = '100%';
-        textArea.style.resize = 'vertical';
-        textArea.style.marginTop = '4px';
-        textArea.style.padding = '6px 8px';
-        textArea.style.border = '1px solid var(--background-modifier-border)';
-        textArea.style.borderRadius = '4px';
-        textArea.style.background = 'var(--background-primary)';
-        textArea.style.color = 'var(--text-normal)';
-        textArea.style.font = 'inherit';
-        textArea.style.fontSize = '13px';
+        textArea.setCssStyles({
+            width: '100%',
+            resize: 'vertical',
+            marginTop: '4px',
+            padding: '6px 8px',
+            border: '1px solid var(--background-modifier-border)',
+            borderRadius: '4px',
+            background: 'var(--background-primary)',
+            color: 'var(--text-normal)',
+            font: 'inherit',
+            fontSize: '13px',
+        });
 
         // ── Scan results container ──
         const scanContainer = cellBody.createDiv('inspector-scan-results');
@@ -3013,10 +3064,12 @@ export class PlotgridView extends ItemView {
                 cls: 'inspector-scene-link',
                 text: linkedScene.title || linkedScene.filePath.split('/').pop()?.replace('.md', '') || 'Untitled',
             });
-            sceneLink.style.display = 'block';
-            sceneLink.style.marginTop = '4px';
-            sceneLink.style.cursor = 'pointer';
-            sceneLink.style.color = 'var(--text-accent)';
+            sceneLink.setCssStyles({
+                display: 'block',
+                marginTop: '4px',
+                cursor: 'pointer',
+                color: 'var(--text-accent)',
+            });
             sceneLink.addEventListener('click', () => {
                 const f = this.app.vault.getAbstractFileByPath(linkedScene.filePath) as TFile | null;
                 if (f) this.app.workspace.getLeaf('tab').openFile(f, { state: { mode: 'source', source: false } });
@@ -3044,10 +3097,12 @@ export class PlotgridView extends ItemView {
             const section = container.createDiv('inspector-section');
             section.createSpan({ cls: 'inspector-label', text: 'Characters:' });
             const chipList = section.createDiv('inspector-chip-list');
-            chipList.style.display = 'flex';
-            chipList.style.flexWrap = 'wrap';
-            chipList.style.gap = '4px';
-            chipList.style.marginTop = '4px';
+            chipList.setCssStyles({
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '4px',
+                marginTop: '4px',
+            });
             // Deduplicate via alias map
             const aliasMap = (this.plugin?.characterManager as CharacterManager | undefined)
                 ?.buildAliasMap(this.plugin?.settings.characterAliases) ?? new Map<string, string>();
@@ -3058,12 +3113,14 @@ export class PlotgridView extends ItemView {
                 if (seen.has(key)) continue;
                 seen.add(key);
                 const chip = chipList.createSpan({ cls: 'inspector-chip', text: canonical });
-                chip.style.padding = '2px 10px';
-                chip.style.borderRadius = '10px';
-                chip.style.fontSize = '12px';
-                chip.style.background = 'var(--background-modifier-border)';
-                chip.style.cursor = 'pointer';
-                chip.style.color = 'var(--text-normal)';
+                chip.setCssStyles({
+                    padding: '2px 10px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    background: 'var(--background-modifier-border)',
+                    cursor: 'pointer',
+                    color: 'var(--text-normal)',
+                });
                 chip.addEventListener('click', () => {
                     // Try to open the character file
                     const charMgr = this.plugin?.characterManager as CharacterManager | undefined;
@@ -3081,10 +3138,12 @@ export class PlotgridView extends ItemView {
             const section = container.createDiv('inspector-section');
             section.createSpan({ cls: 'inspector-label', text: 'Locations:' });
             const chipList = section.createDiv('inspector-chip-list');
-            chipList.style.display = 'flex';
-            chipList.style.flexWrap = 'wrap';
-            chipList.style.gap = '4px';
-            chipList.style.marginTop = '4px';
+            chipList.setCssStyles({
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '4px',
+                marginTop: '4px',
+            });
             // Deduplicate locations
             const seen = new Set<string>();
             for (const name of result.locations) {
@@ -3092,11 +3151,13 @@ export class PlotgridView extends ItemView {
                 if (seen.has(key)) continue;
                 seen.add(key);
                 const chip = chipList.createSpan({ cls: 'inspector-chip', text: name });
-                chip.style.padding = '2px 10px';
-                chip.style.borderRadius = '10px';
-                chip.style.fontSize = '12px';
-                chip.style.background = 'var(--background-modifier-border)';
-                chip.style.color = 'var(--text-normal)';
+                chip.setCssStyles({
+                    padding: '2px 10px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    background: 'var(--background-modifier-border)',
+                    color: 'var(--text-normal)',
+                });
             }
         }
 
@@ -3105,21 +3166,27 @@ export class PlotgridView extends ItemView {
             const section = container.createDiv('inspector-section');
             section.createSpan({ cls: 'inspector-label', text: 'Tags:' });
             const tagList = section.createDiv('inspector-tag-list');
-            tagList.style.display = 'flex';
-            tagList.style.flexWrap = 'wrap';
-            tagList.style.gap = '4px';
-            tagList.style.marginTop = '4px';
+            tagList.setCssStyles({
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '4px',
+                marginTop: '4px',
+            });
             const tagColors = this.plugin?.settings.tagColors || {};
             const scheme = this.plugin?.settings.colorScheme || 'mocha';
             const allTagsSorted = [...result.tags].sort();
             for (const tag of result.tags) {
                 const chip = tagList.createSpan({ cls: 'inspector-tag-chip', text: `#${tag}` });
-                chip.style.padding = '2px 8px';
-                chip.style.borderRadius = '10px';
-                chip.style.fontSize = '12px';
-                const chipColor = resolveTagColor(tag, allTagsSorted.indexOf(tag), scheme, tagColors, getPlotlineHSL(this.plugin.settings));
-                chip.style.background = chipColor;
-                chip.style.color = contrastTextColor(chipColor);
+                chip.setCssStyles({
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                });
+                const chipColor = resolveTagColor(tag, allTagsSorted.indexOf(tag), scheme, tagColors, getPlotlineHSL(this.plugin!.settings));
+                chip.setCssStyles({
+                    background: chipColor,
+                    color: contrastTextColor(chipColor),
+                });
             }
         }
     }
@@ -3127,7 +3194,7 @@ export class PlotgridView extends ItemView {
     private hideCellInspector(): void {
         if (this.inspectorEl) {
             this.inspectorEl.empty();
-            this.inspectorEl.style.display = 'none';
+            this.inspectorEl.setCssStyles({ display: 'none' });
         }
     }
 }

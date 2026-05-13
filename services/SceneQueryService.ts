@@ -1,5 +1,4 @@
-import { Scene, SceneFilter, SortConfig, SortField, STATUS_ORDER, getStatusOrder } from '../models/Scene';
-import { compareActChapter } from '../utils/actChapter';
+import { Scene, SceneFilter, SortConfig, getStatusOrder } from '../models/Scene';
 import { compareActChapter } from '../utils/actChapter';
 
 /**

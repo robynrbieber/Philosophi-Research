@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 /**
  * Shared Codex category tab bar — rendered in CodexView, CharacterView, and LocationView
  * so the user can switch between categories from any of those views.
@@ -64,10 +73,10 @@ export function renderCodexCategoryTabs(parent: HTMLElement, opts: CodexTabsOpti
             tab.addEventListener('click', () => {
                 // Navigate to CodexView with this category active
                 try {
-                    leaf.setViewState({ type: CODEX_VIEW_TYPE, active: true, state: {} });
+                    void leaf.setViewState({ type: CODEX_VIEW_TYPE, active: true, state: {} });
                     plugin.app.workspace.revealLeaf(leaf);
                     // After view is set, tell the CodexView which category to show
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         const view = leaf.view;
                         if (view && typeof (view as any).setActiveCategory === 'function') {
                             (view as any).setActiveCategory(cat.id);

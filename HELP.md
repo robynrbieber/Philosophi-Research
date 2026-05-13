@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.9.2** · By Jan Sandström
+By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -1732,4 +1732,4 @@ MIT
 
 ---
 
-*StoryLine v1.7.0 — Transform your vault into a powerful book planning tool.*
+*StoryLine — Transform your vault into a powerful book planning tool.*

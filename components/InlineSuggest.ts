@@ -85,7 +85,7 @@ export class InlineSuggest {
         this.inputEl.addEventListener('focus', this.handleInput); // re-show on re-focus
 
         // Initial render if input already has focus
-        if (document.activeElement === this.inputEl) {
+        if (activeDocument.activeElement === this.inputEl) {
             this.updateDropdown();
         }
     }
@@ -137,7 +137,7 @@ export class InlineSuggest {
 
     private handleBlur = () => {
         // Delay to allow click on dropdown item to register
-        setTimeout(() => {
+        window.setTimeout(() => {
             if (!this.alive) return;
             this.removeDropdown();
             // If the input still has a value, commit it
@@ -252,7 +252,7 @@ export class InlineSuggest {
 
     private ensureDropdown() {
         if (this.dropdown) return;
-        this.dropdown = document.createElement('div');
+        this.dropdown = activeDocument.createElement('div');
         this.dropdown.className = 'sl-suggest-dropdown';
 
         // Position below the input, clamped to viewport
@@ -261,19 +261,25 @@ export class InlineSuggest {
         const spaceBelow = window.innerHeight - rect.bottom - 4;
         const spaceAbove = rect.top - 4;
         const showAbove = spaceBelow < 120 && spaceAbove > spaceBelow;
-        this.dropdown.style.position = 'fixed';
-        this.dropdown.style.left = `${rect.left}px`;
-        this.dropdown.style.width = `${Math.max(rect.width, 200)}px`;
-        this.dropdown.style.zIndex = '10000';
+        this.dropdown.setCssStyles({
+            position: 'fixed',
+            left: `${rect.left}px`,
+            width: `${Math.max(rect.width, 200)}px`,
+            zIndex: '10000',
+        });
         if (showAbove) {
-            this.dropdown.style.bottom = `${window.innerHeight - rect.top + 2}px`;
-            this.dropdown.style.maxHeight = `${Math.min(spaceAbove, dropdownMaxH)}px`;
+            this.dropdown.setCssStyles({
+                bottom: `${window.innerHeight - rect.top + 2}px`,
+                maxHeight: `${Math.min(spaceAbove, dropdownMaxH)}px`,
+            });
         } else {
-            this.dropdown.style.top = `${rect.bottom + 2}px`;
-            this.dropdown.style.maxHeight = `${Math.min(spaceBelow, dropdownMaxH)}px`;
+            this.dropdown.setCssStyles({
+                top: `${rect.bottom + 2}px`,
+                maxHeight: `${Math.min(spaceBelow, dropdownMaxH)}px`,
+            });
         }
 
-        document.body.appendChild(this.dropdown);
+        activeDocument.body.appendChild(this.dropdown);
     }
 
     private removeDropdown() {
@@ -406,7 +412,7 @@ export function renderTagPillInput(opts: TagPillInputOptions): { refresh: (value
                 }
                 render();
                 // Re-focus the new input after re-render
-                setTimeout(() => {
+                window.setTimeout(() => {
                     const newInput = container.querySelector('.sl-tag-pill-input') as HTMLInputElement;
                     if (newInput) newInput.focus();
                 }, 10);
@@ -454,7 +460,6 @@ export interface AutocompleteInputOptions {
 export function renderAutocompleteInput(opts: AutocompleteInputOptions): { refresh: (value: string) => void } {
     const { container, getSuggestions, onChange, placeholder, getDisplayLabel } = opts;
     let currentValue = opts.value;
-    const allowEmpty = opts.allowEmpty ?? true;
     let activeSuggest: InlineSuggest | null = null;
 
     /** Destroy the current InlineSuggest instance before re-rendering. */

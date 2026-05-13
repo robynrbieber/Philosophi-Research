@@ -1,6 +1,7 @@
 import { ItemView, WorkspaceLeaf, MarkdownRenderer, Component } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { HELP_VIEW_TYPE } from '../constants';
+import HELP_MARKDOWN from '../HELP.md';
 
 /**
  * HelpView — displays the HELP.md documentation in a dedicated
@@ -42,29 +43,16 @@ export class HelpView extends ItemView {
     }
 
     /**
-     * Read HELP.md from the plugin folder and render it as
-     * native Obsidian markdown inside the pane.
+     * Render the bundled HELP.md content as native Obsidian markdown
+     * inside the pane. The markdown source is embedded into main.js at
+     * build time (esbuild text loader), so no separate file needs to ship.
      */
     private async renderHelp(container: HTMLElement): Promise<void> {
-        let markdown = '';
-
-        try {
-            // Resolve the plugin's own installation folder
-            const pluginDir = this.plugin.manifest.dir;
-            if (pluginDir) {
-                const helpPath = `${pluginDir}/HELP.md`;
-                const exists = await this.app.vault.adapter.exists(helpPath);
-                if (exists) {
-                    markdown = await this.app.vault.adapter.read(helpPath);
-                }
-            }
-        } catch {
-            // fall through to fallback
-        }
+        const markdown = HELP_MARKDOWN;
 
         if (!markdown) {
             container.createEl('p', {
-                text: 'Could not load HELP.md. Make sure the file is in the StoryLine plugin folder.',
+                text: 'Help content is unavailable.',
                 cls: 'storyline-help-error',
             });
             return;

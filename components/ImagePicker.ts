@@ -98,11 +98,11 @@ function getImagesFolderPath(sceneFolder: string): string {
  */
 function importImageFromComputer(app: App, sceneFolder: string): Promise<string | undefined> {
     return new Promise((resolve) => {
-        const input = document.createElement('input');
+        const input = activeDocument.createElement('input');
         input.type = 'file';
         input.accept = 'image/png,image/jpeg,image/gif,image/svg+xml,image/webp,image/bmp,image/avif';
-        input.style.display = 'none';
-        document.body.appendChild(input);
+        input.setCssStyles({ display: 'none' });
+        activeDocument.body.appendChild(input);
 
         let settled = false;
         const complete = (result: string | undefined): void => {
@@ -111,8 +111,8 @@ function importImageFromComputer(app: App, sceneFolder: string): Promise<string 
             input.removeEventListener('change', onChange);
             input.removeEventListener('cancel', onCancel);
             window.removeEventListener('focus', onFocus);
-            if (document.body.contains(input)) {
-                document.body.removeChild(input);
+            if (activeDocument.body.contains(input)) {
+                activeDocument.body.removeChild(input);
             }
             resolve(result);
         };
@@ -171,7 +171,7 @@ function importImageFromComputer(app: App, sceneFolder: string): Promise<string 
 
         // Fallback for dialogs dismissed without firing 'change'/'cancel'.
         const onFocus = () => {
-            setTimeout(() => {
+            window.setTimeout(() => {
                 if (settled) return;
                 if (input.files && input.files.length > 0) return;
                 complete(undefined);
@@ -235,11 +235,13 @@ class ImageChoiceModal extends Modal {
                 const imgSrc = resolveImagePath(this.app, this.currentImage);
                 
                 const img = preview.createEl('img', { attr: { src: imgSrc } });
-                img.style.maxWidth = '160px';
-                img.style.maxHeight = '120px';
-                img.style.borderRadius = '8px';
-                img.style.objectFit = 'cover';
-                img.style.border = '1px solid var(--background-modifier-border)';
+                img.setCssStyles({
+                    maxWidth: '160px',
+                    maxHeight: '120px',
+                    borderRadius: '8px',
+                    objectFit: 'cover',
+                    border: '1px solid var(--background-modifier-border)',
+                });
                 
                 // Add error handler to show placeholder if image fails to load
                 img.onerror = () => {
@@ -255,9 +257,11 @@ class ImageChoiceModal extends Modal {
             }
 
             const pathLabel = preview.createDiv();
-            pathLabel.style.fontSize = '11px';
-            pathLabel.style.color = 'var(--text-muted)';
-            pathLabel.style.marginTop = '4px';
+            pathLabel.setCssStyles({
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+                marginTop: '4px',
+            });
             pathLabel.textContent = this.currentImage;
         }
 
@@ -352,6 +356,6 @@ class VaultImagePickerModal extends FuzzySuggestModal<TFile> {
         super.onClose();
         // Defer cancel emission to avoid event-order race where close can fire
         // before choose callback in some modal stacks.
-        setTimeout(() => this.emitOnce(undefined), 0);
+        window.setTimeout(() => this.emitOnce(undefined), 0);
     }
 }

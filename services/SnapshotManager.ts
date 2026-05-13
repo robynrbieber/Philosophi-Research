@@ -146,7 +146,7 @@ export class SnapshotManager {
     async deleteSnapshot(snapshotPath: string): Promise<void> {
         const file = this.app.vault.getAbstractFileByPath(snapshotPath);
         if (file instanceof TFile) {
-            await this.app.vault.delete(file);
+            await this.app.fileManager.trashFile(file);
         }
     }
 

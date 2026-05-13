@@ -1,7 +1,13 @@
-import { ItemView, WorkspaceLeaf, TFile } from 'obsidian';
-import { STATUS_CONFIG, SceneStatus, Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { SceneManager } from '../services/SceneManager';
-import { Validator, PlotWarning, WarningSeverity } from '../services/Validator';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
@@ -9,6 +15,9 @@ import type { WritingTracker } from '../services/WritingTracker';
 
 import { STATS_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
+import { ItemView, WorkspaceLeaf } from 'obsidian';
+import { Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+import { PlotWarning, Validator } from '../services/Validator';
 
 /**
  * Statistics Dashboard View
@@ -19,7 +28,7 @@ export class StatsView extends ItemView {
     private rootContainer: HTMLElement | null = null;
     private proseCache: { readability: ReadabilityResult; wordFreq: [string, number][] } | null = null;
     private echoCache: { echoes: EchoCluster[]; perScene: SceneEchoReport[] } | null = null;
-    private sprintTimerId: ReturnType<typeof setInterval> | null = null;
+    private sprintTimerId: number | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -53,7 +62,7 @@ export class StatsView extends ItemView {
     }
 
     async onClose(): Promise<void> {
-        if (this.sprintTimerId) { clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
+        if (this.sprintTimerId) { window.clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
     }
 
     // ════════════════════════════════════════════════════
@@ -71,7 +80,7 @@ export class StatsView extends ItemView {
         renderViewSwitcher(toolbar, STATS_VIEW_TYPE, this.plugin, this.leaf);
 
         const content = container.createDiv('story-line-stats-content');
-        const stats = this.sceneManager.getStatistics();
+        const stats = this.sceneManager.queryService.getStatistics();
         const allScenes = this.sceneManager.getAllScenes();
 
         // 1. Overview (always open)
@@ -165,8 +174,10 @@ export class StatsView extends ItemView {
         });
         const bar = goalRow.createDiv('stats-bar stats-bar-wide');
         const fill = bar.createDiv('stats-bar-fill');
-        fill.style.width = `${Math.min(100, wordPct)}%`;
-        fill.style.backgroundColor = 'var(--sl-success, #4CAF50)';
+        fill.setCssStyles({
+            width: `${Math.min(100, wordPct)}%`,
+            backgroundColor: 'var(--sl-success, #4CAF50)',
+        });
 
         // Pace-to-deadline projection
         const tracker = this.plugin.writingTracker;
@@ -235,7 +246,7 @@ export class StatsView extends ItemView {
         let sprintEndChimePlayed = false;
 
         const updateTimerDisplay = () => {
-            const stats = this.sceneManager.getStatistics();
+            const stats = this.sceneManager.queryService.getStatistics();
             const totalNow = stats.totalWords;
             if (tracker.isSprintRunning()) {
                 const remaining = tracker.getSprintRemaining();
@@ -275,17 +286,17 @@ export class StatsView extends ItemView {
 
         startBtn.addEventListener('click', () => {
             sprintEndChimePlayed = false;
-            const stats = this.sceneManager.getStatistics();
+            const stats = this.sceneManager.queryService.getStatistics();
             tracker.startSprint(stats.totalWords);
-            if (this.sprintTimerId) clearInterval(this.sprintTimerId);
-            this.sprintTimerId = setInterval(updateTimerDisplay, 1000);
+            if (this.sprintTimerId) window.clearInterval(this.sprintTimerId);
+            this.sprintTimerId = window.setInterval(updateTimerDisplay, 1000);
             updateTimerDisplay();
         });
 
         stopBtn.addEventListener('click', () => {
-            const stats = this.sceneManager.getStatistics();
+            const stats = this.sceneManager.queryService.getStatistics();
             const entry = tracker.stopSprint(stats.totalWords);
-            if (this.sprintTimerId) { clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
+            if (this.sprintTimerId) { window.clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
             updateTimerDisplay();
             // Persist and re-render to show updated log
             this.plugin.saveProjectSystemData();
@@ -297,14 +308,14 @@ export class StatsView extends ItemView {
 
         resetBtn.addEventListener('click', () => {
             tracker.resetSprint();
-            if (this.sprintTimerId) { clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
+            if (this.sprintTimerId) { window.clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
             updateTimerDisplay();
         });
 
         // Restore timer tick if sprint is still running (view re-opened)
         if (tracker.isSprintRunning()) {
-            if (this.sprintTimerId) clearInterval(this.sprintTimerId);
-            this.sprintTimerId = setInterval(updateTimerDisplay, 1000);
+            if (this.sprintTimerId) window.clearInterval(this.sprintTimerId);
+            this.sprintTimerId = window.setInterval(updateTimerDisplay, 1000);
         }
         updateTimerDisplay();
 
@@ -347,8 +358,10 @@ export class StatsView extends ItemView {
         goalRow.createSpan({ text: `Today: ${todayWords.toLocaleString()} / ${dailyGoal.toLocaleString()} words (${goalPct}%)` });
         const goalBar = goalRow.createDiv('stats-bar stats-bar-wide');
         const goalFill = goalBar.createDiv('stats-bar-fill');
-        goalFill.style.width = `${goalPct}%`;
-        goalFill.style.backgroundColor = goalPct >= 100 ? 'var(--sl-success, #4CAF50)' : 'var(--sl-info, #2196F3)';
+        goalFill.setCssStyles({
+            width: `${goalPct}%`,
+            backgroundColor: goalPct >= 100 ? 'var(--sl-success, #4CAF50)' : 'var(--sl-info, #2196F3)',
+        });
 
         // Trio of progress rings (Today / This week / This month)
         const ringsRow = section.createDiv('stats-rings');
@@ -366,7 +379,7 @@ export class StatsView extends ItemView {
             const col = sparkRow.createDiv('stats-sprint-spark-col');
             const hPct = (day.words / maxDay) * 100;
             const b = col.createDiv('stats-sprint-spark-bar');
-            b.style.height = `${Math.max(2, hPct)}%`;
+            b.setCssStyles({ height: `${Math.max(2, hPct)}%` });
             b.setAttribute('title', `${day.date}: ${day.words} words`);
             col.createDiv({ cls: 'stats-sprint-spark-label', text: day.date.slice(5) });
         }
@@ -383,7 +396,7 @@ export class StatsView extends ItemView {
                 const col = revRow.createDiv('stats-sprint-spark-col');
                 const hPct = (day.words / maxRev) * 100;
                 const b = col.createDiv('stats-sprint-spark-bar stats-revision-bar');
-                b.style.height = `${Math.max(2, hPct)}%`;
+                b.setCssStyles({ height: `${Math.max(2, hPct)}%` });
                 b.setAttribute('title', `${day.date}: ${day.words} words revised`);
                 col.createDiv({ cls: 'stats-sprint-spark-label', text: day.date.slice(5) });
             }
@@ -497,7 +510,7 @@ export class StatsView extends ItemView {
             const col = chart.createDiv('stats-history-col');
             const hPct = (entry.words / maxVal) * 100;
             const bar = col.createDiv('stats-history-bar');
-            bar.style.height = `${Math.max(2, hPct)}%`;
+            bar.setCssStyles({ height: `${Math.max(2, hPct)}%` });
             bar.setAttribute('title', `${entry.date}: ${entry.words.toLocaleString()} words`);
             if (data.length <= 31) {
                 col.createDiv({ cls: 'stats-history-label', text: entry.date.slice(5) });
@@ -531,8 +544,10 @@ export class StatsView extends ItemView {
             lic.createSpan({ text: ` ${cfg.label}: ${count} (${pct}%)` });
             const bar = li.createDiv('stats-bar');
             const fill = bar.createDiv('stats-bar-fill');
-            fill.style.width = `${pct}%`;
-            fill.style.backgroundColor = cfg.color;
+            fill.setCssStyles({
+                width: `${pct}%`,
+                backgroundColor: cfg.color,
+            });
         }
 
         // ── Chapter word counts ──
@@ -568,8 +583,10 @@ export class StatsView extends ItemView {
                 });
                 const bar = row.createDiv('stats-bar');
                 const fill = bar.createDiv('stats-bar-fill');
-                fill.style.width = `${pct}%`;
-                fill.style.backgroundColor = outlier ? 'var(--sl-warning, #FF9800)' : 'var(--sl-info, #2196F3)';
+                fill.setCssStyles({
+                    width: `${pct}%`,
+                    backgroundColor: outlier ? 'var(--sl-warning, #FF9800)' : 'var(--sl-info, #2196F3)',
+                });
             }
         }
 
@@ -588,7 +605,7 @@ export class StatsView extends ItemView {
                 row.createSpan({ text: `${act}: ${count} scenes` });
                 const bar = row.createDiv('stats-bar');
                 const fill = bar.createDiv('stats-bar-fill');
-                fill.style.width = `${pct}%`;
+                fill.setCssStyles({ width: `${pct}%` });
                 row.createSpan({ cls: 'stats-percent', text: `${pct}%` });
             }
         }
@@ -640,7 +657,7 @@ export class StatsView extends ItemView {
                 const row = sec.createDiv('stats-row');
                 row.createSpan({ text: `${pov}: ${count} scenes (${pct}%)` });
                 const bar = row.createDiv('stats-bar');
-                bar.createDiv('stats-bar-fill').style.width = `${(count / maxPov) * 100}%`;
+                bar.createDiv('stats-bar-fill').setCssStyles({ width: `${(count / maxPov) * 100}%` });
             }
         }
 
@@ -660,7 +677,7 @@ export class StatsView extends ItemView {
                     const row = container.createDiv('stats-row');
                     row.createSpan({ text: `${name}: ${count} scene${count !== 1 ? 's' : ''}` });
                     const bar = row.createDiv('stats-bar');
-                    bar.createDiv('stats-bar-fill').style.width = `${(count / maxC) * 100}%`;
+                    bar.createDiv('stats-bar-fill').setCssStyles({ width: `${(count / maxC) * 100}%` });
                 }
             };
             renderRows(charEntries.slice(0, LIMIT), sec);
@@ -686,7 +703,7 @@ export class StatsView extends ItemView {
                 const row = sec.createDiv('stats-row');
                 row.createSpan({ text: `${loc}: ${count} scene${count !== 1 ? 's' : ''}` });
                 const bar = row.createDiv('stats-bar');
-                bar.createDiv('stats-bar-fill').style.width = `${(count / maxL) * 100}%`;
+                bar.createDiv('stats-bar-fill').setCssStyles({ width: `${(count / maxL) * 100}%` });
             }
         } else {
             parent.createEl('p', { cls: 'stats-empty', text: 'No location data.' });
@@ -699,7 +716,7 @@ export class StatsView extends ItemView {
     private renderCharacterHeatmap(
         parent: HTMLElement,
         allScenes: Scene[],
-        resolve: (name: string) => string,
+        _resolve: (name: string) => string,
         sceneChars: (scene: Scene) => Set<string>,
     ): void {
         // Build chapter list (sorted)
@@ -762,7 +779,7 @@ export class StatsView extends ItemView {
                 const cell = row.createEl('td', { cls: 'stats-heatmap-cell' });
                 if (count > 0) {
                     const opacity = Math.max(0.15, count / maxCount);
-                    cell.style.backgroundColor = `rgba(var(--sl-accent-rgb, 66, 150, 252), ${opacity})`;
+                    cell.setCssStyles({ backgroundColor: `rgba(var(--sl-accent-rgb, 66, 150, 252), ${opacity})` });
                     cell.setAttribute('title', `${entry.name} in Ch ${ch}: ${count} scene${count !== 1 ? 's' : ''}`);
                     cell.textContent = String(count);
                 }
@@ -882,8 +899,6 @@ export class StatsView extends ItemView {
         }
 
         // ── Dangling setups (Chekhov's guns that haven't fired) ──
-        const scenesWithPayoff = new Set(links.map(l => l.from.filePath));
-        const scenesBeingPaidOff = new Set(links.map(l => l.to.filePath));
         const orphanSetups = allScenes.filter(s =>
             s.payoff_scenes?.length && s.payoff_scenes.length > 0 &&
             !s.payoff_scenes.some(t => titleMap.has(t))
@@ -951,7 +966,7 @@ export class StatsView extends ItemView {
             row.createSpan({ cls: 'pacing-avg-label', text: act });
             row.createSpan({ cls: 'pacing-avg-value', text: `${avg.toLocaleString()} avg words (${data.count} scene${data.count !== 1 ? 's' : ''})` });
             const bar = row.createDiv('stats-bar');
-            bar.createDiv('stats-bar-fill').style.cssText = `width:${pct}%;background:var(--sl-info,#2196F3)`;
+            bar.createDiv('stats-bar-fill').setCssStyles({ width: `${pct}%`, background: 'var(--sl-info,#2196F3)' });
         }
 
         // ── Word-count distribution histogram ──
@@ -978,7 +993,7 @@ export class StatsView extends ItemView {
         for (const bkt of buckets) {
             const col = chart.createDiv('pacing-dist-col');
             const bar = col.createDiv('pacing-dist-bar');
-            bar.style.height = `${Math.max(2, (bkt.count / maxBkt) * 100)}%`;
+            bar.setCssStyles({ height: `${Math.max(2, (bkt.count / maxBkt) * 100)}%` });
             bar.setAttribute('title', `${bkt.label} words: ${bkt.count} scene${bkt.count !== 1 ? 's' : ''}`);
             col.createDiv({ cls: 'pacing-dist-count', text: String(bkt.count) });
             col.createDiv({ cls: 'pacing-dist-label', text: bkt.label });
@@ -1019,7 +1034,7 @@ export class StatsView extends ItemView {
         this.renderPacingCoach(parent, allScenes);
 
         // ── Tension curve ──
-        const ordered = this.sceneManager.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
+        const ordered = this.sceneManager.queryService.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
         const intensityScenes = ordered.filter(s => s.intensity !== undefined);
         if (intensityScenes.length > 2) {
             this.renderTensionCurve(parent, intensityScenes);
@@ -1063,9 +1078,9 @@ export class StatsView extends ItemView {
             row.createSpan({ text: `${act}: ${pct}% dialogue` });
             const bar = row.createDiv('stats-bar stats-stacked-bar');
             const df = bar.createDiv('stats-bar-fill stats-dialogue-fill');
-            df.style.width = `${pct}%`;
+            df.setCssStyles({ width: `${pct}%` });
             const nf = bar.createDiv('stats-bar-fill stats-narrative-fill');
-            nf.style.width = `${100 - pct}%`;
+            nf.setCssStyles({ width: `${100 - pct}%` });
         }
     }
 
@@ -1077,7 +1092,7 @@ export class StatsView extends ItemView {
             const col = chart.createDiv('tension-col');
             const val = scene.intensity || 0;
             const bar = col.createDiv('tension-bar');
-            bar.style.height = `${(val / 10) * 100}%`;
+            bar.setCssStyles({ height: `${(val / 10) * 100}%` });
             bar.setAttribute('title', `${scene.title || 'Untitled'}: ${val}/10`);
             col.createDiv({ cls: 'tension-label', text: String(val) });
         }
@@ -1104,7 +1119,7 @@ export class StatsView extends ItemView {
         obsidian.setIcon(ico, 'loader');
         spinner.createSpan({ text: ' Analyzing prose…' });
 
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             const allText = withBody.map(s => s.body!).join('\n\n');
             this.proseCache = {
                 readability: this.computeReadability(allText),
@@ -1149,7 +1164,7 @@ export class StatsView extends ItemView {
             r.createSpan({ cls: 'stats-word-freq-word', text: word });
             r.createSpan({ cls: 'stats-word-freq-count', text: `${count.toLocaleString()} (${((count / totalWc) * 100).toFixed(2)}%)` });
             const bar = r.createDiv('stats-bar');
-            bar.createDiv('stats-bar-fill').style.width = `${(count / maxF) * 100}%`;
+            bar.createDiv('stats-bar-fill').setCssStyles({ width: `${(count / maxF) * 100}%` });
         }
 
         // Overused words (>0.5% of total)
@@ -1257,7 +1272,7 @@ export class StatsView extends ItemView {
         obsidian.setIcon(ico, 'loader');
         spinner.createSpan({ text: ' Finding echoes…' });
 
-        requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
             this.echoCache = this.computeEchoes(withBody);
             spinner.remove();
             this.renderEchoResults(parent, this.echoCache);
@@ -1297,7 +1312,8 @@ export class StatsView extends ItemView {
 
         for (const scene of scenes) {
             const body = scene.body!;
-            const sentences = body.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+            // Sentence split — avoid lookbehind for iOS <16.4 compatibility.
+            const sentences = body.replace(/([.!?])\s+/g, '$1\u0001').split('\u0001').filter(s => s.trim().length > 0);
             const sceneWordList = this.extractWords(body);
             const sceneFreq: Record<string, number> = {};
             const sceneTotal = sceneWordList.filter(w => !stop.has(w) && w.length > 2).length;
@@ -1446,8 +1462,8 @@ export class StatsView extends ItemView {
     //  Pacing Coach (inside Pacing & Tension)
     // ════════════════════════════════════════════════════
 
-    private renderPacingCoach(parent: HTMLElement, allScenes: Scene[]): void {
-        const ordered = this.sceneManager.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
+    private renderPacingCoach(parent: HTMLElement, _allScenes: Scene[]): void {
+        const ordered = this.sceneManager.queryService.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
         if (ordered.length < 3) return;
 
         const sec = parent.createDiv('stats-subsection');
@@ -1464,7 +1480,7 @@ export class StatsView extends ItemView {
 
             const col = chart.createDiv('pacing-coach-col');
             const bar = col.createDiv('pacing-coach-bar');
-            bar.style.height = `${Math.max(2, hPct)}%`;
+            bar.setCssStyles({ height: `${Math.max(2, hPct)}%` });
 
             if (!hasConflict && wc > 0) {
                 bar.addClass('pacing-no-conflict');
@@ -1622,13 +1638,13 @@ export class StatsView extends ItemView {
         const arcColor = reached ? 'var(--sl-success, #4CAF50)' : color;
 
         const SVG_NS = 'http://www.w3.org/2000/svg';
-        const svg = document.createElementNS(SVG_NS, 'svg');
+        const svg = activeDocument.createElementNS(SVG_NS, 'svg');
         svg.setAttribute('width', String(size));
         svg.setAttribute('height', String(size));
         svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
         svg.classList.add('stats-ring-svg');
 
-        const track = document.createElementNS(SVG_NS, 'circle');
+        const track = activeDocument.createElementNS(SVG_NS, 'circle');
         track.setAttribute('cx', String(c));
         track.setAttribute('cy', String(c));
         track.setAttribute('r', String(r));
@@ -1637,7 +1653,7 @@ export class StatsView extends ItemView {
         track.setAttribute('stroke-width', String(stroke));
         svg.appendChild(track);
 
-        const arc = document.createElementNS(SVG_NS, 'circle');
+        const arc = activeDocument.createElementNS(SVG_NS, 'circle');
         arc.setAttribute('cx', String(c));
         arc.setAttribute('cy', String(c));
         arc.setAttribute('r', String(r));
@@ -1649,7 +1665,7 @@ export class StatsView extends ItemView {
         arc.setAttribute('transform', `rotate(-90 ${c} ${c})`);
         svg.appendChild(arc);
 
-        const text = document.createElementNS(SVG_NS, 'text');
+        const text = activeDocument.createElementNS(SVG_NS, 'text');
         text.setAttribute('x', String(c));
         text.setAttribute('y', String(c));
         text.setAttribute('text-anchor', 'middle');

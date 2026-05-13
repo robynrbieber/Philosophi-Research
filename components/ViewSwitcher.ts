@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { WorkspaceLeaf } from 'obsidian';
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
@@ -15,7 +24,7 @@ import {
     CODEX_VIEW_TYPE,
     MANUSCRIPT_VIEW_TYPE,
 } from '../constants';
-import { BUILTIN_CODEX_CATEGORIES, getBuiltinCodexCategory, makeCustomCodexCategory } from '../models/Codex';
+import { getBuiltinCodexCategory, makeCustomCodexCategory } from '../models/Codex';
 
 export interface ViewSwitcherEntry {
     type: string;
@@ -122,15 +131,17 @@ function showCodexDropdown(
     activeViewType: string,
 ): void {
     // Close any existing dropdown
-    document.querySelectorAll('.codex-dropdown-menu').forEach(el => el.remove());
+    activeDocument.querySelectorAll('.codex-dropdown-menu').forEach(el => el.remove());
 
-    const menu = document.createElement('div');
+    const menu = activeDocument.createElement('div');
     menu.classList.add('codex-dropdown-menu');
 
     // Position below the anchor tab
     const rect = anchor.getBoundingClientRect();
-    menu.style.top = `${rect.bottom + 2}px`;
-    menu.style.left = `${rect.left}px`;
+    menu.setCssStyles({
+        top: `${rect.bottom + 2}px`,
+        left: `${rect.left}px`,
+    });
 
     const switchTo = async (viewType: string) => {
         menu.remove();
@@ -193,7 +204,7 @@ function showCodexDropdown(
         }
     }
 
-    document.body.appendChild(menu);
+    activeDocument.body.appendChild(menu);
 
     // Close on click outside
     const onClickOutside = (ev: MouseEvent) => {
@@ -202,9 +213,9 @@ function showCodexDropdown(
             removeClickOutside();
         }
     };
-    const removeClickOutside = () => document.removeEventListener('click', onClickOutside, true);
+    const removeClickOutside = () => activeDocument.removeEventListener('click', onClickOutside, true);
     // Delay attaching so the current click doesn't immediately close it
-    setTimeout(() => document.addEventListener('click', onClickOutside, true), 0);
+    window.setTimeout(() => activeDocument.addEventListener('click', onClickOutside, true), 0);
 }
 
 function addDropdownItem(

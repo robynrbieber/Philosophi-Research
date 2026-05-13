@@ -1,7 +1,7 @@
 /**
  * Instant tooltip utility — attaches a zero-delay tooltip to any element.
  *
- * Uses a real DOM element appended to document.body, positioned via
+ * Uses a real DOM element appended to activeDocument.body, positioned via
  * getBoundingClientRect().  This avoids Obsidian's slow built-in tooltip
  * (~500 ms delay) and CSS ::after flicker issues.
  *
@@ -27,16 +27,18 @@ export function attachTooltip(el: HTMLElement, text: string): void {
 
     el.addEventListener('mouseenter', () => {
         // Remove any stale tooltips (e.g. from toolbar re-renders)
-        document.querySelectorAll(`.${TOOLTIP_CLASS}`).forEach(t => t.remove());
+        activeDocument.querySelectorAll(`.${TOOLTIP_CLASS}`).forEach(t => t.remove());
 
-        tip = document.createElement('div');
+        tip = activeDocument.createElement('div');
         tip.className = TOOLTIP_CLASS;
         tip.textContent = text;
-        document.body.appendChild(tip);
+        activeDocument.body.appendChild(tip);
 
         const rect = el.getBoundingClientRect();
-        tip.style.left = `${rect.left + rect.width / 2}px`;
-        tip.style.top = `${rect.bottom + 4}px`;
+        tip.setCssStyles({
+            left: `${rect.left + rect.width / 2}px`,
+            top: `${rect.bottom + 4}px`,
+        });
     });
 
     el.addEventListener('mouseleave', remove);

@@ -324,7 +324,7 @@ export class ResearchView extends ItemView {
                 const openUrlBtn = actions.createEl('button', { cls: 'sl-research-action-btn', text: 'Open' });
                 openUrlBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    window.open(post.sourceUrl!);
+                    if (post.sourceUrl) window.open(post.sourceUrl);
                 });
             } else {
                 // Open file in editor
@@ -459,7 +459,7 @@ export class ResearchView extends ItemView {
                             : researchType === 'webclip' ? 'Page title or description'
                             : 'Research topic'
                     ).setValue(title).onChange(v => { title = v; });
-                    if (!title) setTimeout(() => text.inputEl.focus(), 50);
+                    if (!title) window.setTimeout(() => text.inputEl.focus(), 50);
                 });
 
             new Setting(dynamicContainer)
@@ -488,7 +488,7 @@ export class ResearchView extends ItemView {
                                 : 'Your research notes…'
                         ).setValue(body).onChange(v => { body = v; });
                         text.inputEl.rows = 6;
-                        text.inputEl.style.width = '100%';
+                        text.inputEl.setCssStyles({ width: '100%' });
                     });
             }
         };
@@ -549,7 +549,7 @@ export class ResearchView extends ItemView {
             .addText(text => {
                 text.setPlaceholder('Title')
                     .setValue(title).onChange(v => { title = v; });
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         new Setting(modal.contentEl)

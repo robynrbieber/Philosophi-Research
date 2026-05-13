@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath, setIcon, FuzzySuggestModal } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { SceneManager } from './services/SceneManager';
@@ -118,6 +127,7 @@ export default class SceneCardsPlugin extends Plugin {
         // API surface varies between Obsidian versions.
         for (const ext of ['json', 'docx']) {
             try {
+                // eslint-disable-next-line @typescript-eslint/no-this-alias -- needed for `any` cast to access version-dependent API
                 const pluginAny: any = this;
                 let alreadyRegistered = false;
 
@@ -134,8 +144,7 @@ export default class SceneCardsPlugin extends Plugin {
                     }
                 }
             } catch (e) {
-                // non-fatal
-                // eslint-disable-next-line no-console
+                // non-fatal: extension registration may fail if already registered by another plugin
                 console.error(`StoryLine: failed to register .${ext} extension`, e);
             }
         }
@@ -220,7 +229,7 @@ export default class SceneCardsPlugin extends Plugin {
             // (removed — createPlotGridIfMissing was causing race-condition overwrites)
 
             // Initialize writing tracker from per-project System/stats.json
-            const stats = this.sceneManager.getStatistics();
+            const stats = this.sceneManager.queryService.getStatistics();
             this.writingTracker.startSession(stats.totalWords);
 
             // Refresh all open views now that the project is set — this ensures
@@ -233,7 +242,7 @@ export default class SceneCardsPlugin extends Plugin {
         });
 
         // Ribbon icons — open project chooser (load/create) so users can switch projects
-        this.addRibbonIcon('layout-grid', 'StoryLine: Projects', () => {
+        this.addRibbonIcon('layout-grid', 'StoryLine projects', () => {
             const modal = new ProjectSelectModal(this.app, this);
             modal.open();
         });
@@ -241,76 +250,59 @@ export default class SceneCardsPlugin extends Plugin {
         // Commands
         this.addCommand({
             id: 'open-board-view',
-            name: 'Open Board View',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '1' }],
-            callback: () => this.activateView(BOARD_VIEW_TYPE),
+            name: 'Open board view',            callback: () => this.activateView(BOARD_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-timeline-view',
-            name: 'Open Timeline View',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '2' }],
-            callback: () => this.activateView(TIMELINE_VIEW_TYPE),
+            name: 'Open timeline view',            callback: () => this.activateView(TIMELINE_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-plotgrid-view',
-            name: 'Open Plotgrid View',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '3' }],
-            callback: () => this.activateView(PLOTGRID_VIEW_TYPE),
+            name: 'Open plotgrid view',            callback: () => this.activateView(PLOTGRID_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-storyline-view',
-            name: 'Open Storyline View',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '4' }],
+            name: 'Open storyline view',
             callback: () => this.activateView(STORYLINE_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-character-view',
-            name: 'Open Character View',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '5' }],
-            callback: () => this.activateView(CHARACTER_VIEW_TYPE),
+            name: 'Open character view',            callback: () => this.activateView(CHARACTER_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-stats-view',
-            name: 'Open Statistics Dashboard',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '6' }],
-            callback: () => this.activateView(STATS_VIEW_TYPE),
+            name: 'Open statistics dashboard',            callback: () => this.activateView(STATS_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-location-view',
-            name: 'Open Location View',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '7' }],
-            callback: () => this.activateView(LOCATION_VIEW_TYPE),
+            name: 'Open location view',            callback: () => this.activateView(LOCATION_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-codex-view',
-            name: 'Open Codex',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '8' }],
-            callback: () => this.activateView(CODEX_VIEW_TYPE),
+            name: 'Open codex',            callback: () => this.activateView(CODEX_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'create-new-scene',
-            name: 'Create New Scene',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'n' }],
-            callback: () => this.openQuickAdd(),
+            name: 'Create new scene',            callback: () => this.openQuickAdd(),
         });
 
         this.addCommand({
             id: 'create-new-project',
-            name: 'Create New StoryLine Project',
+            name: 'Create new project',
             callback: () => this.openNewProjectModal(),
         });
 
         this.addCommand({
             id: 'switch-project',
-            name: 'Open/Switch StoryLine Project',
+            name: 'Open or switch project',
             callback: () => {
                 const projects = this.sceneManager.getProjects();
                 if (projects.length <= 1) {
@@ -328,13 +320,13 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'fork-project',
-            name: 'Fork Current StoryLine Project',
+            name: 'Fork current project',
             callback: () => this.openForkProjectModal(),
         });
 
         this.addCommand({
             id: 'undo',
-            name: 'Undo Last Scene Change',
+            name: 'Undo last scene change',
             callback: async () => {
                 await this.sceneManager.undoManager.undo();
             },
@@ -342,7 +334,7 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'redo',
-            name: 'Redo Last Scene Change',
+            name: 'Redo last scene change',
             callback: async () => {
                 await this.sceneManager.undoManager.redo();
             },
@@ -350,52 +342,50 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'export-project',
-            name: 'Export Project',
-            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: 'e' }],
-            callback: () => {
+            name: 'Export project',            callback: () => {
                 new ExportModal(this).open();
             },
         });
 
         this.addCommand({
             id: 'open-help',
-            name: 'Open Help',
+            name: 'Open help',
             callback: () => this.openHelp(),
         });
 
         this.addCommand({
             id: 'open-navigator',
-            name: 'Open StoryLine Navigator',
+            name: 'Open navigator',
             callback: () => this.openNavigator(),
         });
 
         this.addCommand({
             id: 'open-scene-inspector',
-            name: 'Open Scene Details Sidebar',
+            name: 'Open scene details sidebar',
             callback: () => this.openSceneInspector(),
         });
 
         this.addCommand({
             id: 'open-research',
-            name: 'Open Research Sidebar',
+            name: 'Open research sidebar',
             callback: () => this.openResearch(),
         });
 
         this.addCommand({
             id: 'create-series',
-            name: 'Create New Series from Current Project',
+            name: 'Create new series from current project',
             callback: () => this.openCreateSeriesModal(),
         });
 
         this.addCommand({
             id: 'add-to-series',
-            name: 'Add Current Project to Existing Series',
+            name: 'Add current project to existing series',
             callback: () => this.openAddToSeriesModal(),
         });
 
         this.addCommand({
             id: 'remove-from-series',
-            name: 'Remove Current Project from Series',
+            name: 'Remove current project from series',
             callback: async () => {
                 const project = this.sceneManager.activeProject;
                 if (!project?.seriesId) {
@@ -413,13 +403,13 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'rename-project',
-            name: 'Rename Current Project',
+            name: 'Rename current project',
             callback: () => this.openRenameProjectModal(),
         });
 
         this.addCommand({
             id: 'manage-view-snapshots',
-            name: 'Manage View Snapshots',
+            name: 'Manage view snapshots',
             callback: () => {
                 if (!this.sceneManager.activeProject) {
                     new Notice('No active project.');
@@ -431,7 +421,7 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'import-scrivener',
-            name: 'Import Scrivener Project',
+            name: 'Import Scrivener project',
             callback: async () => {
                 const { ScrivenerImporter } = await import('./services/ScrivenerImporter');
                 if (!ScrivenerImporter.isAvailable()) {
@@ -493,7 +483,7 @@ export default class SceneCardsPlugin extends Plugin {
                 const existing = this.sceneManager.getScene(file.path);
                 if (existing && existing.type === 'scene' && !existing.corkboardNote) return;
                 menu.addItem(item => {
-                    item.setTitle('StoryLine: Convert to scene')
+                    item.setTitle('Convert to scene')
                         .setIcon('clapperboard')
                         .onClick(async () => {
                             const newPath = await this.sceneManager.convertFileToScene(file.path);
@@ -548,7 +538,7 @@ export default class SceneCardsPlugin extends Plugin {
         // and navigates to the appropriate detail panel.
         this.addCommand({
             id: 'show-entity-details',
-            name: 'Show in StoryLine',
+            name: 'Show in details view',
             checkCallback: (checking) => {
                 const file = this.app.workspace.getActiveFile();
                 if (!file) return false;
@@ -594,7 +584,7 @@ export default class SceneCardsPlugin extends Plugin {
     onunload(): void {
         // Flush writing session into daily history and persist to System/stats.json
         try {
-            const stats = this.sceneManager.getStatistics();
+            const stats = this.sceneManager.queryService.getStatistics();
             // Stop any active sprint so it gets recorded
             if (this.writingTracker.isSprintRunning()) {
                 this.writingTracker.stopSprint(stats.totalWords);
@@ -608,8 +598,8 @@ export default class SceneCardsPlugin extends Plugin {
             this.nativeTooltipObserver = null;
         }
 
-        // Clean up any floating lightbox windows left on document.body
-        document.querySelectorAll('.gallery-lightbox-window').forEach(el => el.remove());
+        // Clean up any floating lightbox windows left on activeDocument.body
+        activeDocument.querySelectorAll('.gallery-lightbox-window').forEach(el => el.remove());
     }
 
     /**
@@ -619,7 +609,7 @@ export default class SceneCardsPlugin extends Plugin {
      */
     private injectFormattingToolbar(leaf: WorkspaceLeaf | null): void {
         // Remove any previously injected toolbar in other leaves
-        document.querySelectorAll('.sl-injected-fmt-toolbar').forEach(el => el.remove());
+        activeDocument.querySelectorAll('.sl-injected-fmt-toolbar').forEach(el => el.remove());
 
         if (!leaf) return;
         if (!this.settings.showFormattingToolbar) return;
@@ -665,37 +655,38 @@ export default class SceneCardsPlugin extends Plugin {
         };
 
         const stripTitles = (root: ParentNode): void => {
-            if (!(root instanceof HTMLElement || root instanceof Document || root instanceof DocumentFragment)) return;
+            const rootNode = root as unknown as Node;
+            if (!(rootNode.instanceOf(HTMLElement) || rootNode.instanceOf(Document) || rootNode.instanceOf(DocumentFragment))) return;
             const candidates = (root as ParentNode).querySelectorAll?.('[title]') || [];
             for (const node of Array.from(candidates)) {
-                if (!(node instanceof HTMLElement)) continue;
+                if (!node.instanceOf(HTMLElement)) continue;
                 if (isInStoryLineUi(node)) {
                     node.removeAttribute('title');
                 }
             }
-            if (root instanceof HTMLElement && root.hasAttribute('title') && isInStoryLineUi(root)) {
-                root.removeAttribute('title');
+            if (rootNode.instanceOf(HTMLElement) && (root as HTMLElement).hasAttribute('title') && isInStoryLineUi(root as HTMLElement)) {
+                (root as HTMLElement).removeAttribute('title');
             }
         };
 
-        stripTitles(document.body);
+        stripTitles(activeDocument.body);
 
         this.nativeTooltipObserver = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
                 if (mutation.type === 'attributes') {
                     const target = mutation.target;
-                    if (target instanceof HTMLElement && target.hasAttribute('title') && isInStoryLineUi(target)) {
+                    if (target.instanceOf(HTMLElement) && target.hasAttribute('title') && isInStoryLineUi(target)) {
                         target.removeAttribute('title');
                     }
                     continue;
                 }
                 for (const node of Array.from(mutation.addedNodes)) {
-                    if (node instanceof HTMLElement) stripTitles(node);
+                    if (node.instanceOf(HTMLElement)) stripTitles(node);
                 }
             }
         });
 
-        this.nativeTooltipObserver.observe(document.body, {
+        this.nativeTooltipObserver.observe(activeDocument.body, {
             subtree: true,
             childList: true,
             attributes: true,
@@ -790,7 +781,7 @@ export default class SceneCardsPlugin extends Plugin {
     }
 
     private applyImageSizingVariables(): void {
-        const root = document.documentElement;
+        const root = activeDocument.documentElement;
         root.style.setProperty('--sl-character-card-portrait-size', `${this.settings.characterCardPortraitSize}px`);
         root.style.setProperty('--sl-character-detail-portrait-size', `${this.settings.characterDetailPortraitSize}px`);
         root.style.setProperty('--sl-location-tree-thumb-size', `${this.settings.locationTreeThumbSize}px`);
@@ -1656,7 +1647,7 @@ export default class SceneCardsPlugin extends Plugin {
 
         // Flush writing tracker so daily stats update in real-time
         try {
-            const stats = this.sceneManager.getStatistics();
+            const stats = this.sceneManager.queryService.getStatistics();
             this.writingTracker.flushSession(stats.totalWords);
         } catch { /* project may not be set yet */ }
 
@@ -1712,21 +1703,6 @@ export default class SceneCardsPlugin extends Plugin {
             // non-fatal — PlotGrid may not exist yet
         }
     }
-
-    /** Ensure a plotgrid file exists (create one with defaults if missing) */
-    private async createPlotGridIfMissing(): Promise<void> {
-        try {
-            const existing = await this.loadPlotGrid();
-            if (!existing) {
-                const empty: PlotGridData = { rows: [], columns: [], cells: {}, zoom: 1 };
-                await this.savePlotGrid(empty);
-            }
-        } catch (e) {
-            // show a non-blocking notice
-            new Notice('StoryLine: failed to create PlotGrid file: ' + String(e));
-        }
-    }
-
     /**
      * Debounce utility
      */
@@ -1734,10 +1710,10 @@ export default class SceneCardsPlugin extends Plugin {
         func: T,
         wait: number
     ): T {
-        let timeout: ReturnType<typeof setTimeout> | null = null;
+        let timeout: number | null = null;
         return ((...args: any[]) => {
-            if (timeout) clearTimeout(timeout);
-            timeout = setTimeout(() => func(...args), wait);
+            if (timeout) window.clearTimeout(timeout);
+            timeout = window.setTimeout(() => func(...args), wait);
         }) as unknown as T;
     }
 
@@ -1859,7 +1835,6 @@ export default class SceneCardsPlugin extends Plugin {
                         if (raw.zoom !== undefined) pgData.zoom = raw.zoom;
                         if (raw.stickyHeaders !== undefined) pgData.stickyHeaders = raw.stickyHeaders;
                         await adapter.write(pgPath, JSON.stringify(pgData, null, 2));
-                    } else {
                     }
                 } catch (e) {
                     console.error('[StoryLine] Migration: plotgrid write failed:', e);
@@ -1968,7 +1943,7 @@ export default class SceneCardsPlugin extends Plugin {
                     if (await adapter.exists(newPath)) {
                         // Delete the old file since System/ version exists
                         const oldFile = this.app.vault.getAbstractFileByPath(oldPath);
-                        if (oldFile) await this.app.vault.delete(oldFile);
+                        if (oldFile) await this.app.fileManager.trashFile(oldFile);
                         continue;
                     }
 
@@ -2006,7 +1981,7 @@ export default class SceneCardsPlugin extends Plugin {
         // to let the vault / metadata cache finish indexing.
         if (projects.length === 0 && this.settings.activeProjectFile) {
             for (let attempt = 1; attempt <= 3; attempt++) {
-                await new Promise(r => setTimeout(r, attempt * 1000));
+                await new Promise(r => window.setTimeout(r, attempt * 1000));
                 projects = await this.sceneManager.scanProjects();
                 if (projects.length > 0) break;
             }
@@ -2022,7 +1997,7 @@ export default class SceneCardsPlugin extends Plugin {
                 if (exists) {
                     // The file exists but wasn't found by scanProjects — retry once more
                     // with a longer delay to give the metadata cache time to catch up.
-                    await new Promise(r => setTimeout(r, 5000));
+                    await new Promise(r => window.setTimeout(r, 5000));
                     projects = await this.sceneManager.scanProjects();
                     if (projects.length > 0) return;
                 }
@@ -2058,7 +2033,7 @@ export default class SceneCardsPlugin extends Plugin {
                     text.setPlaceholder('My Trilogy');
                     text.onChange((v: string) => (seriesName = v));
                 });
-            seriesNameSetting.settingEl.style.display = 'none';
+            seriesNameSetting.settingEl.setCssStyles({ display: 'none' });
 
             new Setting(modal.contentEl)
                 .setName('Create as series')
@@ -2067,7 +2042,7 @@ export default class SceneCardsPlugin extends Plugin {
                     toggle.setValue(false);
                     toggle.onChange((v: boolean) => {
                         createAsSeries = v;
-                        seriesNameSetting.settingEl.style.display = v ? '' : 'none';
+                        seriesNameSetting.settingEl.setCssStyles({ display: v ? '' : 'none' });
                     });
                 });
 
@@ -2188,7 +2163,7 @@ export default class SceneCardsPlugin extends Plugin {
             .addText((text: any) => {
                 text.setPlaceholder('My Trilogy');
                 text.onChange((v: string) => (seriesName = v));
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         new Setting(modal.contentEl)
@@ -2275,7 +2250,7 @@ export default class SceneCardsPlugin extends Plugin {
             .addText((text: any) => {
                 text.setValue(project.title);
                 text.onChange((v: string) => (newTitle = v));
-                setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
+                window.setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
             });
 
         new Setting(modal.contentEl)
@@ -2425,8 +2400,10 @@ class ProjectSelectModal extends Modal {
             browseModal.titleEl.setText('Select a StoryLine project file');
             const container = browseModal.contentEl.createDiv({ cls: 'project-browse-list' });
             const fileList = container.createDiv();
-            fileList.style.maxHeight = '300px';
-            fileList.style.overflowY = 'auto';
+            fileList.setCssStyles({
+                maxHeight: '300px',
+                overflowY: 'auto',
+            });
             fileList.createDiv({ text: 'Scanning…' });
 
             // Scan StoryLine root and one level deep, filtering to only
@@ -2476,12 +2453,14 @@ class ProjectSelectModal extends Modal {
             }
             for (const pf of projectFiles) {
                 const row = fileList.createDiv({ cls: 'project-browse-row' });
-                row.style.padding = '4px 8px';
-                row.style.cursor = 'pointer';
-                row.style.borderRadius = '4px';
+                row.setCssStyles({
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    borderRadius: '4px',
+                });
                 row.textContent = `${pf.title}  (${pf.path})`;
-                row.addEventListener('mouseenter', () => { row.style.background = 'var(--background-modifier-hover)'; });
-                row.addEventListener('mouseleave', () => { row.style.background = ''; });
+                row.addEventListener('mouseenter', () => { row.setCssStyles({ background: 'var(--background-modifier-hover)' }); });
+                row.addEventListener('mouseleave', () => { row.setCssStyles({ background: '' }); });
                 row.addEventListener('click', async () => {
                     try {
                         const adapter = this.app.vault.adapter;
@@ -2580,8 +2559,7 @@ class SeriesManagementModal extends Modal {
 
             // ── Header row: series name + rename button ──
             const header = card.createDiv({ cls: 'sl-series-header' });
-            const titleEl = header.createSpan({ cls: 'sl-series-title', text: meta.name });
-            const folderHint = header.createSpan({
+            header.createSpan({
                 cls: 'sl-series-folder-hint',
                 text: folder.split('/').pop() ?? folder,
             });
@@ -2597,7 +2575,6 @@ class SeriesManagementModal extends Modal {
                 const bookName = meta.bookOrder[i];
                 const row = bookList.createDiv({ cls: 'sl-series-book-row' });
 
-                const orderBadge = row.createSpan({ cls: 'sl-series-book-order', text: `${i + 1}` });
 
                 row.createSpan({ cls: 'sl-series-book-name', text: bookName });
 
@@ -2647,7 +2624,7 @@ class SeriesManagementModal extends Modal {
             .addText((text: any) => {
                 text.setValue(meta.name);
                 text.onChange((v: string) => (newName = v));
-                setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
+                window.setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
             });
 
         new Setting(modal.contentEl)
@@ -2750,7 +2727,7 @@ class SeriesManagementModal extends Modal {
         this.render();
     }
 
-    private async renameBook(folder: string, meta: SeriesMetadata, bookName: string) {
+    private async renameBook(folder: string, _meta: SeriesMetadata, bookName: string) {
         const projects = this.plugin.sceneManager.getProjects();
         const bookProject = projects.find(p => {
             const fp = normalizePath(p.filePath);
@@ -2772,7 +2749,7 @@ class SeriesManagementModal extends Modal {
             .addText((text: any) => {
                 text.setValue(bookProject.title);
                 text.onChange((v: string) => (newTitle = v));
-                setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
+                window.setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
             });
 
         new Setting(modal.contentEl)

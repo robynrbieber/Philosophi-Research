@@ -346,8 +346,8 @@ export class Validator {
                 for (const target of scene.payoff_scenes) {
                     const targetScene = titleMap.get(target);
                     if (targetScene) {
-                        const srcOrder = (scene.act ?? 0) * 1_000_000 + (scene.chapter ?? 0) * 1_000 + (scene.sequence ?? 0);
-                        const tgtOrder = (targetScene.act ?? 0) * 1_000_000 + (targetScene.chapter ?? 0) * 1_000 + (targetScene.sequence ?? 0);
+                        const srcOrder = (Number(scene.act) || 0) * 1_000_000 + (Number(scene.chapter) || 0) * 1_000 + (scene.sequence ?? 0);
+                        const tgtOrder = (Number(targetScene.act) || 0) * 1_000_000 + (Number(targetScene.chapter) || 0) * 1_000 + (targetScene.sequence ?? 0);
                         if (tgtOrder < srcOrder) {
                             warnings.push({
                                 severity: 'warning',

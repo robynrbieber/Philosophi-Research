@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 /**
  * Mobile support adapter for StoryLine.
  *
@@ -79,12 +88,12 @@ export const TOUCH_TARGET_PX = 44;
  */
 export function enableTouchDrag(
     card: HTMLElement,
-    filePath: string,
+    _filePath: string,
     onDrop: (targetEl: HTMLElement, insertBefore: boolean) => void,
 ): (() => void) | null {
     if (!isMobile) return null;
 
-    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+    let longPressTimer: number | null = null;
     let isDragging = false;
     let ghost: HTMLElement | null = null;
     let startX = 0;
@@ -119,7 +128,7 @@ export function enableTouchDrag(
             ghost = null;
         }
         if (longPressTimer) {
-            clearTimeout(longPressTimer);
+            window.clearTimeout(longPressTimer);
             longPressTimer = null;
         }
         card.removeClass('touch-dragging');
@@ -131,7 +140,7 @@ export function enableTouchDrag(
         }
         scrollParents = [];
         // Remove all drop indicators
-        document.querySelectorAll('.drop-above, .drop-below, .drag-over').forEach(el => {
+        activeDocument.querySelectorAll('.drop-above, .drop-below, .drag-over').forEach(el => {
             el.removeClass('drop-above', 'drop-below', 'drag-over');
         });
     }
@@ -142,31 +151,35 @@ export function enableTouchDrag(
         startX = touch.clientX;
         startY = touch.clientY;
 
-        longPressTimer = setTimeout(() => {
+        longPressTimer = window.setTimeout(() => {
             isDragging = true;
             suppressClick = true;
             card.addClass('touch-dragging');
 
             // Disable scrolling on the card and all scroll ancestors
-            card.style.touchAction = 'none';
+            card.setCssStyles({ touchAction: 'none' });
             scrollParents = getScrollParents(card);
             for (const sp of scrollParents) {
-                sp.style.overflowY = 'hidden';
-                sp.style.touchAction = 'none';
+                sp.setCssStyles({
+                    overflowY: 'hidden',
+                    touchAction: 'none',
+                });
             }
 
             // Create ghost element
             ghost = card.cloneNode(true) as HTMLElement;
             ghost.addClass('sl-touch-ghost');
-            ghost.style.position = 'fixed';
-            ghost.style.zIndex = '10000';
-            ghost.style.pointerEvents = 'none';
-            ghost.style.opacity = '0.85';
-            ghost.style.width = card.offsetWidth + 'px';
-            ghost.style.transform = 'scale(1.05)';
-            ghost.style.left = (startX - card.offsetWidth / 2) + 'px';
-            ghost.style.top = (startY - 20) + 'px';
-            document.body.appendChild(ghost);
+            ghost.setCssStyles({
+                position: 'fixed',
+                zIndex: '10000',
+                pointerEvents: 'none',
+                opacity: '0.85',
+                width: card.offsetWidth + 'px',
+                transform: 'scale(1.05)',
+                left: (startX - card.offsetWidth / 2) + 'px',
+                top: (startY - 20) + 'px',
+            });
+            activeDocument.body.appendChild(ghost);
 
             // Haptic feedback on supported devices
             if (navigator.vibrate) navigator.vibrate(50);
@@ -182,7 +195,7 @@ export function enableTouchDrag(
             const dy = touch.clientY - startY;
             if (Math.abs(dx) > MOVE_THRESHOLD || Math.abs(dy) > MOVE_THRESHOLD) {
                 if (longPressTimer) {
-                    clearTimeout(longPressTimer);
+                    window.clearTimeout(longPressTimer);
                     longPressTimer = null;
                 }
             }
@@ -195,17 +208,19 @@ export function enableTouchDrag(
 
         // Move ghost
         if (ghost) {
-            ghost.style.left = (touch.clientX - card.offsetWidth / 2) + 'px';
-            ghost.style.top = (touch.clientY - 20) + 'px';
+            ghost.setCssStyles({
+                left: (touch.clientX - card.offsetWidth / 2) + 'px',
+                top: (touch.clientY - 20) + 'px',
+            });
         }
 
         // Find the card under the touch point
-        if (ghost) ghost.style.display = 'none';
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (ghost) ghost.style.display = '';
+        if (ghost) ghost.setCssStyles({ display: 'none' });
+        const target = activeDocument.elementFromPoint(touch.clientX, touch.clientY);
+        if (ghost) ghost.setCssStyles({ display: '' });
 
         // Clear previous indicators
-        document.querySelectorAll('.drop-above, .drop-below').forEach(el => {
+        activeDocument.querySelectorAll('.drop-above, .drop-below').forEach(el => {
             el.removeClass('drop-above', 'drop-below');
         });
 
@@ -231,9 +246,9 @@ export function enableTouchDrag(
         const touch = e.changedTouches[0];
 
         // Find drop target
-        if (ghost) ghost.style.display = 'none';
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (ghost) ghost.style.display = '';
+        if (ghost) ghost.setCssStyles({ display: 'none' });
+        const target = activeDocument.elementFromPoint(touch.clientX, touch.clientY);
+        if (ghost) ghost.setCssStyles({ display: '' });
 
         const targetCard = target?.closest('.scene-card') as HTMLElement | null;
         if (targetCard && targetCard !== card) {
@@ -247,7 +262,7 @@ export function enableTouchDrag(
 
         // Suppress the synthetic click event that the browser fires after touchend
         // Use a short timeout so the flag resets even if click never fires
-        setTimeout(() => { suppressClick = false; }, 400);
+        window.setTimeout(() => { suppressClick = false; }, 400);
     }
 
     function onClickCapture(e: MouseEvent) {

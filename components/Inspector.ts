@@ -1,4 +1,12 @@
-import { Scene, STATUS_CONFIG, SceneStatus, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode, TIMELINE_MODES, getStatusOrder, getStatusConfig, resolveStatusCfg } from '../models/Scene';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { Modal, App, FuzzySuggestModal, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { openConfirmModal } from './ConfirmModal';
@@ -8,13 +16,11 @@ import { WikilinkSuggest } from './WikilinkSuggest';
 import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
 import { resolveTagColor, getPlotlineHSL, contrastTextColor } from '../settings';
-import { LocationManager } from '../services/LocationManager';
-import type { SnapshotManager, SceneSnapshot } from '../services/SnapshotManager';
-import { LinkScanner, LinkScanResult } from '../services/LinkScanner';
 import { renderTagPillInput, renderAutocompleteInput } from './InlineSuggest';
 import { AddFieldModal } from './AddFieldModal';
 import { UniversalFieldTemplate } from '../services/FieldTemplateService';
 import { parseActChapterInput, actChapterHasIllegalPathChars } from '../utils/actChapter';
+import { Scene, SceneStatus, TIMELINE_MODES, TIMELINE_MODE_LABELS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 
 /**
  * Scene inspector sidebar component
@@ -72,7 +78,7 @@ export class InspectorComponent {
         }
         this.currentScene = scene;
         this.render();
-        this.container.style.display = 'block';
+        this.container.setCssStyles({ display: 'block' });
     }
 
     /**
@@ -94,7 +100,7 @@ export class InspectorComponent {
      */
     hide(): void {
         this.currentScene = null;
-        this.container.style.display = 'none';
+        this.container.setCssStyles({ display: 'none' });
     }
 
     /**
@@ -124,27 +130,31 @@ export class InspectorComponent {
 
         // ── Shared input style helper ──
         const styleInput = (el: HTMLElement) => {
-            el.style.width = '100%';
-            el.style.marginTop = '4px';
-            el.style.padding = '4px 8px';
-            el.style.border = '1px solid var(--background-modifier-border)';
-            el.style.borderRadius = '4px';
-            el.style.background = 'var(--background-primary)';
-            el.style.color = 'var(--text-normal)';
-            el.style.font = 'inherit';
-            el.style.fontSize = '13px';
-            el.style.boxSizing = 'border-box';
+            el.setCssStyles({
+                width: '100%',
+                marginTop: '4px',
+                padding: '4px 8px',
+                border: '1px solid var(--background-modifier-border)',
+                borderRadius: '4px',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                font: 'inherit',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+            });
         };
         const styleSelect = (el: HTMLSelectElement) => {
-            el.style.width = '100%';
-            el.style.marginTop = '4px';
-            el.style.padding = '4px 8px';
-            el.style.border = '1px solid var(--background-modifier-border)';
-            el.style.borderRadius = '4px';
-            el.style.background = 'var(--background-primary)';
-            el.style.color = 'var(--text-normal)';
-            el.style.fontSize = '13px';
-            el.style.boxSizing = 'border-box';
+            el.setCssStyles({
+                width: '100%',
+                marginTop: '4px',
+                padding: '4px 8px',
+                border: '1px solid var(--background-modifier-border)',
+                borderRadius: '4px',
+                background: 'var(--background-primary)',
+                color: 'var(--text-normal)',
+                fontSize: '13px',
+                boxSizing: 'border-box',
+            });
         };
 
         // ── Title (editable) ──
@@ -154,15 +164,17 @@ export class InspectorComponent {
             attr: { type: 'text', placeholder: 'Scene title…' },
         });
         titleInput.value = scene.title || '';
-        titleInput.style.width = '100%';
-        titleInput.style.fontSize = '16px';
-        titleInput.style.fontWeight = '600';
-        titleInput.style.padding = '4px 8px';
-        titleInput.style.border = '1px solid var(--background-modifier-border)';
-        titleInput.style.borderRadius = '4px';
-        titleInput.style.background = 'var(--background-primary)';
-        titleInput.style.color = 'var(--text-normal)';
-        titleInput.style.boxSizing = 'border-box';
+        titleInput.setCssStyles({
+            width: '100%',
+            fontSize: '16px',
+            fontWeight: '600',
+            padding: '4px 8px',
+            border: '1px solid var(--background-modifier-border)',
+            borderRadius: '4px',
+            background: 'var(--background-primary)',
+            color: 'var(--text-normal)',
+            boxSizing: 'border-box',
+        });
         titleInput.addEventListener('change', async () => {
             const val = titleInput.value.trim();
             if (val && val !== scene.title) {
@@ -194,7 +206,7 @@ export class InspectorComponent {
         });
         subtitleInput.value = scene.subtitle || '';
         styleInput(subtitleInput);
-        subtitleInput.style.fontStyle = 'italic';
+        subtitleInput.setCssStyles({ fontStyle: 'italic' });
         subtitleInput.addEventListener('change', async () => {
             const val = subtitleInput.value.trim() || undefined;
             await this.sceneManager.updateScene(scene.filePath, { subtitle: val } as any);
@@ -203,9 +215,11 @@ export class InspectorComponent {
 
         // ── Act / Chapter / Sequence row ──
         const acRow = this.container.createDiv('inspector-section');
-        acRow.style.display = 'grid';
-        acRow.style.gridTemplateColumns = '1fr 1fr 1fr';
-        acRow.style.gap = '8px';
+        acRow.setCssStyles({
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '8px',
+        });
 
         // Act
         const actGroup = acRow.createDiv();
@@ -281,12 +295,11 @@ export class InspectorComponent {
         });
         const btnIcon = statusButton.createSpan({ cls: 'inspector-status-icon' });
         obsidian.setIcon(btnIcon, currentCfg.icon);
-        const btnLabel = statusButton.createSpan({ text: currentCfg.label });
         const btnChevron = statusButton.createSpan({ cls: 'inspector-status-chevron' });
         obsidian.setIcon(btnChevron, 'chevron-down');
 
         const statusMenu = statusDropdown.createDiv('inspector-status-menu');
-        statusMenu.style.display = 'none';
+        statusMenu.setCssStyles({ display: 'none' });
 
         const statusValues = getStatusOrder();
         statusValues.forEach(s => {
@@ -299,7 +312,7 @@ export class InspectorComponent {
             item.createSpan({ text: cfg.label });
 
             item.addEventListener('click', () => {
-                statusMenu.style.display = 'none';
+                statusMenu.setCssStyles({ display: 'none' });
                 this.onStatusChange(scene, s);
             });
         });
@@ -307,18 +320,18 @@ export class InspectorComponent {
         statusButton.addEventListener('click', (e) => {
             e.stopPropagation();
             const isVisible = statusMenu.style.display !== 'none';
-            statusMenu.style.display = isVisible ? 'none' : 'block';
+            statusMenu.setCssStyles({ display: isVisible ? 'none' : 'block' });
         });
 
         // Close menu when clicking outside
         const closeMenu = (e: MouseEvent) => {
             if (!statusDropdown.contains(e.target as Node)) {
-                statusMenu.style.display = 'none';
-                document.removeEventListener('click', closeMenu);
+                statusMenu.setCssStyles({ display: 'none' });
+                activeDocument.removeEventListener('click', closeMenu);
             }
         };
         statusButton.addEventListener('click', () => {
-            setTimeout(() => document.addEventListener('click', closeMenu), 0);
+            window.setTimeout(() => activeDocument.addEventListener('click', closeMenu), 0);
         });
 
         // ── POV (autocomplete input) ──
@@ -329,7 +342,7 @@ export class InspectorComponent {
             container: povContainer,
             value: scene.pov || '',
             getSuggestions: () => {
-                const allCharNames = this.sceneManager.getAllCharacters();
+                const allCharNames = this.sceneManager.queryService.getAllCharacters();
                 // Also include characters from CharacterManager
                 const cm = this.plugin.characterManager;
                 const names = new Map<string, string>();
@@ -357,7 +370,7 @@ export class InspectorComponent {
             container: charPillContainer,
             values: scene.characters || [],
             getSuggestions: () => {
-                const allCharNames = this.sceneManager.getAllCharacters();
+                const allCharNames = this.sceneManager.queryService.getAllCharacters();
                 const cm = this.plugin.characterManager;
                 const names = new Map<string, string>();
                 for (const c of allCharNames) names.set(c.toLowerCase(), c);
@@ -398,9 +411,11 @@ export class InspectorComponent {
 
         // ── Timeline Mode / Strand ──
         const tmRow = this.container.createDiv('inspector-section');
-        tmRow.style.display = 'grid';
-        tmRow.style.gridTemplateColumns = '1fr 1fr';
-        tmRow.style.gap = '8px';
+        tmRow.setCssStyles({
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px',
+        });
 
         const tmGroup = tmRow.createDiv();
         tmGroup.createSpan({ cls: 'inspector-label', text: 'Timeline Mode' });
@@ -429,9 +444,11 @@ export class InspectorComponent {
 
         // ── Story Date / Time ──
         const dtRow = this.container.createDiv('inspector-section');
-        dtRow.style.display = 'grid';
-        dtRow.style.gridTemplateColumns = '1fr 1fr';
-        dtRow.style.gap = '8px';
+        dtRow.setCssStyles({
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px',
+        });
 
         const dateGroup = dtRow.createDiv();
         dateGroup.createSpan({ cls: 'inspector-label', text: 'Story Date' });
@@ -457,15 +474,19 @@ export class InspectorComponent {
 
         // ── Word count + Target ──
         const wcRow = this.container.createDiv('inspector-section');
-        wcRow.style.display = 'grid';
-        wcRow.style.gridTemplateColumns = '1fr 1fr';
-        wcRow.style.gap = '8px';
+        wcRow.setCssStyles({
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '8px',
+        });
 
         const wcGroup = wcRow.createDiv();
         wcGroup.createSpan({ cls: 'inspector-label', text: 'Words' });
         const wcDisplay = wcGroup.createDiv();
-        wcDisplay.style.marginTop = '4px';
-        wcDisplay.style.fontSize = '13px';
+        wcDisplay.setCssStyles({
+            marginTop: '4px',
+            fontSize: '13px',
+        });
         wcDisplay.textContent = String(scene.wordcount || 0);
 
         const targetGroup = wcRow.createDiv();
@@ -483,30 +504,38 @@ export class InspectorComponent {
         const tagSection = this.container.createDiv('inspector-section');
         tagSection.createSpan({ cls: 'inspector-label', text: 'Plotlines / Tags:' });
         const tagChips = tagSection.createDiv('inspector-chip-list');
-        tagChips.style.display = 'flex';
-        tagChips.style.flexWrap = 'wrap';
-        tagChips.style.gap = '4px';
-        tagChips.style.marginTop = '4px';
+        tagChips.setCssStyles({
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '4px',
+            marginTop: '4px',
+        });
 
         const tagColors = this.plugin.settings.tagColors || {};
         const scheme = this.plugin.settings.colorScheme;
-        const allTagsSorted = this.sceneManager.getAllTags().sort();
+        const allTagsSorted = this.sceneManager.queryService.getAllTags().sort();
         const renderTagChips = () => {
             tagChips.empty();
             (scene.tags || []).forEach((t, idx) => {
                 const chip = tagChips.createSpan({ cls: 'inspector-chip', text: t });
-                chip.style.padding = '2px 8px';
-                chip.style.borderRadius = '10px';
-                chip.style.fontSize = '12px';
-                chip.style.display = 'inline-flex';
-                chip.style.alignItems = 'center';
-                chip.style.gap = '4px';
+                chip.setCssStyles({
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontSize: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                });
                 const chipColor = resolveTagColor(t, Math.max(0, allTagsSorted.indexOf(t)), scheme, tagColors, getPlotlineHSL(this.plugin.settings));
-                chip.style.background = chipColor;
-                chip.style.color = contrastTextColor(chipColor);
+                chip.setCssStyles({
+                    background: chipColor,
+                    color: contrastTextColor(chipColor),
+                });
                 const removeBtn = chip.createSpan({ text: '×', cls: 'inspector-chip-remove' });
-                removeBtn.style.cursor = 'pointer';
-                removeBtn.style.marginLeft = '2px';
+                removeBtn.setCssStyles({
+                    cursor: 'pointer',
+                    marginLeft: '2px',
+                });
                 removeBtn.addEventListener('click', async () => {
                     const updated = (scene.tags || []).filter((_, i) => i !== idx);
                     await this.sceneManager.updateScene(scene.filePath, { tags: updated } as any);
@@ -516,12 +545,14 @@ export class InspectorComponent {
             });
             // Add button
             const addChip = tagChips.createSpan({ cls: 'inspector-chip inspector-chip-add', text: '+' });
-            addChip.style.padding = '2px 8px';
-            addChip.style.borderRadius = '10px';
-            addChip.style.fontSize = '12px';
-            addChip.style.background = 'var(--background-modifier-border)';
-            addChip.style.cursor = 'pointer';
-            addChip.style.opacity = '0.7';
+            addChip.setCssStyles({
+                padding: '2px 8px',
+                borderRadius: '10px',
+                fontSize: '12px',
+                background: 'var(--background-modifier-border)',
+                cursor: 'pointer',
+                opacity: '0.7',
+            });
             addChip.addEventListener('click', () => {
                 const input = tagSection.createEl('input', { attr: { type: 'text', placeholder: 'plotline/main, theme/hope…' } });
                 styleInput(input);
@@ -553,8 +584,10 @@ export class InspectorComponent {
             });
             descInput.value = scene.body || '';
             styleInput(descInput);
-            descInput.style.padding = '6px 8px';
-            descInput.style.resize = 'vertical';
+            descInput.setCssStyles({
+                padding: '6px 8px',
+                resize: 'vertical',
+            });
             descInput.addEventListener('change', async () => {
                 const val = descInput.value;
                 await this.sceneManager.updateScene(scene.filePath, { body: val } as any);
@@ -574,8 +607,10 @@ export class InspectorComponent {
         });
         conflictInput.value = scene.conflict || '';
         styleInput(conflictInput);
-        conflictInput.style.padding = '6px 8px';
-        conflictInput.style.resize = 'vertical';
+        conflictInput.setCssStyles({
+            padding: '6px 8px',
+            resize: 'vertical',
+        });
         conflictInput.addEventListener('change', async () => {
             const val = conflictInput.value.trim() || undefined;
             await this.sceneManager.updateScene(scene.filePath, { conflict: val } as any);
@@ -683,7 +718,6 @@ export class InspectorComponent {
      * Render custom (universal) fields for scenes.
      */
     private renderUniversalFields(scene: Scene): void {
-        const templates = this.plugin.fieldTemplates.getBySection('Scene', 'scene');
         // Also gather templates from any section that targets scenes
         const allTemplates = this.plugin.fieldTemplates.getAll().filter(t => (t.category || 'character') === 'scene');
 
@@ -787,7 +821,6 @@ export class InspectorComponent {
         } else if (tpl.type === 'multi-select') {
             const raw = scene.universalFields[tpl.id];
             const selected: string[] = Array.isArray(raw) ? [...raw] : (typeof raw === 'string' && raw ? [raw] : []);
-            const allOptions = [...tpl.options].sort((a, b) => a.localeCompare(b));
 
             const msContainer = row.createDiv('inspector-universal-multi');
             const pillsEl = msContainer.createDiv('inspector-universal-pills');
@@ -992,9 +1025,11 @@ export class InspectorComponent {
 
             const section = this.container.createDiv('inspector-section');
             const labelRow = section.createDiv();
-            labelRow.style.display = 'flex';
-            labelRow.style.alignItems = 'center';
-            labelRow.style.gap = '4px';
+            labelRow.setCssStyles({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+            });
             const iconEl = labelRow.createSpan();
             obsidian.setIcon(iconEl, catDef.icon);
             labelRow.createSpan({ cls: 'inspector-label', text: `${catDef.label}:` });
@@ -1277,7 +1312,7 @@ export class InspectorComponent {
         }
 
         // From scene metadata (catches locations not yet profiled)
-        const sceneLocations = this.sceneManager.getUniqueValues('location');
+        const sceneLocations = this.sceneManager.queryService.getUniqueValues('location');
         for (const name of sceneLocations) {
             const key = name.toLowerCase();
             if (!names.has(key)) names.set(key, name);
@@ -1347,14 +1382,18 @@ class SnapshotLabelModal extends Modal {
             attr: { type: 'text', placeholder: 'Snapshot label…' },
             cls: 'snapshot-label-input',
         });
-        input.style.width = '100%';
-        input.style.marginBottom = '12px';
-        setTimeout(() => input.focus(), 50);
+        input.setCssStyles({
+            width: '100%',
+            marginBottom: '12px',
+        });
+        window.setTimeout(() => input.focus(), 50);
 
         const btnRow = contentEl.createDiv({ cls: 'snapshot-label-btns' });
-        btnRow.style.display = 'flex';
-        btnRow.style.gap = '8px';
-        btnRow.style.justifyContent = 'flex-end';
+        btnRow.setCssStyles({
+            display: 'flex',
+            gap: '8px',
+            justifyContent: 'flex-end',
+        });
 
         const cancelBtn = btnRow.createEl('button', { text: 'Cancel' });
         cancelBtn.addEventListener('click', () => this.close());

@@ -1,11 +1,10 @@
-import { Scene, STATUS_CONFIG, SceneStatus, ColorCodingMode, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import * as obsidian from 'obsidian';
 import { MarkdownRenderer, Component, Modal, App } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
-import type { LinkScanResult } from '../services/LinkScanner';
 import type { SceneManager } from '../services/SceneManager';
 import { formatActChapterPrefix } from '../utils/actChapter';
+import { ColorCodingMode, Scene, SceneStatus, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 
 /**
  * Renders a single scene card element
@@ -44,9 +43,9 @@ export class SceneCardComponent {
             this.applyNoteColor(card, scene);
         } else {
             // Color stripe based on coding mode (always applied as border-left)
-            const colorMode = options?.colorCoding || this.plugin.settings.colorCoding as ColorCodingMode;
+            const colorMode = options?.colorCoding || this.plugin.settings.colorCoding;
             const color = this.getCardColor(scene, colorMode);
-            card.style.borderLeftColor = color;
+            card.setCssStyles({ borderLeftColor: color });
 
             // Custom per-scene color applied as background overlay (independent of edge color)
             if (scene.color && /^#[0-9a-fA-F]{6}$/.test(scene.color)) {
@@ -175,7 +174,7 @@ export class SceneCardComponent {
         // Intercept internal-link clicks before card-level handlers
         card.addEventListener('click', (e) => {
             const target = e.target as HTMLElement;
-            const link = target.closest('a.internal-link') as HTMLAnchorElement | null;
+            const link = target.closest('a.internal-link');
             if (link) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -353,7 +352,7 @@ export class SceneCardComponent {
         }
         const hue = Math.abs(hash % 360);
         // Resolve lightness from theme (darker themes need brighter POV colors)
-        const lightness = getComputedStyle(document.body).getPropertyValue('--sl-pov-lightness').trim() || '55%';
+        const lightness = getComputedStyle(activeDocument.body).getPropertyValue('--sl-pov-lightness').trim() || '55%';
         return `hsl(${hue}, 65%, ${lightness})`;
     }
 
@@ -448,17 +447,21 @@ export class SceneCardComponent {
         modal.titleEl.setText('Scene Color');
         const colorInput = modal.contentEl.createEl('input', {
             type: 'color',
-        }) as HTMLInputElement;
+        });
         colorInput.value = scene.color || '#6366F1';
-        colorInput.style.width = '100%';
-        colorInput.style.height = '50px';
-        colorInput.style.cursor = 'pointer';
-        colorInput.style.border = 'none';
+        colorInput.setCssStyles({
+            width: '100%',
+            height: '50px',
+            cursor: 'pointer',
+            border: 'none',
+        });
 
         const btnRow = modal.contentEl.createDiv();
-        btnRow.style.display = 'flex';
-        btnRow.style.gap = '8px';
-        btnRow.style.marginTop = '12px';
+        btnRow.setCssStyles({
+            display: 'flex',
+            gap: '8px',
+            marginTop: '12px',
+        });
 
         const saveBtn = btnRow.createEl('button', { text: 'Save', cls: 'mod-cta' });
         saveBtn.addEventListener('click', async () => {

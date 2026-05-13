@@ -1,5 +1,5 @@
 import { Modal, App, Setting } from 'obsidian';
-import { CascadeRenameService, RenamePreview } from '../services/CascadeRenameService';
+import { RenamePreview } from '../services/CascadeRenameService';
 
 /**
  * Modal that shows the user what a rename will affect and asks for confirmation.
@@ -36,7 +36,7 @@ export class RenameConfirmModal extends Modal {
         // Description
         contentEl.createEl('p', {
             text: `Rename "${this.oldName}" → "${this.newName}"?`,
-        }).style.fontWeight = '600';
+        }).setCssStyles({ fontWeight: '600' });
 
         contentEl.createEl('p', {
             text: this.summaryText,
@@ -45,9 +45,11 @@ export class RenameConfirmModal extends Modal {
 
         // Detail breakdown
         const details = contentEl.createEl('div');
-        details.style.marginBottom = '12px';
-        details.style.fontSize = '13px';
-        details.style.color = 'var(--text-muted)';
+        details.setCssStyles({
+            marginBottom: '12px',
+            fontSize: '13px',
+            color: 'var(--text-muted)',
+        });
 
         if (this.preview.sceneCount > 0) {
             details.createEl('div', { text: `• ${this.preview.sceneCount} scene${this.preview.sceneCount !== 1 ? 's' : ''} (pov, characters, location fields)` });

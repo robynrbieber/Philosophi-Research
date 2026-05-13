@@ -2,6 +2,21 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.10.0
+
+### Why this release
+
+This release prepares StoryLine for submission to the **official Obsidian community plugin directory**. To pass the official review, every plugin must follow Obsidian's strict guidelines for stability, theming, and cross-platform safety. The changes below are mostly under the hood — there are no new user-facing features — but they make StoryLine eligible for one-click install from inside Obsidian, automatic updates, and the trust badge that comes with being a vetted community plugin.
+
+### Bug Fixes & Improvements
+
+- **Theme-friendly styling everywhere** — Every place where StoryLine previously set colors, sizes, or spacing directly on an element has been moved to proper CSS classes. Custom themes now style StoryLine consistently, and dark / light mode switches look cleaner.
+- **Cross-window safety** — Views, timers, and pop-out windows now use the correct window context, so detaching the corkboard or timeline into its own Obsidian window no longer causes glitches or stale UI.
+- **Help is now built in** — The Help pane no longer needs a separate `HELP.md` file shipped alongside the plugin; the help text is bundled inside the plugin itself, so it always matches the installed version and there's nothing extra to copy.
+- **Cleaner integration with Obsidian** — Command names, ribbon icons, hotkeys, and menu entries follow Obsidian's official naming and behavior conventions. Default hotkeys were removed to avoid clashing with your personal shortcuts (you can assign your own under **Settings → Hotkeys**).
+- **Stability & maintenance** — Switched to Obsidian's modern APIs across the board (file operations, settings, markdown rendering, network requests). Removed dead code and unused imports. The plugin is leaner, starts faster, and is less likely to break on future Obsidian updates.
+
+---
 ## Version 1.9.9
 
 ### Bug Fixes

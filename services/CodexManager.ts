@@ -1,12 +1,15 @@
-import { App, TFile, parseYaml, stringifyYaml, normalizePath } from 'obsidian';
-import {
-    CodexEntry,
-    CodexCategoryDef,
-    BUILTIN_CODEX_CATEGORIES,
-    getBuiltinCodexCategory,
-    makeCustomCodexCategory,
-} from '../models/Codex';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
+import { App, TFile, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
+import { CodexCategoryDef, CodexEntry, getBuiltinCodexCategory } from '../models/Codex';
 
 /**
  * Manages generic Codex entries — loading, saving, creating, and deleting
@@ -322,7 +325,7 @@ export class CodexManager {
         const normalizedPath = normalizePath(filePath);
         const file = this.app.vault.getAbstractFileByPath(normalizedPath);
         if (file instanceof TFile) {
-            await this.app.vault.trash(file, true);
+            await this.app.fileManager.trashFile(file);
         }
         for (const catMap of this.entriesByCategory.values()) {
             catMap.delete(normalizedPath);

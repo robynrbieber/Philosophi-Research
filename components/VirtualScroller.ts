@@ -103,7 +103,6 @@ export class VirtualScroller<T> {
 
         const scrollTop = this.container.scrollTop;
         const viewHeight = this.container.clientHeight;
-        const totalHeight = this.items.length * this.itemHeight;
 
         let start = Math.floor(scrollTop / this.itemHeight) - this.overscan;
         let end = Math.ceil((scrollTop + viewHeight) / this.itemHeight) + this.overscan;
@@ -116,8 +115,8 @@ export class VirtualScroller<T> {
         this.lastEnd = end;
 
         // Update spacers
-        this.topSpacer.style.height = `${start * this.itemHeight}px`;
-        this.bottomSpacer.style.height = `${(this.items.length - end) * this.itemHeight}px`;
+        this.topSpacer.setCssStyles({ height: `${start * this.itemHeight}px` });
+        this.bottomSpacer.setCssStyles({ height: `${(this.items.length - end) * this.itemHeight}px` });
 
         // Render visible items
         this.contentEl.empty();

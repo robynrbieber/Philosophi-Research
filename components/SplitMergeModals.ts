@@ -1,6 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { Modal, Setting, Notice } from 'obsidian';
-import { Scene, STATUS_ORDER, STATUS_CONFIG, SceneStatus, getStatusOrder } from '../models/Scene';
 import type SceneCardsPlugin from '../main';
+import { STATUS_CONFIG, Scene, SceneStatus, getStatusOrder } from '../models/Scene';
 
 // ────────────────────────────────────────────────────────
 //  Split Scene Modal
@@ -69,18 +78,20 @@ export class SplitSceneModal extends Modal {
             cls: 'setting-item-name',
             text: 'Click to place split point:',
         });
-        label.style.marginBottom = '6px';
+        label.setCssStyles({ marginBottom: '6px' });
 
         this.textAreaEl = contentEl.createEl('textarea', {
             cls: 'storyline-split-textarea',
         });
         this.textAreaEl.value = body;
         this.textAreaEl.readOnly = true;
-        this.textAreaEl.style.width = '100%';
-        this.textAreaEl.style.height = '250px';
-        this.textAreaEl.style.fontFamily = 'var(--font-monospace)';
-        this.textAreaEl.style.fontSize = '13px';
-        this.textAreaEl.style.resize = 'vertical';
+        this.textAreaEl.setCssStyles({
+            width: '100%',
+            height: '250px',
+            fontFamily: 'var(--font-monospace)',
+            fontSize: '13px',
+            resize: 'vertical',
+        });
 
         // Default split at midpoint (nearest paragraph break)
         const mid = Math.floor(body.length / 2);

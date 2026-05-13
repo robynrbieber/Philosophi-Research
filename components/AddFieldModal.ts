@@ -12,7 +12,6 @@ import { CHARACTER_CATEGORIES } from '../models/Character';
  */
 export class AddFieldModal extends Modal {
     private existing: UniversalFieldTemplate | null;
-    private defaultSection: string;
     private onSubmit: (template: UniversalFieldTemplate) => void;
     private onDelete?: () => void;
     private customSectionNames?: string[];
@@ -45,7 +44,6 @@ export class AddFieldModal extends Modal {
         sectionNames?: string[],
     ) {
         super(app);
-        this.defaultSection = defaultSection;
         this.existing = existing;
         this.onSubmit = onSubmit;
         this.onDelete = onDelete;
@@ -127,11 +125,11 @@ export class AddFieldModal extends Modal {
                     this.type = v as UniversalFieldType;
                     const showOpts = this.type === 'dropdown' || this.type === 'multi-select';
                     if (optionsContainer) {
-                        optionsContainer.style.display = showOpts ? '' : 'none';
+                        optionsContainer.setCssStyles({ display: showOpts ? '' : 'none' });
                     }
                     if (folderSourceContainer) {
                         const showFolderSrc = this.type === 'multi-select' || this.type === 'dropdown';
-                        folderSourceContainer.style.display = showFolderSrc ? '' : 'none';
+                        folderSourceContainer.setCssStyles({ display: showFolderSrc ? '' : 'none' });
                     }
                 });
             });
@@ -148,13 +146,13 @@ export class AddFieldModal extends Modal {
 
         // ── Dropdown options ──
         optionsContainer = contentEl.createDiv('storyline-field-options-container');
-        if (this.type !== 'dropdown' && this.type !== 'multi-select') optionsContainer.style.display = 'none';
+        if (this.type !== 'dropdown' && this.type !== 'multi-select') optionsContainer.setCssStyles({ display: 'none' });
 
         const optionsLabel = optionsContainer.createEl('div', {
             cls: 'setting-item-name',
             text: 'Dropdown options',
         });
-        optionsLabel.style.marginBottom = '4px';
+        optionsLabel.setCssStyles({ marginBottom: '4px' });
 
         const optionsList = optionsContainer.createDiv('storyline-field-options-list');
         const renderOptions = () => {
@@ -193,12 +191,12 @@ export class AddFieldModal extends Modal {
             renderOptions();
             // Focus the new input
             const inputs = optionsList.querySelectorAll('input');
-            if (inputs.length) (inputs[inputs.length - 1] as HTMLInputElement).focus();
+            if (inputs.length) inputs[inputs.length - 1].focus();
         });
 
         // ── Folder source (dropdown / multi-select) ──
         folderSourceContainer = contentEl.createDiv('storyline-field-folder-source-container');
-        if (this.type !== 'multi-select' && this.type !== 'dropdown') folderSourceContainer.style.display = 'none';
+        if (this.type !== 'multi-select' && this.type !== 'dropdown') folderSourceContainer.setCssStyles({ display: 'none' });
         new Setting(folderSourceContainer)
             .setName('Folder source (optional)')
             .setDesc('Vault folder path whose note names become selectable options (e.g. Traits/)')
@@ -246,7 +244,6 @@ export class AddFieldModal extends Modal {
             });
         }
 
-        const spacer = footer.createDiv('storyline-add-field-spacer');
 
         const cancelBtn = footer.createEl('button', { text: 'Cancel' });
         cancelBtn.addEventListener('click', () => this.close());

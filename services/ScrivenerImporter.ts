@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 /**
  * ScrivenerImporter — import a .scriv project into StoryLine.
  *
@@ -12,11 +21,11 @@
  *  5. Write markdown files with YAML frontmatter
  */
 
-import { App, Modal, Setting, normalizePath, stringifyYaml, Notice, TFile } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import type { SceneStatus } from '../models/Scene';
 import { makeCustomCodexCategory } from '../models/Codex';
 import type { SeriesMetadata } from '../models/StoryLineProject';
+import { App, Modal, Notice, Setting, normalizePath, stringifyYaml } from 'obsidian';
 
 // Node modules — only available on desktop
 const fs = (window as any).require?.('fs') as typeof import('fs') | undefined;
@@ -521,13 +530,6 @@ function getAllTags(xml: string, tag: string): string[] {
     }
     return matches;
 }
-
-function getAttr(xml: string, tag: string, attr: string): string {
-    const re = new RegExp(`<${tag}[^>]*\\s${attr}="([^"]*)"`, 'i');
-    const m = xml.match(re);
-    return m ? m[1] : '';
-}
-
 // ────────────────────────────────────────────────────
 //  Scrivx parser
 // ────────────────────────────────────────────────────
@@ -1028,7 +1030,7 @@ export class ScrivenerImporter {
             }
             // Allow UI to breathe
             if (processed % 5 === 0) {
-                await new Promise(r => setTimeout(r, 0));
+                await new Promise(r => window.setTimeout(r, 0));
             }
 
             // Read content — may be RTF, plain text, image, PDF, or other binary

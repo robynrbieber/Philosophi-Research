@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { ItemView, WorkspaceLeaf, TFile, Setting, Notice, Menu, Modal } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Scene } from '../models/Scene';
@@ -29,8 +38,8 @@ export class StorylineView extends ItemView {
     /** Set of plotline tag names that are hidden in the subway view */
     private hiddenPlotlines: Set<string> = new Set();
     /** Cache key for skip-if-unchanged optimization */
-    private _lastRenderKey = '';
     private _lastCacheVersion = -1;
+    private _lastRenderKey = '';
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -126,7 +135,7 @@ export class StorylineView extends ItemView {
                 ? `Filtering: ${this.hiddenPlotlines.size} hidden`
                 : 'Filter plotlines');
             filterBtn.addEventListener('click', (e) => {
-                const allTags = this.sceneManager.getAllTags().sort();
+                const allTags = this.sceneManager.queryService.getAllTags().sort();
                 const menu = new Menu();
                 // Show All / Hide All
                 menu.addItem((item: any) => {
@@ -189,7 +198,7 @@ export class StorylineView extends ItemView {
 
         const content = container.createDiv('story-line-storyline-content');
 
-        const scenes = this.sceneManager.getFilteredScenes(
+        const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: 'sequence', direction: 'asc' }
         );
@@ -369,33 +378,37 @@ export class StorylineView extends ItemView {
         const svgHeight = trackBottom + 30;
 
         const wrapper = content.createDiv('subway-map-wrapper');
-        wrapper.style.overflowX = 'auto';
-        wrapper.style.overflowY = 'auto';
-        wrapper.style.padding = '12px 0';
-        wrapper.style.position = 'relative';
+        wrapper.setCssStyles({
+            overflowX: 'auto',
+            overflowY: 'auto',
+            padding: '12px 0',
+            position: 'relative',
+        });
 
         // Enable drag-to-pan
         enableDragToPan(wrapper);
 
         // ── Sticky label column (stays visible when scrolling right) ──
         const labelCol = wrapper.createDiv('subway-label-col');
-        labelCol.style.position = 'sticky';
-        labelCol.style.left = '0';
-        labelCol.style.width = `${TRACK_LEFT}px`;
-        labelCol.style.height = `${svgHeight}px`;
-        labelCol.style.zIndex = '2';
-        labelCol.style.pointerEvents = 'none';
-        labelCol.style.background = 'var(--background-primary)';
-        labelCol.style.flexShrink = '0';
+        labelCol.setCssStyles({
+            position: 'sticky',
+            left: '0',
+            width: `${TRACK_LEFT}px`,
+            height: `${svgHeight}px`,
+            zIndex: '2',
+            pointerEvents: 'none',
+            background: 'var(--background-primary)',
+            flexShrink: '0',
+        });
 
         const svgNS = 'http://www.w3.org/2000/svg';
-        const svg = document.createElementNS(svgNS, 'svg');
+        const svg = activeDocument.createElementNS(svgNS, 'svg');
         svg.setAttribute('width', String(svgWidth));
         svg.setAttribute('height', String(svgHeight));
         svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
-        svg.style.minWidth = `${svgWidth}px`;
+        svg.setCssStyles({ minWidth: `${svgWidth}px` });
         // Pull SVG up so it overlaps the label column
-        svg.style.marginTop = `-${svgHeight}px`;
+        svg.setCssStyles({ marginTop: `-${svgHeight}px` });
         wrapper.appendChild(svg);
 
         const colX = (col: number) => TRACK_LEFT + col * SCENE_SPACING + SCENE_SPACING / 2;
@@ -426,7 +439,7 @@ export class StorylineView extends ItemView {
         // ── Act dividers ──
         const acts = new Map<number, number[]>();
         orderedScenes.forEach((s, col) => {
-            const act = s.act ?? 0;
+            const act = Number(s.act) || 0;
             if (!acts.has(act)) acts.set(act, []);
             acts.get(act)!.push(col);
         });
@@ -439,7 +452,7 @@ export class StorylineView extends ItemView {
 
             // Act label
             const centerX = (colX(minCol) + colX(maxCol)) / 2;
-            const actLabel = document.createElementNS(svgNS, 'text');
+            const actLabel = activeDocument.createElementNS(svgNS, 'text');
             actLabel.setAttribute('x', String(centerX));
             actLabel.setAttribute('y', String(TOP_MARGIN - 20));
             actLabel.setAttribute('text-anchor', 'middle');
@@ -452,7 +465,7 @@ export class StorylineView extends ItemView {
             // Vertical divider line before this act group (clear, visible)
             if (ai > 0) {
                 const divX = colX(minCol) - SCENE_SPACING / 2;
-                const line = document.createElementNS(svgNS, 'line');
+                const line = activeDocument.createElementNS(svgNS, 'line');
                 line.setAttribute('x1', String(divX));
                 line.setAttribute('y1', String(TOP_MARGIN - 10));
                 line.setAttribute('x2', String(divX));
@@ -474,14 +487,16 @@ export class StorylineView extends ItemView {
 
             // Plotline label in the sticky HTML column
             const lblDiv = labelCol.createDiv('subway-lane-label');
-            lblDiv.style.position = 'absolute';
-            lblDiv.style.left = `${LABEL_LEFT}px`;
-            lblDiv.style.top = `${y - 8}px`;
-            lblDiv.style.fontSize = '15px';
-            lblDiv.style.fontWeight = '700';
-            lblDiv.style.color = color;
-            lblDiv.style.whiteSpace = 'nowrap';
-            lblDiv.style.fontFamily = 'var(--font-interface)';
+            lblDiv.setCssStyles({
+                position: 'absolute',
+                left: `${LABEL_LEFT}px`,
+                top: `${y - 8}px`,
+                fontSize: '15px',
+                fontWeight: '700',
+                color: color,
+                whiteSpace: 'nowrap',
+                fontFamily: 'var(--font-interface)',
+            });
             lblDiv.textContent = this.formatPlotlineName(pk);
 
             if (cols.length === 0) continue;
@@ -492,7 +507,7 @@ export class StorylineView extends ItemView {
             const leadIn = 30; // small rounded approach before first node
             const trailOut = 30; // small trail after last node
 
-            const path = document.createElementNS(svgNS, 'path');
+            const path = activeDocument.createElementNS(svgNS, 'path');
             path.setAttribute('d', `M ${firstX - leadIn} ${y} L ${lastX + trailOut} ${y}`);
             path.setAttribute('stroke', color);
             path.setAttribute('stroke-width', String(LINE_WIDTH));
@@ -513,25 +528,25 @@ export class StorylineView extends ItemView {
             // Gradient connector
             const gradId = `conn-grad-${col}`;
             const defs = svg.querySelector('defs') || (() => {
-                const d = document.createElementNS(svgNS, 'defs');
+                const d = activeDocument.createElementNS(svgNS, 'defs');
                 svg.insertBefore(d, svg.firstChild);
                 return d;
             })();
-            const grad = document.createElementNS(svgNS, 'linearGradient');
+            const grad = activeDocument.createElementNS(svgNS, 'linearGradient');
             grad.setAttribute('id', gradId);
             grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
             grad.setAttribute('x2', '0'); grad.setAttribute('y2', '1');
-            const stop1 = document.createElementNS(svgNS, 'stop');
+            const stop1 = activeDocument.createElementNS(svgNS, 'stop');
             stop1.setAttribute('offset', '0%');
             stop1.setAttribute('stop-color', laneColor(sortedLanes[0], plotlineKeys[sortedLanes[0]]));
-            const stop2 = document.createElementNS(svgNS, 'stop');
+            const stop2 = activeDocument.createElementNS(svgNS, 'stop');
             stop2.setAttribute('offset', '100%');
             stop2.setAttribute('stop-color', laneColor(sortedLanes[sortedLanes.length - 1], plotlineKeys[sortedLanes[sortedLanes.length - 1]]));
             grad.appendChild(stop1);
             grad.appendChild(stop2);
             defs.appendChild(grad);
 
-            const connector = document.createElementNS(svgNS, 'rect');
+            const connector = activeDocument.createElementNS(svgNS, 'rect');
             connector.setAttribute('x', String(x - 3));
             connector.setAttribute('y', String(topY));
             connector.setAttribute('width', '6');
@@ -556,14 +571,14 @@ export class StorylineView extends ItemView {
                 const scene = orderedScenes[col];
 
                 // Circle node
-                const circle = document.createElementNS(svgNS, 'circle');
+                const circle = activeDocument.createElementNS(svgNS, 'circle');
                 circle.setAttribute('cx', String(x));
                 circle.setAttribute('cy', String(y));
                 circle.setAttribute('r', String(NODE_RADIUS));
                 circle.setAttribute('fill', 'var(--background-primary)');
                 circle.setAttribute('stroke', color);
                 circle.setAttribute('stroke-width', '3.5');
-                circle.style.cursor = 'pointer';
+                circle.setCssStyles({ cursor: 'pointer' });
                 svg.appendChild(circle);
 
                 circle.addEventListener('click', (e) => {
@@ -572,7 +587,7 @@ export class StorylineView extends ItemView {
                 });
 
                 // Tooltip
-                const titleEl = document.createElementNS(svgNS, 'title');
+                const titleEl = activeDocument.createElementNS(svgNS, 'title');
                 const actStr = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
                 const seqStr = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
                 let tip = `[${actStr}-${seqStr}] ${scene.title || 'Untitled'}`;
@@ -586,7 +601,7 @@ export class StorylineView extends ItemView {
                 // Story time above node (small)
                 const timeStr = scene.storyTime || scene.storyDate || '';
                 if (timeStr) {
-                    const timeLabel = document.createElementNS(svgNS, 'text');
+                    const timeLabel = activeDocument.createElementNS(svgNS, 'text');
                     timeLabel.setAttribute('x', String(x));
                     timeLabel.setAttribute('y', String(y - NODE_RADIUS - 6));
                     timeLabel.setAttribute('text-anchor', 'middle');
@@ -600,14 +615,14 @@ export class StorylineView extends ItemView {
                 const labelY1 = y + NODE_RADIUS + 16;
                 const labelText = `[${actStr}-${seqStr}] ${scene.title || 'Untitled'}`;
 
-                const sceneLabel = document.createElementNS(svgNS, 'text');
+                const sceneLabel = activeDocument.createElementNS(svgNS, 'text');
                 sceneLabel.setAttribute('x', String(x));
                 sceneLabel.setAttribute('y', String(labelY1));
                 sceneLabel.setAttribute('text-anchor', 'middle');
                 sceneLabel.setAttribute('font-size', '11');
                 sceneLabel.setAttribute('font-weight', '600');
                 sceneLabel.setAttribute('fill', 'var(--text-normal)');
-                sceneLabel.style.cursor = 'pointer';
+                sceneLabel.setCssStyles({ cursor: 'pointer' });
                 sceneLabel.textContent = labelText;
                 sceneLabel.addEventListener('click', () => this.openScene(scene));
                 svg.appendChild(sceneLabel);
@@ -626,7 +641,7 @@ export class StorylineView extends ItemView {
                     for (const { tag, width } of pillData) {
                         const pillIdx = plotlineKeys.indexOf(tag);
                         const pillColor = resolveTagColor(tag, Math.max(0, pillIdx), scheme, tagColors, hslAdj);
-                        const rect = document.createElementNS(svgNS, 'rect');
+                        const rect = activeDocument.createElementNS(svgNS, 'rect');
                         rect.setAttribute('x', String(px));
                         rect.setAttribute('y', String(pillY - 8));
                         rect.setAttribute('width', String(width));
@@ -635,7 +650,7 @@ export class StorylineView extends ItemView {
                         rect.setAttribute('fill', pillColor);
                         svg.appendChild(rect);
 
-                        const text = document.createElementNS(svgNS, 'text');
+                        const text = activeDocument.createElementNS(svgNS, 'text');
                         text.setAttribute('x', String(px + width / 2));
                         text.setAttribute('y', String(pillY + 3));
                         text.setAttribute('text-anchor', 'middle');
@@ -669,10 +684,10 @@ export class StorylineView extends ItemView {
         // Collapsible header
         const header = section.createDiv('storyline-header');
         if (plotlineColor) {
-            header.style.borderLeftColor = plotlineColor;
+            header.setCssStyles({ borderLeftColor: plotlineColor });
         }
         const toggle = header.createSpan({ cls: 'storyline-toggle', text: '▼ ' });
-        const titleSpan = header.createSpan({
+        header.createSpan({
             cls: 'storyline-plotline-title',
             text: `${this.formatPlotlineName(plotline)} (${scenes.length})`
         });
@@ -689,11 +704,13 @@ export class StorylineView extends ItemView {
         obsidian.setIcon(colorIcon, 'palette');
         // Hidden native color input
         const colorInput = colorBtn.createEl('input', { type: 'color' }) as HTMLInputElement;
-        colorInput.style.position = 'absolute';
-        colorInput.style.width = '0';
-        colorInput.style.height = '0';
-        colorInput.style.opacity = '0';
-        colorInput.style.overflow = 'hidden';
+        colorInput.setCssStyles({
+            position: 'absolute',
+            width: '0',
+            height: '0',
+            opacity: '0',
+            overflow: 'hidden',
+        });
         colorInput.value = plotlineColor || '#888888';
         colorBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -703,7 +720,7 @@ export class StorylineView extends ItemView {
             const newColor = (e.target as HTMLInputElement).value;
             this.plugin.settings.tagColors[plotline] = newColor;
             await this.plugin.saveSettings();
-            this.renderContent();
+            this.refresh();
         });
 
         // Rename button
@@ -759,7 +776,7 @@ export class StorylineView extends ItemView {
                         .onClick(async () => {
                             delete this.plugin.settings.tagColors[plotline];
                             await this.plugin.saveSettings();
-                            this.renderContent();
+                            this.refresh();
                         });
                 });
             }
@@ -827,16 +844,16 @@ export class StorylineView extends ItemView {
         // Mini progress bar
         const bar = summary.createDiv('plotline-progress-bar');
         const fill = bar.createDiv('plotline-progress-fill');
-        fill.style.width = `${pct}%`;
+        fill.setCssStyles({ width: `${pct}%` });
         if (plotlineColor) {
-            fill.style.backgroundColor = plotlineColor;
+            fill.setCssStyles({ backgroundColor: plotlineColor });
         }
 
         // Toggle collapse
         let collapsed = false;
         header.addEventListener('click', () => {
             collapsed = !collapsed;
-            body.style.display = collapsed ? 'none' : 'block';
+            body.setCssStyles({ display: collapsed ? 'none' : 'block' });
             toggle.textContent = collapsed ? '▶ ' : '▼ ';
         });
     }
@@ -844,7 +861,7 @@ export class StorylineView extends ItemView {
     private renderSceneNode(
         container: HTMLElement,
         scene: Scene,
-        availablePlotlines: string[]
+        _availablePlotlines: string[]
     ): void {
         const node = container.createDiv('storyline-node');
         const act = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
@@ -864,12 +881,14 @@ export class StorylineView extends ItemView {
             const tagsEl = node.createDiv('storyline-node-tags');
             const tagColors = this.plugin.settings.tagColors || {};
             const scheme = this.plugin.settings.colorScheme;
-            const allTagsSorted = this.sceneManager.getAllTags().sort();
+            const allTagsSorted = this.sceneManager.queryService.getAllTags().sort();
             scene.tags.forEach(tag => {
                 const badge = tagsEl.createSpan({ cls: 'storyline-tag-badge', text: tag });
                 const badgeColor = resolveTagColor(tag, Math.max(0, allTagsSorted.indexOf(tag)), scheme, tagColors, getPlotlineHSL(this.plugin.settings));
-                badge.style.backgroundColor = badgeColor;
-                badge.style.color = contrastTextColor(badgeColor);
+                badge.setCssStyles({
+                    backgroundColor: badgeColor,
+                    color: contrastTextColor(badgeColor),
+                });
             });
         }
 
@@ -890,7 +909,7 @@ export class StorylineView extends ItemView {
      */
     private showTagAssignMenu(scene: Scene, anchorEl: HTMLElement): void {
         const menu = new Menu();
-        const allTags = this.sceneManager.getAllTags();
+        const allTags = this.sceneManager.queryService.getAllTags();
         const sceneTags = new Set(scene.tags || []);
 
         if (allTags.length > 0) {
@@ -1026,7 +1045,7 @@ export class StorylineView extends ItemView {
             text: 'Select scenes to include (optional):'
         });
 
-        const scenes = this.sceneManager.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
+        const scenes = this.sceneManager.queryService.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
         const selectedPaths = new Set<string>();
 
         const sceneList = scenePicker.createDiv('storyline-scene-picker-list');
@@ -1156,7 +1175,7 @@ export class StorylineView extends ItemView {
         if (this._pendingRefresh) {
             cancelAnimationFrame(this._pendingRefresh);
         }
-        this._pendingRefresh = requestAnimationFrame(() => {
+        this._pendingRefresh = window.requestAnimationFrame(() => {
             this._pendingRefresh = null;
             if (this.rootContainer) {
                 this._lastCacheVersion = this.sceneManager.cacheVersion;

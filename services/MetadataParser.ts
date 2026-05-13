@@ -1,6 +1,15 @@
-import { App, TFile, TFolder, parseYaml, stringifyYaml } from 'obsidian';
-import { Scene, SceneStatus, TimelineMode, TIMELINE_MODES, getStatusOrder } from '../models/Scene';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
+import { App, TFile, parseYaml, stringifyYaml } from 'obsidian';
+import { Scene, SceneStatus, TIMELINE_MODES, TimelineMode } from '../models/Scene';
 
 /**
  * Issue #73 — frontmatter scene fields that point at other entities (scenes,
@@ -222,7 +231,7 @@ export class MetadataParser {
      */
     static generateSceneContent(
         scene: Partial<Scene>,
-        template?: string,
+        _template?: string,
         extraFrontmatter?: Record<string, any>,
     ): string {
         const fm: Record<string, any> = {

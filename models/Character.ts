@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 /**
  * Character data model - represents a character profile stored as a markdown file
  * in the project's Characters/ folder.
@@ -250,12 +259,12 @@ export function normalizeRoleEntries(raw: unknown): RoleEntry[] {
         }
         if (item && typeof item === 'object') {
             const obj = item as Record<string, unknown>;
-            const role = String(obj.role ?? '').trim();
+            const role = typeof obj.role === 'string' ? obj.role.trim() : '';
             if (!role) continue;
             const entry: RoleEntry = { role };
-            const from = obj.from != null ? String(obj.from).trim() : '';
-            const plotline = obj.plotline != null ? String(obj.plotline).trim() : '';
-            const book = obj.book != null ? String(obj.book).trim() : '';
+            const from = typeof obj.from === 'string' ? obj.from.trim() : '';
+            const plotline = typeof obj.plotline === 'string' ? obj.plotline.trim() : '';
+            const book = typeof obj.book === 'string' ? obj.book.trim() : '';
             if (from) entry.from = from;
             if (plotline) entry.plotline = plotline;
             if (book) entry.book = book;

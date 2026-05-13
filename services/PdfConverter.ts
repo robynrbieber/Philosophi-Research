@@ -88,7 +88,6 @@ export class SLMarkdownToPdfConverter {
         const pageSize = this.getPageDimensions();
         const { marginTop, marginBottom, marginLeft, marginRight } = this.settings;
         const contentWidth = pageSize[0] - marginLeft - marginRight;
-        const pageContentHeight = pageSize[1] - marginTop - marginBottom;
 
         // Parse markdown into drawable blocks
         const blocks = this.parseMarkdown(safeMarkdown);
@@ -293,8 +292,8 @@ export class SLMarkdownToPdfConverter {
      */
     private cleanInline(text: string): string {
         let s = text;
-        // Strip Obsidian tags (#tag)
-        s = s.replace(/(?<=\s|^)#([\w\-\/]+)/g, '$1');
+        // Strip Obsidian tags (#tag) — avoid lookbehind for iOS <16.4 compatibility.
+        s = s.replace(/(^|\s)#([\w\-\/]+)/g, '$1$2');
         // Strip wikilinks [[Display|Alias]] → Alias, [[Note]] → Note
         s = s.replace(/\[\[([^\]]+)\]\]/g, (_m, inner: string) => {
             if (inner.includes('|')) return inner.split('|').pop()!.trim();

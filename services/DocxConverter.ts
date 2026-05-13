@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 /**
  * StoryLine DOCX Converter
  * 
@@ -9,6 +18,7 @@
  */
 
 import { zip, strToU8 } from 'fflate';
+import { requestUrl } from 'obsidian';
 import MarkdownIt from 'markdown-it';
 import { full as markdownItEmoji } from 'markdown-it-emoji';
 import markdownItMark from 'markdown-it-mark';
@@ -181,7 +191,7 @@ export class SLMarkdownToDocxConverter {
             try {
                 const chunkElements = await this.parseMarkdownToElements(chunks[i]);
                 allElements = allElements.concat(chunkElements);
-                await new Promise(resolve => setTimeout(resolve, 10));
+                await new Promise(resolve => window.setTimeout(resolve, 10));
             } catch (error) {
                 console.error(`StoryLine DOCX: Error processing chunk ${i + 1}:`, error);
             }
@@ -393,7 +403,7 @@ export class SLMarkdownToDocxConverter {
 
     // ── DOCX generation ──
 
-    private generateDocx(elements: SLDocumentElement[], title: string): Promise<Blob> {
+    private generateDocx(elements: SLDocumentElement[], _title: string): Promise<Blob> {
         const documentXml = this.getDocumentXml(elements);
 
         const files: { [path: string]: Uint8Array } = {};
@@ -1369,8 +1379,8 @@ ${imageRels}</Relationships>`;
                 let imageData = null;
                 if (url.startsWith('http://') || url.startsWith('https://')) {
                     try {
-                        const response = await fetch(url);
-                        if (response.ok) imageData = await response.arrayBuffer();
+                        const response = await requestUrl({ url });
+                        if (response.status >= 200 && response.status < 300) imageData = response.arrayBuffer;
                     } catch (error) {
                         console.error('StoryLine DOCX: Error fetching external image:', error);
                     }

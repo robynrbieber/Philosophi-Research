@@ -100,7 +100,7 @@ export class WikilinkSuggest {
 
     private handleBlur = () => {
         // Delay so a click on a dropdown item still registers.
-        setTimeout(() => { if (this.alive) this.removeDropdown(); }, 150);
+        window.setTimeout(() => { if (this.alive) this.removeDropdown(); }, 150);
     };
 
     // ─── Suggestions ──────────────────────────────────────────
@@ -172,9 +172,9 @@ export class WikilinkSuggest {
 
     private ensureDropdown(): void {
         if (this.dropdown) return;
-        const dd = document.createElement('div');
+        const dd = activeDocument.createElement('div');
         dd.className = 'sl-suggest-dropdown sl-wikilink-suggest';
-        document.body.appendChild(dd);
+        activeDocument.body.appendChild(dd);
         this.dropdown = dd;
     }
 
@@ -200,19 +200,21 @@ export class WikilinkSuggest {
         const rect = this.textareaEl.getBoundingClientRect();
         // Simple heuristic: anchor below the textarea, indented by caret column
         // approximation. Good enough for a small notes field.
-        this.dropdown.style.position = 'fixed';
-        this.dropdown.style.left = `${Math.round(rect.left)}px`;
-        this.dropdown.style.top = `${Math.round(rect.bottom + 2)}px`;
-        this.dropdown.style.minWidth = `${Math.min(320, Math.max(180, rect.width))}px`;
-        this.dropdown.style.maxWidth = '420px';
-        this.dropdown.style.maxHeight = '240px';
-        this.dropdown.style.overflowY = 'auto';
-        this.dropdown.style.zIndex = '9999';
-        this.dropdown.style.background = 'var(--background-primary)';
-        this.dropdown.style.border = '1px solid var(--background-modifier-border)';
-        this.dropdown.style.borderRadius = '6px';
-        this.dropdown.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
-        this.dropdown.style.padding = '4px';
+        this.dropdown.setCssStyles({
+            position: 'fixed',
+            left: `${Math.round(rect.left)}px`,
+            top: `${Math.round(rect.bottom + 2)}px`,
+            minWidth: `${Math.min(320, Math.max(180, rect.width))}px`,
+            maxWidth: '420px',
+            maxHeight: '240px',
+            overflowY: 'auto',
+            zIndex: '9999',
+            background: 'var(--background-primary)',
+            border: '1px solid var(--background-modifier-border)',
+            borderRadius: '6px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            padding: '4px',
+        });
     }
 
     // ─── Commit ───────────────────────────────────────────────

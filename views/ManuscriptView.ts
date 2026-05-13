@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { ItemView, WorkspaceLeaf, WorkspaceSplit, MarkdownRenderer, TFile, setIcon } from 'obsidian';
 import { EditorView, Decoration } from '@codemirror/view';
 import { RangeSetBuilder, StateEffect, Compartment } from '@codemirror/state';
@@ -6,11 +15,11 @@ import { Scene, SceneFilter, SortConfig } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { FiltersComponent } from '../components/Filters';
-import type SceneCardsPlugin from '../main';
-import { MANUSCRIPT_VIEW_TYPE, NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE } from '../constants';
 import { applyMobileClass, isMobile, isPhone, isTablet } from '../components/MobileAdapter';
 import { buildFormattingToolbar } from '../components/FormattingToolbar';
 import { compareActChapter } from '../utils/actChapter';
+import SceneCardsPlugin from '../main';
+import { MANUSCRIPT_VIEW_TYPE } from '../constants';
 
 /**
  * Manuscript View — Scrivenings-style continuous document view.
@@ -49,8 +58,6 @@ export class ManuscriptView extends ItemView {
     private atomicCompartment = new Compartment();
     /** Whether focus mode is active (hides non-writing UI, dims inactive scenes) */
     private _focusMode = false;
-    /** Dynamic style element for focus-mode dimming values */
-    private focusStyleEl: HTMLStyleElement | null = null;
     /** File path of the scene currently most visible in the scroll area */
     focusedScenePath: string | null = null;
     /** Formatting toolbar element */
@@ -95,10 +102,13 @@ export class ManuscriptView extends ItemView {
         this.lazyObserver?.disconnect();
         this.focusObserver = null;
         this.lazyObserver = null;
-        // Clean up focus styles and body class on close
-        this.focusStyleEl?.remove();
-        this.focusStyleEl = null;
-        document.body.removeClass('sl-focus-active-global');
+        // Clean up focus mode body class and CSS variables on close
+        const body = activeDocument.body;
+        body.removeClass('sl-focus-active-global');
+        body.removeClass('sl-focus-has-darken');
+        body.style.removeProperty('--sl-focus-toolbar-opacity');
+        body.style.removeProperty('--sl-focus-bg');
+        body.style.removeProperty('--sl-focus-filter');
     }
 
 
@@ -210,7 +220,7 @@ export class ManuscriptView extends ItemView {
         // Formatting toolbar (hidden until an editor is focused)
         if (this.plugin.settings.showFormattingToolbar) {
             this.fmtToolbar = container.createDiv('sl-fmt-toolbar');
-            this.fmtToolbar.style.display = 'none';
+            this.fmtToolbar.setCssStyles({ display: 'none' });
             this.buildFormattingToolbar(this.fmtToolbar);
         }
 
@@ -223,7 +233,7 @@ export class ManuscriptView extends ItemView {
             this._hasActiveFocus = true;
             // Find which embedded leaf owns the focused element
             const target = e.target as HTMLElement;
-            for (const [path, leaf] of this.embeddedLeaves) {
+            for (const [_path, leaf] of this.embeddedLeaves) {
                 const splitEl = (leaf as any).containerEl?.parentElement;
                 if (splitEl?.contains(target)) {
                     this.activeLeaf = leaf;
@@ -238,14 +248,14 @@ export class ManuscriptView extends ItemView {
                     break;
                 }
             }
-            if (this.fmtToolbar) this.fmtToolbar.style.display = '';
+            if (this.fmtToolbar) this.fmtToolbar.setCssStyles({ display: '' });
         });
         this.scrollArea.addEventListener('focusout', () => {
-            setTimeout(() => {
-                if (!this.scrollArea?.contains(document.activeElement)) {
+            window.setTimeout(() => {
+                if (!this.scrollArea?.contains(activeDocument.activeElement)) {
                     this._hasActiveFocus = false;
                     this.activeLeaf = null;
-                    if (this.fmtToolbar) this.fmtToolbar.style.display = 'none';
+                    if (this.fmtToolbar) this.fmtToolbar.setCssStyles({ display: 'none' });
                 }
             }, 100);
         });
@@ -282,7 +292,7 @@ export class ManuscriptView extends ItemView {
         ) {
             scenes = this._lastScenes;
         } else {
-            scenes = this.sceneManager.getFilteredScenes(this.currentFilter, this.currentSort)
+            scenes = this.sceneManager.queryService.getFilteredScenes(this.currentFilter, this.currentSort)
                 .filter(s => !s.corkboardNote);
 
             // When user picks a non-structural sort (e.g. "title"), respect it
@@ -442,7 +452,7 @@ export class ManuscriptView extends ItemView {
 
             // Give the split an initial height so the absolute-positioned
             // workspace-leaf chain has a viewport for CM6 to render into.
-            splitEl.style.height = '300px';
+            splitEl.setCssStyles({ height: '300px' });
 
             const leaf = this.app.workspace.createLeafInParent(split, 0);
 
@@ -476,8 +486,8 @@ export class ManuscriptView extends ItemView {
                 const h = Math.max(rect, offset, scroll);
                 if (h > 0) {
                     const px = Math.ceil(h) + 'px';
-                    splitEl.style.height = px;
-                    container.style.height = px;
+                    splitEl.setCssStyles({ height: px });
+                    container.setCssStyles({ height: px });
                 }
             };
 
@@ -485,18 +495,18 @@ export class ManuscriptView extends ItemView {
             const debouncedSync = () => {
                 if (rafPending) return;
                 rafPending = true;
-                requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
                     rafPending = false;
                     syncHeight();
                 });
             };
 
             // CM6 may render lazily; sync across multiple frames.
-            requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
                 syncHeight();
-                requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => {
                     syncHeight();
-                    setTimeout(syncHeight, 300);
+                    window.setTimeout(syncHeight, 300);
                 });
             });
 
@@ -505,19 +515,19 @@ export class ManuscriptView extends ItemView {
             if (isMobile) {
                 let lastH = 0;
                 let stableCount = 0;
-                const poll = setInterval(() => {
+                const poll = window.setInterval(() => {
                     syncHeight();
                     const sizer = splitEl.querySelector('.cm-sizer') as HTMLElement | null;
                     const h = sizer ? Math.max(sizer.getBoundingClientRect().height, sizer.offsetHeight) : 0;
                     if (h > 0 && Math.abs(h - lastH) < 2) {
                         stableCount++;
-                        if (stableCount >= 3) clearInterval(poll);
+                        if (stableCount >= 3) window.clearInterval(poll);
                     } else {
                         stableCount = 0;
                         lastH = h;
                     }
                 }, 250);
-                setTimeout(() => clearInterval(poll), 10000);
+                window.setTimeout(() => window.clearInterval(poll), 10000);
             }
 
             // Keep height synced as user edits (content grows/shrinks).
@@ -635,7 +645,7 @@ export class ManuscriptView extends ItemView {
         const key = this.computeFilterKey();
         const scenes = (key === this._lastFilterKey && this._lastScenes.length > 0)
             ? this._lastScenes
-            : this.sceneManager.getFilteredScenes(this.currentFilter, this.currentSort)
+            : this.sceneManager.queryService.getFilteredScenes(this.currentFilter, this.currentSort)
                 .filter(s => !s.corkboardNote);
         let totalWords = 0;
         for (const s of scenes) {
@@ -645,60 +655,35 @@ export class ManuscriptView extends ItemView {
         this.footerEl.setText(`${scenes.length} scenes · ${totalWords.toLocaleString()} ${wordLabel}`);
     }
 
-    /** Apply focus-mode effects via a dynamic <style> targeting specific UI elements */
-    private applyFocusCssVars(container: HTMLElement): void {
+    /** Apply focus-mode effects via CSS custom properties; static rules live in styles.css. */
+    private applyFocusCssVars(_container: HTMLElement): void {
         const s = this.plugin.settings;
         const opacity = 0.25;
         const darken = (s.focusDarkenAmount ?? 0) / 100;
         const blur = s.focusBlurAmount ?? 0;
 
-        if (!this.focusStyleEl) {
-            this.focusStyleEl = document.createElement('style');
-            document.head.appendChild(this.focusStyleEl);
-        }
+        const body = activeDocument.body;
 
         if (this._focusMode) {
-            document.body.addClass('sl-focus-active-global');
+            body.addClass('sl-focus-active-global');
 
             const darkenFilter = darken > 0 ? `brightness(${1 - darken})` : '';
             const blurFilter = blur > 0 ? `blur(${blur}px)` : '';
             const combinedFilter = [darkenFilter, blurFilter].filter(Boolean).join(' ') || 'none';
 
-            // Compute a darkened background to fill gaps/corners
             const bgBright = Math.round(255 * (1 - darken));
             const darkBg = `rgb(${bgBright}, ${bgBright}, ${bgBright})`;
 
-            this.focusStyleEl.textContent = `
-                /* StoryLine toolbar: dimmed but not darkened */
-                .sl-manuscript-focus .story-line-toolbar {
-                    opacity: ${opacity};
-                    transition: opacity 0.25s ease;
-                }
-                /* Fill all gaps/corners with matching dark background */
-                ${darken > 0 ? `.sl-focus-active-global .app-container {
-                    background-color: ${darkBg} !important;
-                }` : ''}
-                /* Darken + blur sidebars and ribbon */
-                .sl-focus-active-global .workspace-split.mod-left-split,
-                .sl-focus-active-global .workspace-split.mod-right-split,
-                .sl-focus-active-global .workspace-ribbon {
-                    filter: ${combinedFilter} !important;
-                    transition: filter 0.25s ease;
-                }
-                /* Center tab header bar */
-                .sl-focus-active-global .mod-root > .workspace-tabs > .workspace-tab-header-container {
-                    filter: ${combinedFilter} !important;
-                    transition: filter 0.25s ease;
-                }
-                /* Title bar */
-                .sl-focus-active-global .titlebar {
-                    filter: ${combinedFilter} !important;
-                    transition: filter 0.25s ease;
-                }
-            `;
+            body.style.setProperty('--sl-focus-toolbar-opacity', String(opacity));
+            body.style.setProperty('--sl-focus-bg', darkBg);
+            body.style.setProperty('--sl-focus-filter', combinedFilter);
+            body.toggleClass('sl-focus-has-darken', darken > 0);
         } else {
-            document.body.removeClass('sl-focus-active-global');
-            this.focusStyleEl.textContent = '';
+            body.removeClass('sl-focus-active-global');
+            body.removeClass('sl-focus-has-darken');
+            body.style.removeProperty('--sl-focus-toolbar-opacity');
+            body.style.removeProperty('--sl-focus-bg');
+            body.style.removeProperty('--sl-focus-filter');
         }
     }
 

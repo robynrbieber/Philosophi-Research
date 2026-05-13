@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 // ═══════════════════════════════════════════════════════
 //  Scene Provider — Issue #66 Phase 1 foundation
 // ═══════════════════════════════════════════════════════
@@ -70,7 +79,7 @@ export class BookSceneProvider implements SceneProvider {
     }
 
     getAll(): ScopedScene[] {
-        const folder = this.plugin.settings.folderPath || '';
+        const folder = this.plugin.settings.storyLineRoot || '';
         const label = folder.split('/').filter(Boolean).pop() || 'Book';
         const book: BookContext = {
             bookId: folder,
@@ -81,7 +90,7 @@ export class BookSceneProvider implements SceneProvider {
     }
 
     getBooks(): BookContext[] {
-        const folder = this.plugin.settings.folderPath || '';
+        const folder = this.plugin.settings.storyLineRoot || '';
         const label = folder.split('/').filter(Boolean).pop() || 'Book';
         return [{ bookId: folder, bookLabel: label, bookOrder: 0 }];
     }

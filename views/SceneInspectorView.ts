@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { ItemView, WorkspaceLeaf, TFile, MarkdownView } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
@@ -44,7 +53,7 @@ export class SceneInspectorView extends ItemView {
 
         // Inspector component container
         const inspectorEl = container.createDiv('story-line-inspector-panel sl-sidebar-inspector');
-        inspectorEl.style.display = 'none';
+        inspectorEl.setCssStyles({ display: 'none' });
 
         // Empty state
         this.emptyEl = container.createDiv('sl-scene-inspector-empty');
@@ -64,7 +73,7 @@ export class SceneInspectorView extends ItemView {
                 onDelete: async (scene) => {
                     await this.sceneManager.deleteScene(scene.filePath);
                     this.inspectorComponent?.hide();
-                    if (this.emptyEl) this.emptyEl.style.display = 'block';
+                    if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'block' });
                 },
                 onRefresh: () => {
                     this.lastEditTime = Date.now();
@@ -102,7 +111,7 @@ export class SceneInspectorView extends ItemView {
             this.app.vault.on('modify', () => {
                 if (!this.inspectorComponent?.isVisible()) return;
                 if (Date.now() - this.lastEditTime < 2000) return;
-                setTimeout(() => this.refreshCurrentScene(), 600);
+                window.setTimeout(() => this.refreshCurrentScene(), 600);
             })
         );
 
@@ -114,7 +123,7 @@ export class SceneInspectorView extends ItemView {
                 if (Date.now() - this.lastEditTime < 2000) return;
                 const scene = this.sceneManager.getScene(filePath);
                 if (scene) {
-                    if (this.emptyEl) this.emptyEl.style.display = 'none';
+                    if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'none' });
                     this.inspectorComponent?.show(scene);
                 }
             })
@@ -126,7 +135,7 @@ export class SceneInspectorView extends ItemView {
                 if (Date.now() - this.lastEditTime < 2000) return;
                 const scene = this.sceneManager.getScene(filePath);
                 if (scene) {
-                    if (this.emptyEl) this.emptyEl.style.display = 'none';
+                    if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'none' });
                     this.inspectorComponent?.show(scene);
                 }
             })
@@ -145,14 +154,14 @@ export class SceneInspectorView extends ItemView {
         if (activeFile && activeFile.extension === 'md') {
             const scene = this.sceneManager.getScene(activeFile.path);
             if (scene) {
-                if (this.emptyEl) this.emptyEl.style.display = 'none';
+                if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'none' });
                 this.inspectorComponent?.show(scene);
                 return;
             }
         }
         // Active file is not a scene — show empty state
         this.inspectorComponent?.hide();
-        if (this.emptyEl) this.emptyEl.style.display = 'block';
+        if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'block' });
     }
 
     /**

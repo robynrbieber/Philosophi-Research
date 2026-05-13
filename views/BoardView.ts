@@ -1,3 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { ItemView, WorkspaceLeaf, Menu, Notice, TFile, Modal, Setting, MarkdownRenderer } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Scene, SceneFilter, SortConfig, BoardGroupBy, SceneStatus, SceneTemplate, BUILTIN_BEAT_SHEETS, getStatusOrder, getStatusConfig, resolveStatusCfg } from '../models/Scene';
@@ -18,7 +27,7 @@ import { resolveStickyNoteColors } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import { resolveImagePath } from '../components/ImagePicker';
 import type SceneCardsPlugin from '../main';
-import { compareActChapter, parseActChapterInput, isPureNumericActChapter } from '../utils/actChapter';
+import { compareActChapter, parseActChapterInput } from '../utils/actChapter';
 
 type BoardMode = 'kanban' | 'corkboard';
 
@@ -29,6 +38,7 @@ export class BoardView extends ItemView {
     private plugin: SceneCardsPlugin;
     private sceneManager: SceneManager;
     private cardComponent: SceneCardComponent;
+    private _lastCacheVersion = -1;
     private filtersComponent: FiltersComponent | null = null;
     private inspectorComponent: InspectorComponent | null = null;
     private currentFilter: SceneFilter = {};
@@ -40,11 +50,10 @@ export class BoardView extends ItemView {
     private bulkBarEl: HTMLElement | null = null;
     private rootContainer: HTMLElement | null = null;
     private _pendingRefresh: number | null = null;
-    private _lastCacheVersion = -1;
     private boardMode: BoardMode = 'corkboard';
     private corkboardPositions: Map<string, { x: number; y: number; z: number; h?: number }> = new Map();
     private corkboardJustDragged: Set<string> = new Set();
-    private corkboardPersistTimer: ReturnType<typeof setTimeout> | null = null;
+    private corkboardPersistTimer: number | null = null;
     private corkboardLoadedProjectFile: string | null = null;
     private _corkboardProjectLoaded = false;
     private dragToPanCleanup: (() => void) | null = null;
@@ -111,7 +120,7 @@ export class BoardView extends ItemView {
             this.dragToPanCleanup = null;
         }
         if (this.corkboardPersistTimer) {
-            clearTimeout(this.corkboardPersistTimer);
+            window.clearTimeout(this.corkboardPersistTimer);
             this.corkboardPersistTimer = null;
         }
         await this.persistCorkboardLayout();
@@ -194,13 +203,13 @@ export class BoardView extends ItemView {
 
         // Bulk action bar (hidden until 2+ selected)
         this.bulkBarEl = mainArea.createDiv('story-line-bulk-bar');
-        this.bulkBarEl.style.display = 'none';
+        this.bulkBarEl.setCssStyles({ display: 'none' });
 
         this.refreshBoard();
 
         // Inspector sidebar
         const inspectorEl = mainArea.createDiv('story-line-inspector-panel');
-        inspectorEl.style.display = 'none';
+        inspectorEl.setCssStyles({ display: 'none' });
         this.inspectorComponent = new InspectorComponent(
             inspectorEl,
             this.plugin,
@@ -342,7 +351,7 @@ export class BoardView extends ItemView {
             }
             attachTooltip(reseqBtn, 'Resequence all scenes');
             reseqBtn.addEventListener('click', async () => {
-                const scenes = this.sceneManager.getFilteredScenes(
+                const scenes = this.sceneManager.queryService.getFilteredScenes(
                     undefined,
                     { field: 'sequence', direction: 'asc' }
                 );
@@ -471,7 +480,7 @@ export class BoardView extends ItemView {
         for (const vs of this.scrollers) vs.destroy();
         this.scrollers = [];
 
-        const groups = this.sceneManager.getScenesGroupedByWithEmpty(
+        const groups = this.sceneManager.queryService.getScenesGroupedByWithEmpty(
             this.groupBy,
             this.currentFilter,
             this.currentSort
@@ -515,13 +524,12 @@ export class BoardView extends ItemView {
         for (const vs of this.scrollers) vs.destroy();
         this.scrollers = [];
 
-        let scenes = this.sceneManager.getFilteredScenes(this.currentFilter, this.currentSort);
+        let scenes = this.sceneManager.queryService.getFilteredScenes(this.currentFilter, this.currentSort);
         if (!this.plugin.settings.showScenesInCorkboard) {
             scenes = scenes.filter(scene => this.isCorkboardNoteScene(scene));
         }
         // Only render nodes for visible scenes, but keep positions for
         // filtered-out scenes so they don't lose their layout.
-        const validPaths = new Set(scenes.map(s => s.filePath));
 
         const currentMaxZ = () => {
             let max = 0;
@@ -567,9 +575,11 @@ export class BoardView extends ItemView {
             }
 
             const node = canvas.createDiv('story-line-corkboard-node');
-            node.style.left = `${pos.x}px`;
-            node.style.top = `${pos.y}px`;
-            node.style.zIndex = String(pos.z ?? 1);
+            node.setCssStyles({
+                left: `${pos.x}px`,
+                top: `${pos.y}px`,
+                zIndex: String(pos.z ?? 1),
+            });
             if (this.isCorkboardNoteScene(scene)) {
                 node.addClass('story-line-corkboard-note-node');
             }
@@ -602,7 +612,7 @@ export class BoardView extends ItemView {
 
             // Restore persisted height from layout data (only for note cards)
             if (pos.h && pos.h > 0 && this.isCorkboardNoteScene(scene)) {
-                cardEl.style.height = `${pos.h}px`;
+                cardEl.setCssStyles({ height: `${pos.h}px` });
             }
 
             this.attachCorkboardNoteEditor(cardEl, scene);
@@ -654,7 +664,7 @@ export class BoardView extends ItemView {
 
         const detachOutsideClose = () => {
             if (!outsidePointerHandler) return;
-            document.removeEventListener('pointerdown', outsidePointerHandler, true);
+            activeDocument.removeEventListener('pointerdown', outsidePointerHandler, true);
             outsidePointerHandler = null;
         };
 
@@ -685,6 +695,7 @@ export class BoardView extends ItemView {
             }
 
             if (offset === null && typeof docAny.caretRangeFromPoint === 'function') {
+                // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional fallback for older browsers without caretPositionFromPoint
                 const range = docAny.caretRangeFromPoint(clientX, clientY);
                 if (range && (range.startContainer === textNode || range.startContainer === textarea)) {
                     offset = range.startOffset;
@@ -704,8 +715,8 @@ export class BoardView extends ItemView {
         const setEditing = (editing: boolean, clickPoint?: { x: number; y: number }) => {
             isEditing = editing;
             if (editing) {
-                preview.style.display = 'none';
-                textarea.style.display = 'block';
+                preview.setCssStyles({ display: 'none' });
+                textarea.setCssStyles({ display: 'block' });
                 autoGrow();
                 textarea.focus();
                 if (clickPoint) {
@@ -722,19 +733,23 @@ export class BoardView extends ItemView {
                 };
                 window.setTimeout(() => {
                     if (outsidePointerHandler) {
-                        document.addEventListener('pointerdown', outsidePointerHandler, true);
+                        activeDocument.addEventListener('pointerdown', outsidePointerHandler, true);
                     }
                 }, 0);
             } else {
                 detachOutsideClose();
-                textarea.style.display = 'none';
-                preview.style.display = 'block';
+                textarea.setCssStyles({ display: 'none' });
+                preview.setCssStyles({ display: 'block' });
             }
         };
 
         const autoGrow = () => {
-            textarea.style.height = 'auto';
-            textarea.style.height = `${Math.max(96, textarea.scrollHeight)}px`;
+            textarea.setCssStyles({
+                height: 'auto'
+            });
+            textarea.setCssStyles({
+                height: `${Math.max(96, textarea.scrollHeight)}px`,
+            });
         };
         autoGrow();
 
@@ -817,7 +832,7 @@ export class BoardView extends ItemView {
 
             const onMove = (moveEvent: PointerEvent) => {
                 const nextHeight = Math.max(minHeight, startHeight + (moveEvent.clientY - startY) / zoom);
-                cardEl.style.height = `${nextHeight}px`;
+                cardEl.setCssStyles({ height: `${nextHeight}px` });
             };
 
             const onUp = () => {
@@ -902,8 +917,10 @@ export class BoardView extends ItemView {
 
         const applyDragPosition = () => {
             dragRaf = null;
-            node.style.left = `${pendingX}px`;
-            node.style.top = `${pendingY}px`;
+            node.setCssStyles({
+                left: `${pendingX}px`,
+                top: `${pendingY}px`,
+            });
             const current = this.corkboardPositions.get(scenePath);
             this.corkboardPositions.set(scenePath, { x: pendingX, y: pendingY, z: current?.z ?? 1 });
         };
@@ -920,7 +937,7 @@ export class BoardView extends ItemView {
             pendingY = startY + dy / zoom;
 
             if (dragRaf === null) {
-                dragRaf = requestAnimationFrame(applyDragPosition);
+                dragRaf = window.requestAnimationFrame(applyDragPosition);
             }
 
             e.preventDefault();
@@ -1000,7 +1017,7 @@ export class BoardView extends ItemView {
     }
 
     private applyCorkboardCamera(canvas: HTMLElement): void {
-        canvas.style.transform = `translate(${this.corkboardCamera.x}px, ${this.corkboardCamera.y}px) scale(${this.corkboardCamera.zoom})`;
+        canvas.setCssStyles({ transform: `translate(${this.corkboardCamera.x}px, ${this.corkboardCamera.y}px) scale(${this.corkboardCamera.zoom})` });
     }
 
     /**
@@ -1036,7 +1053,7 @@ export class BoardView extends ItemView {
 
             // Stop when close enough to the target
             if (Math.abs(newZoom - target) > 0.001) {
-                this.corkboardZoomRaf = requestAnimationFrame(step);
+                this.corkboardZoomRaf = window.requestAnimationFrame(step);
             } else {
                 // Snap to exact target on last frame
                 const worldX2 = (vx - this.corkboardCamera.x) / newZoom;
@@ -1049,7 +1066,7 @@ export class BoardView extends ItemView {
                 this.corkboardZoomTarget = null;
             }
         };
-        this.corkboardZoomRaf = requestAnimationFrame(step);
+        this.corkboardZoomRaf = window.requestAnimationFrame(step);
     }
 
     private enableCorkboardCameraInteraction(viewport: HTMLElement, canvas: HTMLElement): () => void {
@@ -1105,9 +1122,9 @@ export class BoardView extends ItemView {
                 this.corkboardCamera.x += velocityX;
                 this.corkboardCamera.y += velocityY;
                 this.applyCorkboardCamera(canvas);
-                this.corkboardInertiaRaf = requestAnimationFrame(inertiaStep);
+                this.corkboardInertiaRaf = window.requestAnimationFrame(inertiaStep);
             };
-            this.corkboardInertiaRaf = requestAnimationFrame(inertiaStep);
+            this.corkboardInertiaRaf = window.requestAnimationFrame(inertiaStep);
         };
 
         const onPointerDown = (e: PointerEvent) => {
@@ -1269,7 +1286,7 @@ export class BoardView extends ItemView {
     /** Flush any pending corkboard position writes to SceneManager immediately. */
     async flushPendingCorkboardPersist(): Promise<void> {
         if (this.corkboardPersistTimer) {
-            clearTimeout(this.corkboardPersistTimer);
+            window.clearTimeout(this.corkboardPersistTimer);
             this.corkboardPersistTimer = null;
             await this.persistCorkboardLayout();
         }
@@ -1282,7 +1299,7 @@ export class BoardView extends ItemView {
         // Cancel pending persist from a prior render to prevent auto-layout
         // defaults from overwriting real positions loaded from board.json.
         if (this.corkboardPersistTimer) {
-            clearTimeout(this.corkboardPersistTimer);
+            window.clearTimeout(this.corkboardPersistTimer);
             this.corkboardPersistTimer = null;
         }
 
@@ -1303,9 +1320,9 @@ export class BoardView extends ItemView {
 
     private schedulePersistCorkboardLayout(): void {
         if (this.corkboardPersistTimer) {
-            clearTimeout(this.corkboardPersistTimer);
+            window.clearTimeout(this.corkboardPersistTimer);
         }
-        this.corkboardPersistTimer = setTimeout(() => {
+        this.corkboardPersistTimer = window.setTimeout(() => {
             this.corkboardPersistTimer = null;
             void this.persistCorkboardLayout();
         }, 500);
@@ -1483,15 +1500,6 @@ export class BoardView extends ItemView {
         const toHex = (n: number) => n.toString(16).padStart(2, '0').toUpperCase();
         return `#${toHex(nr)}${toHex(ng)}${toHex(nb)}`;
     }
-
-    private hexToRgba(hex: string, alpha: number): string {
-        const normalized = this.normalizeHexColor(hex) ?? '#9A9072';
-        const r = Number.parseInt(normalized.slice(1, 3), 16);
-        const g = Number.parseInt(normalized.slice(3, 5), 16);
-        const b = Number.parseInt(normalized.slice(5, 7), 16);
-        return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
-    }
-
     private applyCorkboardNoteColor(cardEl: HTMLElement, scene: Scene): void {
         const presets = resolveStickyNoteColors(this.plugin.settings);
         const defaultColor = presets.length > 0 ? presets[0].color : '#F6EDB4';
@@ -1635,7 +1643,7 @@ export class BoardView extends ItemView {
                     // Resolve the *target* column (may differ from source)
                     const targetColumn = targetEl.closest('.story-line-column');
                     const targetGroupKey = targetColumn?.getAttribute('data-group') || title;
-                    const groups = this.sceneManager.getScenesGroupedByWithEmpty(
+                    const groups = this.sceneManager.queryService.getScenesGroupedByWithEmpty(
                         this.groupBy, this.currentFilter, this.currentSort
                     );
                     const targetScenes = groups.get(targetGroupKey) || scenes;
@@ -1900,12 +1908,12 @@ export class BoardView extends ItemView {
         if (!this.bulkBarEl) return;
 
         if (this.selectedScenes.size < 2) {
-            this.bulkBarEl.style.display = 'none';
+            this.bulkBarEl.setCssStyles({ display: 'none' });
             return;
         }
 
         this.bulkBarEl.empty();
-        this.bulkBarEl.style.display = 'flex';
+        this.bulkBarEl.setCssStyles({ display: 'flex' });
 
         const count = this.selectedScenes.size;
         this.bulkBarEl.createSpan({
@@ -1952,7 +1960,7 @@ export class BoardView extends ItemView {
             const acts = this.sceneManager.getDefinedActs();
             if (acts.length === 0) {
                 // Fallback: use acts found in scenes
-                const actValues = this.sceneManager.getUniqueValues('act');
+                const actValues = this.sceneManager.queryService.getUniqueValues('act');
                 actValues.forEach(act => {
                     menu.addItem(item => {
                         item.setTitle(`Act ${act}`)
@@ -1995,7 +2003,7 @@ export class BoardView extends ItemView {
         obsidian.setIcon(tagIcon, 'tag');
         tagBtn.addEventListener('click', (e) => {
             const menu = new Menu();
-            const tags = this.sceneManager.getAllTags();
+            const tags = this.sceneManager.queryService.getAllTags();
 
             tags.forEach(tag => {
                 menu.addItem(item => {
@@ -2025,8 +2033,18 @@ export class BoardView extends ItemView {
                 item.setTitle('New tag…')
                     .setIcon('plus')
                     .onClick(() => {
-                        const newTag = prompt('Enter new tag:');
-                        if (newTag) {
+                        const inputModal = new Modal(this.app);
+                        inputModal.titleEl.setText('New tag');
+                        const { contentEl } = inputModal;
+                        const input = contentEl.createEl('input', { type: 'text', attr: { placeholder: 'Enter new tag' } });
+                        input.setCssStyles({ width: '100%' });
+                        const btnRow = contentEl.createDiv({ cls: 'modal-button-container' });
+                        const okBtn = btnRow.createEl('button', { text: 'Add', cls: 'mod-cta' });
+                        const cancelBtn = btnRow.createEl('button', { text: 'Cancel' });
+                        const submit = () => {
+                            const newTag = input.value.trim();
+                            inputModal.close();
+                            if (!newTag) return;
                             (async () => {
                                 for (const fp of this.selectedScenes) {
                                     const scene = this.sceneManager.getScene(fp);
@@ -2043,7 +2061,12 @@ export class BoardView extends ItemView {
                                 this.refreshBoard();
                                 this.updateBulkBar();
                             })();
-                        }
+                        };
+                        okBtn.addEventListener('click', submit);
+                        cancelBtn.addEventListener('click', () => inputModal.close());
+                        input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') submit(); });
+                        inputModal.open();
+                        window.setTimeout(() => input.focus(), 0);
                     });
             });
 
@@ -2320,15 +2343,19 @@ export class BoardView extends ItemView {
         } else {
             for (const item of archived) {
                 const row = modal.contentEl.createDiv();
-                row.style.display = 'flex';
-                row.style.alignItems = 'center';
-                row.style.justifyContent = 'space-between';
-                row.style.padding = '6px 0';
-                row.style.borderBottom = '1px solid var(--background-modifier-border)';
+                row.setCssStyles({
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 0',
+                    borderBottom: '1px solid var(--background-modifier-border)',
+                });
                 row.createSpan({ text: item.title });
                 const restoreBtn = row.createEl('button', { text: 'Restore', cls: 'mod-cta' });
-                restoreBtn.style.fontSize = '11px';
-                restoreBtn.style.padding = '2px 10px';
+                restoreBtn.setCssStyles({
+                    fontSize: '11px',
+                    padding: '2px 10px',
+                });
                 restoreBtn.addEventListener('click', async () => {
                     await this.sceneManager.restoreScene(item.filePath);
                     await this.sceneManager.initialize();
@@ -2536,7 +2563,7 @@ export class BoardView extends ItemView {
         const { contentEl } = modal;
 
         let value = current;
-        const descSetting = new Setting(contentEl)
+        new Setting(contentEl)
             .setName('Description')
             .setDesc(`A short summary for ${type} ${num}. Leave blank to remove.`);
         const textArea = contentEl.createEl('textarea', {
@@ -2545,10 +2572,12 @@ export class BoardView extends ItemView {
         textArea.value = current;
         textArea.placeholder = 'e.g. "Our heroes arrive in the capital…"';
         textArea.rows = 4;
-        textArea.style.width = '100%';
-        textArea.style.resize = 'vertical';
+        textArea.setCssStyles({
+            width: '100%',
+            resize: 'vertical',
+        });
         textArea.addEventListener('input', () => { value = textArea.value; });
-        setTimeout(() => textArea.focus(), 50);
+        window.setTimeout(() => textArea.focus(), 50);
 
         const btnRow = contentEl.createDiv('structure-close-row');
         const saveBtn = btnRow.createEl('button', { text: 'Save', cls: 'mod-cta' });
@@ -2579,7 +2608,7 @@ export class BoardView extends ItemView {
                     .setPlaceholder(`e.g. "The Beginning"`)
                     .onChange(v => { value = v; });
                 // Auto-focus
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         const btnRow = contentEl.createDiv('structure-close-row');
@@ -2615,7 +2644,7 @@ export class BoardView extends ItemView {
             text: `Select scenes to assign to ${label}. Only scenes not already in a ${field} are shown.`
         });
 
-        const allScenes = this.sceneManager.getFilteredScenes(
+        const allScenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: 'sequence', direction: 'asc' }
         );
@@ -2636,16 +2665,20 @@ export class BoardView extends ItemView {
 
         const selectedPaths = new Set<string>();
         const listEl = contentEl.createDiv('assign-scene-list');
-        listEl.style.maxHeight = '400px';
-        listEl.style.overflow = 'auto';
-        listEl.style.margin = '8px 0';
+        listEl.setCssStyles({
+            maxHeight: '400px',
+            overflow: 'auto',
+            margin: '8px 0',
+        });
 
         for (const scene of candidates) {
             const row = listEl.createDiv('assign-scene-row');
-            row.style.display = 'flex';
-            row.style.alignItems = 'center';
-            row.style.gap = '8px';
-            row.style.padding = '4px 0';
+            row.setCssStyles({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '4px 0',
+            });
 
             const cb = row.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
             const currentVal = field === 'chapter' ? scene.chapter : scene.act;
@@ -2659,9 +2692,11 @@ export class BoardView extends ItemView {
         }
 
         const btnRow = contentEl.createDiv('structure-close-row');
-        btnRow.style.display = 'flex';
-        btnRow.style.gap = '8px';
-        btnRow.style.marginTop = '12px';
+        btnRow.setCssStyles({
+            display: 'flex',
+            gap: '8px',
+            marginTop: '12px',
+        });
         const assignBtn = btnRow.createEl('button', { text: 'Assign Selected', cls: 'mod-cta' });
         assignBtn.addEventListener('click', async () => {
             if (selectedPaths.size === 0) {
@@ -2749,13 +2784,12 @@ export class BoardView extends ItemView {
 
         // ── Acts section ──
         contentEl.createEl('h3', { text: 'Acts' });
-        const actsDesc = contentEl.createEl('p', {
+        contentEl.createEl('p', {
             cls: 'setting-item-description',
             text: 'Define acts for your story. Empty acts will appear as columns even without scenes.'
         });
 
         const actsList = contentEl.createDiv('structure-list');
-        const definedActs = this.sceneManager.getDefinedActs();
         const scenesPerAct = new Map<number, number>();
         for (const scene of this.sceneManager.getAllScenes()) {
             if (scene.act !== undefined) {
@@ -3038,7 +3072,7 @@ export class BoardView extends ItemView {
             this.saveColumnScrollPositions();
             this.renderBoard();
             // Restore scroll positions after DOM is rebuilt
-            requestAnimationFrame(() => this.restoreColumnScrollPositions());
+            window.requestAnimationFrame(() => this.restoreColumnScrollPositions());
         }
         // Only refresh inspector if it was already visible
         if (this.selectedScene && this.inspectorComponent?.isVisible()) {
@@ -3056,7 +3090,7 @@ export class BoardView extends ItemView {
     refresh(): void {
         if (!this.rootContainer) return;
         if (this._pendingRefresh) { cancelAnimationFrame(this._pendingRefresh); }
-        this._pendingRefresh = requestAnimationFrame(() => {
+        this._pendingRefresh = window.requestAnimationFrame(() => {
             this._pendingRefresh = null;
             if (!this.rootContainer) return;
             this._lastCacheVersion = this.sceneManager.cacheVersion;
@@ -3068,7 +3102,7 @@ export class BoardView extends ItemView {
             } else {
                 this.saveColumnScrollPositions();
                 this.renderView(this.rootContainer);
-                requestAnimationFrame(() => this.restoreColumnScrollPositions());
+                window.requestAnimationFrame(() => this.restoreColumnScrollPositions());
             }
 
             if (prevSelectedPath) {
@@ -3149,7 +3183,7 @@ export class BoardView extends ItemView {
             attr: { placeholder: 'Add a caption…', rows: '2' },
         });
         captionInput.value = caption;
-        captionInput.style.display = 'none';
+        captionInput.setCssStyles({ display: 'none' });
 
         const renderCaptionPreview = async () => {
             captionPreview.empty();
@@ -3167,8 +3201,8 @@ export class BoardView extends ItemView {
                 await this.sceneManager.updateScene(scene.filePath, { corkboardNoteCaption: next });
                 scene.corkboardNoteCaption = next;
             }
-            captionInput.style.display = 'none';
-            captionPreview.style.display = 'block';
+            captionInput.setCssStyles({ display: 'none' });
+            captionPreview.setCssStyles({ display: 'block' });
             await renderCaptionPreview();
         };
 
@@ -3185,19 +3219,19 @@ export class BoardView extends ItemView {
                 }
                 if (href && !href.startsWith('#')) return;
             }
-            captionPreview.style.display = 'none';
-            captionInput.style.display = 'block';
+            captionPreview.setCssStyles({ display: 'none' });
+            captionInput.setCssStyles({ display: 'block' });
             captionInput.focus();
 
             // Listen for clicks outside the caption to close the editor
             const outsideHandler = (pe: PointerEvent) => {
                 const target = pe.target as Node | null;
                 if (target && editorWrap.contains(target)) return;
-                document.removeEventListener('pointerdown', outsideHandler, true);
+                activeDocument.removeEventListener('pointerdown', outsideHandler, true);
                 void saveCaptionAndClose();
             };
             window.setTimeout(() => {
-                document.addEventListener('pointerdown', outsideHandler, true);
+                activeDocument.addEventListener('pointerdown', outsideHandler, true);
             }, 0);
         });
 
@@ -3218,7 +3252,7 @@ export class BoardView extends ItemView {
             const startHeight = cardEl.getBoundingClientRect().height / zoom;
             const minHeight = 180;
             const onMove = (me: PointerEvent) => {
-                cardEl.style.height = `${Math.max(minHeight, startHeight + (me.clientY - startY) / zoom)}px`;
+                cardEl.setCssStyles({ height: `${Math.max(minHeight, startHeight + (me.clientY - startY) / zoom)}px` });
             };
             const onUp = () => {
                 window.removeEventListener('pointermove', onMove);
@@ -3242,14 +3276,16 @@ export class BoardView extends ItemView {
      */
     private openImageLightbox(src: string, caption?: string): void {
         // Close any existing lightbox
-        document.querySelector('.gallery-lightbox-window')?.remove();
+        activeDocument.querySelector('.gallery-lightbox-window')?.remove();
 
         const winWidth = Math.min(600, window.innerWidth - 40);
         const winHeight = Math.round(winWidth * 3 / 4) + 36 + 28;
 
-        const win = document.body.createDiv('gallery-lightbox-window');
-        win.style.width = `${winWidth}px`;
-        win.style.height = `${winHeight}px`;
+        const win = activeDocument.body.createDiv('gallery-lightbox-window');
+        win.setCssStyles({
+            width: `${winWidth}px`,
+            height: `${winHeight}px`,
+        });
 
         // Titlebar
         const titlebar = win.createDiv('gallery-lightbox-titlebar');
@@ -3263,7 +3299,7 @@ export class BoardView extends ItemView {
         const imgContainer = contentRow.createDiv('gallery-lightbox-content');
         if (src) {
             const img = imgContainer.createEl('img', { attr: { src, alt: caption || 'Image note' } });
-            img.style.transformOrigin = 'center center';
+            img.setCssStyles({ transformOrigin: 'center center' });
         }
 
         // Caption
@@ -3282,7 +3318,7 @@ export class BoardView extends ItemView {
             const delta = e.deltaY > 0 ? -0.1 : 0.1;
             zoom = Math.max(0.5, Math.min(5, zoom + delta));
             const img = imgContainer.querySelector('img');
-            if (img) img.style.transform = `scale(${zoom})`;
+            if (img) img.setCssStyles({ transform: `scale(${zoom})` });
         }, { passive: false });
 
         // Drag titlebar
@@ -3295,16 +3331,20 @@ export class BoardView extends ItemView {
             const rect = win.getBoundingClientRect();
             dragOffsetX = e.clientX - rect.left;
             dragOffsetY = e.clientY - rect.top;
-            win.style.left = `${rect.left}px`;
-            win.style.top = `${rect.top}px`;
-            win.style.transform = 'none';
+            win.setCssStyles({
+                left: `${rect.left}px`,
+                top: `${rect.top}px`,
+                transform: 'none',
+            });
             titlebar.setPointerCapture(e.pointerId);
             e.preventDefault();
         });
         titlebar.addEventListener('pointermove', (e: PointerEvent) => {
             if (!isDragging) return;
-            win.style.left = `${e.clientX - dragOffsetX}px`;
-            win.style.top = `${e.clientY - dragOffsetY}px`;
+            win.setCssStyles({
+                left: `${e.clientX - dragOffsetX}px`,
+                top: `${e.clientY - dragOffsetY}px`,
+            });
         });
         titlebar.addEventListener('pointerup', () => { isDragging = false; });
         titlebar.addEventListener('lostpointercapture', () => { isDragging = false; });
@@ -3321,16 +3361,18 @@ export class BoardView extends ItemView {
         });
         resizeHandle.addEventListener('pointermove', (e: PointerEvent) => {
             if (!isResizing) return;
-            win.style.width = `${Math.max(200, startW + (e.clientX - resizeStartX))}px`;
-            win.style.height = `${Math.max(150, startH + (e.clientY - resizeStartY))}px`;
+            win.setCssStyles({
+                width: `${Math.max(200, startW + (e.clientX - resizeStartX))}px`,
+                height: `${Math.max(150, startH + (e.clientY - resizeStartY))}px`,
+            });
         });
         resizeHandle.addEventListener('pointerup', () => { isResizing = false; });
         resizeHandle.addEventListener('lostpointercapture', () => { isResizing = false; });
 
         // Escape to close
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { cleanup(); win.remove(); } };
-        document.addEventListener('keydown', onKey);
-        const cleanup = () => { document.removeEventListener('keydown', onKey); };
+        activeDocument.addEventListener('keydown', onKey);
+        const cleanup = () => { activeDocument.removeEventListener('keydown', onKey); };
     }
 
     /**

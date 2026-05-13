@@ -1,6 +1,16 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { ItemView, WorkspaceLeaf, TFile, Notice, Modal, Setting } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { Scene, STATUS_CONFIG, resolveStatusCfg } from '../models/Scene';
+import { LOCATION_VIEW_TYPE } from '../constants';
+import { Scene, resolveStatusCfg } from '../models/Scene';
 import {
     StoryWorld, StoryLocation, WorldOrLocation,
     WORLD_CATEGORIES, LOCATION_CATEGORIES, LOCATION_TYPES,
@@ -9,7 +19,6 @@ import {
 import { SceneManager } from '../services/SceneManager';
 import { LocationManager } from '../services/LocationManager';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
-import { UndoManager } from '../services/UndoManager';
 import { pickImage as pickImageModal, resolveImagePath } from '../components/ImagePicker';
 import { AddFieldModal } from '../components/AddFieldModal';
 import type { UniversalFieldTemplate } from '../services/FieldTemplateService';
@@ -19,7 +28,6 @@ import type SceneCardsPlugin from '../main';
 import { CharacterManager } from '../services/CharacterManager';
 import { RenameConfirmModal } from '../components/RenameConfirmModal';
 
-import { LOCATION_VIEW_TYPE, CODEX_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
 import { attachTooltip } from '../components/Tooltip';
 import { renderCodexCategoryTabs } from '../components/CodexCategoryTabs';
@@ -38,7 +46,7 @@ export class LocationView extends ItemView {
     private rootContainer: HTMLElement | null = null;
     private collapsedSections: Set<string> = new Set();
     private collapsedTreeNodes: Set<string> = new Set();
-    private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+    private autoSaveTimer: number | null = null;
     /** The draft waiting to be saved (if any) */
     private pendingSaveDraft: WorldOrLocation | null = null;
     /** Snapshot of the item before any edits — used for undo recording */
@@ -92,7 +100,7 @@ export class LocationView extends ItemView {
         // Flush any pending auto-save so edits are not lost
         await this.flushPendingSave();
         // Remove any orphaned gallery lightbox windows
-        document.querySelectorAll('.gallery-lightbox-window').forEach(el => el.remove());
+        activeDocument.querySelectorAll('.gallery-lightbox-window').forEach(el => el.remove());
     }
 
     // ── Main render ────────────────────────────────────
@@ -152,7 +160,7 @@ export class LocationView extends ItemView {
             this.searchText = searchInput.value;
             this.renderOverview(container);
         });
-        setTimeout(() => {
+        window.setTimeout(() => {
             searchInput.focus();
             searchInput.selectionStart = searchInput.selectionEnd = searchInput.value.length;
         }, 0);
@@ -272,7 +280,7 @@ export class LocationView extends ItemView {
         // Locations from scenes that don't have files yet
         const allLocNames = [...this.locationManager.getAllLocations().map(l => l.name.toLowerCase()),
             ...allWorlds.map(w => w.name.toLowerCase())];
-        const sceneLocations = this.sceneManager.getUniqueValues('location');
+        const sceneLocations = this.sceneManager.queryService.getUniqueValues('location');
         let unlinked = sceneLocations.filter(n => !allLocNames.includes(n.toLowerCase()));
         if (q) {
             unlinked = unlinked.filter(n => n.toLowerCase().includes(q));
@@ -307,7 +315,7 @@ export class LocationView extends ItemView {
                 this.renderView(this.rootContainer!);
             });
         } else {
-            chevron.style.width = '14px'; // spacer
+            chevron.setCssStyles({ width: '14px' }); // spacer
         }
 
         const icon = header.createSpan('location-tree-icon');
@@ -334,7 +342,6 @@ export class LocationView extends ItemView {
 
         header.createSpan({ cls: 'location-tree-name', text: world.name });
 
-        const badge = header.createSpan({ cls: 'location-tree-count', text: `${worldLocations.length} loc` });
 
         header.addEventListener('click', () => {
             this.selectedItem = world.filePath;
@@ -362,7 +369,7 @@ export class LocationView extends ItemView {
         const isCollapsed = this.collapsedTreeNodes.has(loc.filePath);
 
         const header = node.createDiv('location-tree-header');
-        header.style.paddingLeft = `${depth * 20}px`;
+        header.setCssStyles({ paddingLeft: `${depth * 20}px` });
 
         const chevron = header.createSpan('location-tree-chevron');
         if (childLocations.length > 0) {
@@ -377,7 +384,7 @@ export class LocationView extends ItemView {
                 this.renderView(this.rootContainer!);
             });
         } else {
-            chevron.style.width = '14px';
+            chevron.setCssStyles({ width: '14px' });
         }
 
         const icon = header.createSpan('location-tree-icon');
@@ -438,7 +445,7 @@ export class LocationView extends ItemView {
         const node = parent.createDiv('location-tree-node location-unlinked-node');
         const header = node.createDiv('location-tree-header');
 
-        header.createSpan({ cls: 'location-tree-chevron' }).style.width = '14px';
+        header.createSpan({ cls: 'location-tree-chevron' }).setCssStyles({ width: '14px' });
         const icon = header.createSpan('location-tree-icon');
         obsidian.setIcon(icon, 'map-pin');
         header.createSpan({ cls: 'location-tree-name', text: name });
@@ -726,17 +733,17 @@ export class LocationView extends ItemView {
         });
 
         const sectionBody = section.createDiv('location-section-body');
-        if (isCollapsed) sectionBody.style.display = 'none';
+        if (isCollapsed) sectionBody.setCssStyles({ display: 'none' });
 
         sectionHeader.addEventListener('click', (e) => {
             if ((e.target as HTMLElement).closest('.character-section-add-field-btn')) return;
             if (this.collapsedSections.has(category.title)) {
                 this.collapsedSections.delete(category.title);
-                sectionBody.style.display = '';
+                sectionBody.setCssStyles({ display: '' });
                 obsidian.setIcon(chevron, 'chevron-down');
             } else {
                 this.collapsedSections.add(category.title);
-                sectionBody.style.display = 'none';
+                sectionBody.setCssStyles({ display: 'none' });
                 obsidian.setIcon(chevron, 'chevron-right');
             }
         });
@@ -764,14 +771,14 @@ export class LocationView extends ItemView {
                 cls: 'hidden-fields-toggle-link',
             });
             const hiddenContainer = sectionBody.createDiv('hidden-fields-container');
-            hiddenContainer.style.display = 'none';
+            hiddenContainer.setCssStyles({ display: 'none' });
             for (const field of hiddenFieldsInCat) {
                 this.renderField(hiddenContainer, field, draft);
             }
             let showing = false;
             toggleEl.addEventListener('click', () => {
                 showing = !showing;
-                hiddenContainer.style.display = showing ? '' : 'none';
+                hiddenContainer.setCssStyles({ display: showing ? '' : 'none' });
                 toggleEl.querySelector('a')!.textContent = showing
                     ? `Hide ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`
                     : `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`;
@@ -960,7 +967,7 @@ export class LocationView extends ItemView {
                 attr: { placeholder: tpl.placeholder || 'Type to add\u2026' },
             });
             const msDropdown = inputRow.createDiv('universal-multi-dropdown');
-            msDropdown.style.display = 'none';
+            msDropdown.setCssStyles({ display: 'none' });
 
             const renderPills = () => {
                 pillsEl.empty();
@@ -983,8 +990,8 @@ export class LocationView extends ItemView {
                 msDropdown.empty();
                 const lf = filter.toLowerCase();
                 const available = allOptions.filter(o => !selected.includes(o) && o.toLowerCase().includes(lf));
-                if (available.length === 0) { msDropdown.style.display = 'none'; return; }
-                msDropdown.style.display = '';
+                if (available.length === 0) { msDropdown.setCssStyles({ display: 'none' }); return; }
+                msDropdown.setCssStyles({ display: '' });
                 for (const opt of available) {
                     const item = msDropdown.createDiv({ cls: 'universal-multi-dropdown-item', text: opt });
                     item.addEventListener('mousedown', (e) => {
@@ -1001,7 +1008,7 @@ export class LocationView extends ItemView {
 
             msInput.addEventListener('focus', () => updateMsDropdown(msInput.value));
             msInput.addEventListener('input', () => updateMsDropdown(msInput.value));
-            msInput.addEventListener('blur', () => { setTimeout(() => { msDropdown.style.display = 'none'; }, 200); });
+            msInput.addEventListener('blur', () => { window.setTimeout(() => { msDropdown.setCssStyles({ display: 'none' }); }, 200); });
             msInput.addEventListener('keydown', (e: KeyboardEvent) => {
                 if (e.key === 'Enter' && msInput.value.trim()) {
                     e.preventDefault();
@@ -1124,16 +1131,16 @@ export class LocationView extends ItemView {
         sectionHeader.createSpan({ text: title });
 
         const sectionBody = section.createDiv('location-section-body');
-        if (isCollapsed) sectionBody.style.display = 'none';
+        if (isCollapsed) sectionBody.setCssStyles({ display: 'none' });
 
         sectionHeader.addEventListener('click', () => {
             if (this.collapsedSections.has(title)) {
                 this.collapsedSections.delete(title);
-                sectionBody.style.display = '';
+                sectionBody.setCssStyles({ display: '' });
                 obsidian.setIcon(chevron, 'chevron-down');
             } else {
                 this.collapsedSections.add(title);
-                sectionBody.style.display = 'none';
+                sectionBody.setCssStyles({ display: 'none' });
                 obsidian.setIcon(chevron, 'chevron-right');
             }
         });
@@ -1235,7 +1242,7 @@ export class LocationView extends ItemView {
     }
 
     private renderLocationSidePanel(container: HTMLElement, loc: StoryLocation): void {
-        const scenes = this.sceneManager.getFilteredScenes(
+        const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: 'sequence', direction: 'asc' }
         );
@@ -1395,7 +1402,7 @@ export class LocationView extends ItemView {
                 .addText((text: any) => {
                     text.setPlaceholder('Planet');
                     text.onChange((v: string) => (name = v));
-                    setTimeout(() => text.inputEl?.focus(), 0);
+                    window.setTimeout(() => text.inputEl?.focus(), 0);
                     text.inputEl?.addEventListener('keydown', (e: KeyboardEvent) => {
                         if (e.key === 'Enter') {
                             e.preventDefault();
@@ -1431,9 +1438,9 @@ export class LocationView extends ItemView {
     }
 
     private scheduleSave(draft: WorldOrLocation): void {
-        if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+        if (this.autoSaveTimer) window.clearTimeout(this.autoSaveTimer);
         this.pendingSaveDraft = draft;
-        this.autoSaveTimer = setTimeout(async () => {
+        this.autoSaveTimer = window.setTimeout(async () => {
             try {
                 // Record undo snapshot
                 const undoMgr = this.plugin.sceneManager?.undoManager;
@@ -1511,7 +1518,7 @@ export class LocationView extends ItemView {
     /** Immediately flush any pending debounced save */
     private async flushPendingSave(): Promise<void> {
         if (this.autoSaveTimer) {
-            clearTimeout(this.autoSaveTimer);
+            window.clearTimeout(this.autoSaveTimer);
             this.autoSaveTimer = null;
         }
         if (this.pendingSaveDraft) {
@@ -1542,7 +1549,7 @@ export class LocationView extends ItemView {
             .addText(text => {
                 text.setPlaceholder('Enter world name\u2026')
                     .onChange(v => (name = v));
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         new Setting(modal.contentEl)
@@ -1576,7 +1583,7 @@ export class LocationView extends ItemView {
             .addText(text => {
                 text.setPlaceholder('Enter location name\u2026')
                     .onChange(v => (name = v));
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         // World selector
@@ -1759,17 +1766,17 @@ export class LocationView extends ItemView {
         }
 
         const body = wrapper.createDiv('character-gallery-body');
-        if (isCollapsed) body.style.display = 'none';
+        if (isCollapsed) body.setCssStyles({ display: 'none' });
 
         header.addEventListener('click', (e) => {
             if ((e.target as HTMLElement).closest('.character-section-add-field-btn')) return;
             if (this.collapsedSections.has(SECTION_KEY)) {
                 this.collapsedSections.delete(SECTION_KEY);
-                body.style.display = '';
+                body.setCssStyles({ display: '' });
                 obsidian.setIcon(chevron, 'chevron-down');
             } else {
                 this.collapsedSections.add(SECTION_KEY);
-                body.style.display = 'none';
+                body.setCssStyles({ display: 'none' });
                 obsidian.setIcon(chevron, 'chevron-right');
             }
         });
@@ -1790,7 +1797,7 @@ export class LocationView extends ItemView {
                         cls: 'character-gallery-img',
                         attr: { src, alt: entry.caption || 'Gallery image' }
                     });
-                    img.style.cursor = 'pointer';
+                    img.setCssStyles({ cursor: 'pointer' });
                     img.addEventListener('click', () => {
                         const galleryWidth = wrapper.offsetWidth;
                         this.openGalleryLightbox(gallery, activeIndex, galleryWidth);
@@ -1901,16 +1908,18 @@ export class LocationView extends ItemView {
         galleryWidth: number
     ): void {
         // Close any existing lightbox
-        document.querySelector('.gallery-lightbox-window')?.remove();
+        activeDocument.querySelector('.gallery-lightbox-window')?.remove();
 
         let currentIndex = startIndex;
         const winWidth = Math.min(Math.round(galleryWidth * 2), window.innerWidth - 40);
         const winHeight = Math.round(winWidth * 3 / 4) + 36 + 28; // 4:3 content + titlebar + caption
 
         // Floating window directly on body (no overlay — non-blocking)
-        const win = document.body.createDiv('gallery-lightbox-window');
-        win.style.width = `${winWidth}px`;
-        win.style.height = `${winHeight}px`;
+        const win = activeDocument.body.createDiv('gallery-lightbox-window');
+        win.setCssStyles({
+            width: `${winWidth}px`,
+            height: `${winHeight}px`,
+        });
 
         // Titlebar (draggable)
         const titlebar = win.createDiv('gallery-lightbox-titlebar');
@@ -1954,15 +1963,15 @@ export class LocationView extends ItemView {
             imgContainer.empty();
             if (src) {
                 const img = imgContainer.createEl('img', { attr: { src, alt: entry.caption || 'Gallery image' } });
-                img.style.transformOrigin = 'center center';
+                img.setCssStyles({ transformOrigin: 'center center' });
                 const z = getZoom();
-                if (z !== 1) img.style.transform = `scale(${z})`;
+                if (z !== 1) img.setCssStyles({ transform: `scale(${z})` });
             }
             captionEl.textContent = entry.caption || '';
-            captionEl.style.display = entry.caption ? '' : 'none';
+            captionEl.setCssStyles({ display: entry.caption ? '' : 'none' });
             // Hide nav buttons if only one image
-            prevBtn.style.display = gallery.length > 1 ? '' : 'none';
-            nextBtn.style.display = gallery.length > 1 ? '' : 'none';
+            prevBtn.setCssStyles({ display: gallery.length > 1 ? '' : 'none' });
+            nextBtn.setCssStyles({ display: gallery.length > 1 ? '' : 'none' });
         };
         renderContent();
 
@@ -1973,7 +1982,7 @@ export class LocationView extends ItemView {
             const newZoom = Math.max(0.5, Math.min(5, getZoom() + delta));
             setZoom(newZoom);
             const img = imgContainer.querySelector('img');
-            if (img) img.style.transform = `scale(${newZoom})`;
+            if (img) img.setCssStyles({ transform: `scale(${newZoom})` });
         }, { passive: false });
 
         // Touch pinch-to-zoom
@@ -1997,7 +2006,7 @@ export class LocationView extends ItemView {
                 const newZoom = Math.max(0.5, Math.min(5, pinchStartZoom * scale));
                 setZoom(newZoom);
                 const img = imgContainer.querySelector('img');
-                if (img) img.style.transform = `scale(${newZoom})`;
+                if (img) img.setCssStyles({ transform: `scale(${newZoom})` });
             }
         }, { passive: false });
 
@@ -2012,16 +2021,20 @@ export class LocationView extends ItemView {
             const rect = win.getBoundingClientRect();
             dragOffsetX = e.clientX - rect.left;
             dragOffsetY = e.clientY - rect.top;
-            win.style.left = `${rect.left}px`;
-            win.style.top = `${rect.top}px`;
-            win.style.transform = 'none';
+            win.setCssStyles({
+                left: `${rect.left}px`,
+                top: `${rect.top}px`,
+                transform: 'none',
+            });
             titlebar.setPointerCapture(e.pointerId);
             e.preventDefault();
         });
         titlebar.addEventListener('pointermove', (e: PointerEvent) => {
             if (!isDragging) return;
-            win.style.left = `${e.clientX - dragOffsetX}px`;
-            win.style.top = `${e.clientY - dragOffsetY}px`;
+            win.setCssStyles({
+                left: `${e.clientX - dragOffsetX}px`,
+                top: `${e.clientY - dragOffsetY}px`,
+            });
         });
         titlebar.addEventListener('pointerup', () => { isDragging = false; });
         titlebar.addEventListener('lostpointercapture', () => { isDragging = false; });
@@ -2047,8 +2060,10 @@ export class LocationView extends ItemView {
             if (!isResizing) return;
             const newW = Math.max(200, startW + (e.clientX - resizeStartX));
             const newH = Math.max(150, startH + (e.clientY - resizeStartY));
-            win.style.width = `${newW}px`;
-            win.style.height = `${newH}px`;
+            win.setCssStyles({
+                width: `${newW}px`,
+                height: `${newH}px`,
+            });
         });
         resizeHandle.addEventListener('pointerup', () => { isResizing = false; });
         resizeHandle.addEventListener('lostpointercapture', () => { isResizing = false; });
@@ -2060,10 +2075,10 @@ export class LocationView extends ItemView {
                 win.remove();
             }
         };
-        document.addEventListener('keydown', onKey);
+        activeDocument.addEventListener('keydown', onKey);
 
         const cleanup = () => {
-            document.removeEventListener('keydown', onKey);
+            activeDocument.removeEventListener('keydown', onKey);
         };
     }
 

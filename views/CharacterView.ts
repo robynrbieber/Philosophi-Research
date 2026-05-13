@@ -1,11 +1,16 @@
-import { ItemView, WorkspaceLeaf, TFile, Notice, Modal, Setting, requestUrl } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import * as obsidian from 'obsidian';
-import { Scene, STATUS_CONFIG, resolveStatusCfg } from '../models/Scene';
-import { Character, CharacterRelation, CharacterRelationCategory, CHARACTER_CATEGORIES, CHARACTER_ROLES, CharacterFieldDef, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, extractCharacterProps, extractCharacterLocationTags, extractAllCharacterTags, normalizeCharacterRelations, TagType, computeReciprocalUpdates, getRoleList, getRoleDisplay, getPrimaryRole, RoleEntry } from '../models/Character';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
-import { UndoManager } from '../services/UndoManager';
 import { RelationshipMap } from '../components/RelationshipMap';
 import { StoryGraph } from '../components/StoryGraph';
 import { pickImage as pickImageModal, resolveImagePath } from '../components/ImagePicker';
@@ -17,9 +22,12 @@ import { formatActChapterPrefix } from '../utils/actChapter';
 
 import type SceneCardsPlugin from '../main';
 
-import { CHARACTER_VIEW_TYPE, CODEX_VIEW_TYPE } from '../constants';
 import { attachTooltip } from '../components/Tooltip';
 import { renderCodexCategoryTabs } from '../components/CodexCategoryTabs';
+import { ItemView, Modal, Notice, Setting, TFile, WorkspaceLeaf } from 'obsidian';
+import { CHARACTER_CATEGORIES, CHARACTER_ROLES, Character, CharacterFieldDef, CharacterRelation, CharacterRelationCategory, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, RoleEntry, TagType, computeReciprocalUpdates, extractCharacterLocationTags, extractCharacterProps, getPrimaryRole, getRoleDisplay, getRoleList, normalizeCharacterRelations } from '../models/Character';
+import { CHARACTER_VIEW_TYPE } from '../constants';
+import { Scene, resolveStatusCfg } from '../models/Scene';
 
 /**
  * Character View - rich character cards with full profile editing.
@@ -34,7 +42,7 @@ export class CharacterView extends ItemView {
     private selectedCharacter: string | null = null;   // file path of selected character
     private rootContainer: HTMLElement | null = null;
     private collapsedSections: Set<string> = new Set();
-    private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+    private autoSaveTimer: number | null = null;
     /** The draft waiting to be saved (if any) */
     private pendingSaveDraft: Character | null = null;
     /** Snapshot of the character before any edits — used for undo recording */
@@ -101,8 +109,8 @@ export class CharacterView extends ItemView {
     async onClose(): Promise<void> {
         // Flush any pending auto-save so edits are not lost
         await this.flushPendingSave();
-        // Remove any floating lightbox windows from document.body
-        document.querySelectorAll('.gallery-lightbox-window').forEach(el => el.remove());
+        // Remove any floating lightbox windows from activeDocument.body
+        activeDocument.querySelectorAll('.gallery-lightbox-window').forEach(el => el.remove());
     }
 
     // ── Main render ────────────────────────────────────
@@ -224,7 +232,7 @@ export class CharacterView extends ItemView {
             this.renderCharacterOverview(container);
         });
         // Auto-focus the search field and restore cursor position
-        setTimeout(() => {
+        window.setTimeout(() => {
             searchInput.focus();
             searchInput.selectionStart = searchInput.selectionEnd = searchInput.value.length;
         }, 0);
@@ -266,7 +274,7 @@ export class CharacterView extends ItemView {
         const q = this.searchText.toLowerCase();
 
         let fileCharacters = this.characterManager.getAllCharacters();
-        const sceneCharNames = this.sceneManager.getAllCharacters();
+        const sceneCharNames = this.sceneManager.queryService.getAllCharacters();
         const scenes = this.sceneManager.getAllScenes();
 
         // Build alias map: lowered alias → canonical name
@@ -408,7 +416,7 @@ export class CharacterView extends ItemView {
                     const badge = statsDiv.createSpan({ cls: 'character-plotgrid-badge' });
                     badge.textContent = `${pgRows.size} plotgrid`;
                     badge.title = `Mentioned in plotgrid rows: ${[...pgRows].join(', ')}`;
-                    badge.style.color = 'var(--text-accent)';
+                    badge.setCssStyles({ color: 'var(--text-accent)' });
                 }
             }
         });
@@ -503,7 +511,7 @@ export class CharacterView extends ItemView {
         const completeness = card.createDiv('character-card-completeness');
         const bar = completeness.createDiv('character-completeness-bar');
         const fill = bar.createDiv('character-completeness-fill');
-        fill.style.width = `${pct}%`;
+        fill.setCssStyles({ width: `${pct}%` });
         completeness.createSpan({ cls: 'character-completeness-label', text: `${pct}% complete` });
 
         // Prop & location tags extracted from character fields
@@ -652,7 +660,7 @@ export class CharacterView extends ItemView {
 
         const toRemove = new Set<string>(); // lowered names to drop
 
-        for (const [firstLower, group] of byFirst) {
+        for (const [_firstLower, group] of byFirst) {
             if (group.length < 2) continue;
             // Separate single-word names from multi-word names
             const singles = group.filter(n => !n.includes(' '));
@@ -907,18 +915,18 @@ export class CharacterView extends ItemView {
         });
 
         const sectionBody = section.createDiv('character-section-body');
-        if (isCollapsed) sectionBody.style.display = 'none';
+        if (isCollapsed) sectionBody.setCssStyles({ display: 'none' });
 
         sectionHeader.addEventListener('click', (e) => {
             // Ignore clicks on the add-field button
             if ((e.target as HTMLElement).closest('.character-section-add-field-btn')) return;
             if (this.collapsedSections.has(category.title)) {
                 this.collapsedSections.delete(category.title);
-                sectionBody.style.display = '';
+                sectionBody.setCssStyles({ display: '' });
                 obsidian.setIcon(chevron, 'chevron-down');
             } else {
                 this.collapsedSections.add(category.title);
-                sectionBody.style.display = 'none';
+                sectionBody.setCssStyles({ display: 'none' });
                 obsidian.setIcon(chevron, 'chevron-right');
             }
         });
@@ -946,14 +954,14 @@ export class CharacterView extends ItemView {
                 cls: 'hidden-fields-toggle-link',
             });
             const hiddenContainer = sectionBody.createDiv('hidden-fields-container');
-            hiddenContainer.style.display = 'none';
+            hiddenContainer.setCssStyles({ display: 'none' });
             for (const field of hiddenFieldsInCat) {
                 this.renderField(hiddenContainer, field, draft);
             }
             let showing = false;
             toggleEl.addEventListener('click', () => {
                 showing = !showing;
-                hiddenContainer.style.display = showing ? '' : 'none';
+                hiddenContainer.setCssStyles({ display: showing ? '' : 'none' });
                 toggleEl.querySelector('a')!.textContent = showing
                     ? `Hide ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`
                     : `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`;
@@ -1066,13 +1074,13 @@ export class CharacterView extends ItemView {
             textarea.value = value;
             // Auto-grow: fit content, shrink back when empty
             const autoGrow = () => {
-                textarea.style.height = 'auto';
+                textarea.setCssStyles({ height: 'auto' });
                 const scrollH = textarea.scrollHeight;
                 const minH = 48; // ~2 rows
-                textarea.style.height = Math.max(scrollH, minH) + 'px';
+                textarea.setCssStyles({ height: Math.max(scrollH, minH) + 'px' });
             };
             // Initial sizing after paint
-            setTimeout(autoGrow, 0);
+            window.setTimeout(autoGrow, 0);
             textarea.addEventListener('input', () => {
                 (draft as any)[field.key] = textarea.value;
                 this.scheduleSave(draft);
@@ -1171,7 +1179,7 @@ export class CharacterView extends ItemView {
                 attr: { placeholder: tpl.placeholder || 'Type to add\u2026' },
             });
             const msDropdown = inputRow.createDiv('universal-multi-dropdown');
-            msDropdown.style.display = 'none';
+            msDropdown.setCssStyles({ display: 'none' });
 
             const renderPills = () => {
                 pillsEl.empty();
@@ -1194,8 +1202,8 @@ export class CharacterView extends ItemView {
                 msDropdown.empty();
                 const lf = filter.toLowerCase();
                 const available = allOptions.filter(o => !selected.includes(o) && o.toLowerCase().includes(lf));
-                if (available.length === 0) { msDropdown.style.display = 'none'; return; }
-                msDropdown.style.display = '';
+                if (available.length === 0) { msDropdown.setCssStyles({ display: 'none' }); return; }
+                msDropdown.setCssStyles({ display: '' });
                 for (const opt of available) {
                     const item = msDropdown.createDiv({ cls: 'universal-multi-dropdown-item', text: opt });
                     item.addEventListener('mousedown', (e) => {
@@ -1212,7 +1220,7 @@ export class CharacterView extends ItemView {
 
             msInput.addEventListener('focus', () => updateMsDropdown(msInput.value));
             msInput.addEventListener('input', () => updateMsDropdown(msInput.value));
-            msInput.addEventListener('blur', () => { setTimeout(() => { msDropdown.style.display = 'none'; }, 200); });
+            msInput.addEventListener('blur', () => { window.setTimeout(() => { msDropdown.setCssStyles({ display: 'none' }); }, 200); });
             msInput.addEventListener('keydown', (e: KeyboardEvent) => {
                 if (e.key === 'Enter' && msInput.value.trim()) {
                     e.preventDefault();
@@ -1264,10 +1272,10 @@ export class CharacterView extends ItemView {
             });
             textarea.value = value;
             const autoGrow = () => {
-                textarea.style.height = 'auto';
-                textarea.style.height = Math.max(textarea.scrollHeight, 48) + 'px';
+                textarea.setCssStyles({ height: 'auto' });
+                textarea.setCssStyles({ height: Math.max(textarea.scrollHeight, 48) + 'px' });
             };
-            setTimeout(autoGrow, 0);
+            window.setTimeout(autoGrow, 0);
             textarea.addEventListener('input', () => {
                 draft.universalFields![tpl.id] = textarea.value;
                 this.scheduleSave(draft);
@@ -1421,7 +1429,7 @@ export class CharacterView extends ItemView {
         const resolveAlias = (n: string): string => aliasMap.get(n.toLowerCase()) || n;
 
         const fileCharacters = this.characterManager.getAllCharacters().map(c => c.name);
-        const sceneCharacters = this.sceneManager.getAllCharacters();
+        const sceneCharacters = this.sceneManager.queryService.getAllCharacters();
         const mergedNames = Array.from(new Set([...fileCharacters, ...sceneCharacters].map(resolveAlias)))
             .filter(n => n !== draft.name)
             .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -1442,10 +1450,10 @@ export class CharacterView extends ItemView {
             for (const category of RELATION_CATEGORIES) {
                 const types = RELATION_TYPES_BY_CATEGORY[category.value];
                 if (types.length === 0) continue;
-                const group = document.createElement('optgroup');
+                const group = activeDocument.createElement('optgroup');
                 group.label = category.label;
                 for (const type of types) {
-                    const opt = document.createElement('option');
+                    const opt = activeDocument.createElement('option');
                     opt.value = type;
                     opt.text = type;
                     if (currentType === type) opt.selected = true;
@@ -1454,9 +1462,9 @@ export class CharacterView extends ItemView {
                 select.appendChild(group);
             }
 
-            const customGroup = document.createElement('optgroup');
+            const customGroup = activeDocument.createElement('optgroup');
             customGroup.label = 'Custom';
-            const createOpt = document.createElement('option');
+            const createOpt = activeDocument.createElement('option');
             createOpt.value = NEW_CUSTOM_TYPE_VALUE;
             createOpt.text = 'New';
             customGroup.appendChild(createOpt);
@@ -1485,7 +1493,7 @@ export class CharacterView extends ItemView {
                     type: 'text',
                     attr: { placeholder: 'Custom relation type (e.g. bodyguard)' },
                 });
-                customTypeInput.style.display = 'none';
+                customTypeInput.setCssStyles({ display: 'none' });
                 const dragHandle = inlineRow.createDiv('relation-builder-drag-handle');
                 dragHandle.draggable = true;
                 dragHandle.ariaLabel = 'Drag to reorder relation';
@@ -1506,8 +1514,8 @@ export class CharacterView extends ItemView {
                 const removeBtn = inlineRow.createEl('button', { cls: 'character-custom-remove relation-builder-remove', text: '×', attr: { title: 'Remove relation' } });
 
                 const setCustomMode = (enabled: boolean, focus = false) => {
-                    typeSelect.style.display = enabled ? 'none' : '';
-                    customTypeInput.style.display = enabled ? '' : 'none';
+                    typeSelect.setCssStyles({ display: enabled ? 'none' : '' });
+                    customTypeInput.setCssStyles({ display: enabled ? '' : 'none' });
                     if (enabled) {
                         customTypeInput.value = relation.type && relation.type !== NEW_CUSTOM_TYPE_VALUE ? relation.type : '';
                         if (focus) customTypeInput.focus();
@@ -1615,7 +1623,7 @@ export class CharacterView extends ItemView {
                 return;
             }
 
-            addBtn.style.display = 'none';
+            addBtn.setCssStyles({ display: 'none' });
             const tempSelect = addRow.createEl('select', { cls: 'character-field-input dropdown relation-builder-add-type relation-builder-add-picker' });
             tempSelect.createEl('option', { value: '', text: 'Choose relation type…' });
             buildTypeOptions(tempSelect);
@@ -1623,7 +1631,7 @@ export class CharacterView extends ItemView {
 
             const cleanup = () => {
                 if (tempSelect.parentElement) tempSelect.remove();
-                addBtn.style.display = '';
+                addBtn.setCssStyles({ display: '' });
             };
 
             tempSelect.addEventListener('change', () => {
@@ -1641,7 +1649,7 @@ export class CharacterView extends ItemView {
 
             tempSelect.addEventListener('blur', () => {
                 // Delay to allow change to fire first when selecting an option
-                setTimeout(() => cleanup(), 50);
+                window.setTimeout(() => cleanup(), 50);
             });
 
             const picker = tempSelect as HTMLSelectElement & { showPicker?: () => void };
@@ -1654,162 +1662,6 @@ export class CharacterView extends ItemView {
         });
 
         renderRows();
-    }
-
-    /**
-     * Render a tag-style character picker for relationship fields.
-     * Shows existing selections as removable tags, a dropdown to pick from existing characters,
-     * and a "+" button to quickly create a new character.
-     */
-    private renderCharacterTagField(row: HTMLElement, field: CharacterFieldDef, draft: Character): void {
-        const container = row.createDiv('character-tag-field');
-
-        // Build alias map so we can unify name variants
-        const aliasMap = this.characterManager.buildAliasMap(this.plugin.settings.characterAliases);
-
-        // Helper: resolve a name to its canonical form
-        const resolveAlias = (n: string): string => {
-            const canonical = aliasMap.get(n.toLowerCase());
-            return canonical || n;
-        };
-
-        // Current values as array — deduplicated through the alias map
-        const rawValues: string[] = Array.isArray((draft as any)[field.key])
-            ? [...(draft as any)[field.key]]
-            : [];
-        // Resolve aliases and deduplicate
-        const seenCanonical = new Set<string>();
-        const currentValues: string[] = [];
-        let valuesDirty = false;
-        for (const name of rawValues) {
-            const canonical = resolveAlias(name);
-            const key = canonical.toLowerCase();
-            if (seenCanonical.has(key)) {
-                valuesDirty = true; // will need a save
-                continue;
-            }
-            seenCanonical.add(key);
-            if (canonical !== name) {
-                currentValues.push(canonical);
-                valuesDirty = true;
-            } else {
-                currentValues.push(name);
-            }
-        }
-        // If we unified any names, persist immediately
-        if (valuesDirty) {
-            (draft as any)[field.key] = [...currentValues];
-            this.scheduleSave(draft);
-        }
-
-        // Get all available character names (from character files + scene references)
-        const fileCharacters = this.characterManager.getAllCharacters();
-        const allCharNames = fileCharacters.map(c => c.name);
-        const sceneCharNames = this.sceneManager.getAllCharacters();
-        // Merge and deduplicate via alias map — keep only canonical names
-        const rawMerged = new Set([...allCharNames, ...sceneCharNames]);
-        const mergedNames = new Set<string>();
-        for (const n of rawMerged) {
-            mergedNames.add(resolveAlias(n));
-        }
-        // Exclude the current character and already-selected names
-        const available = Array.from(mergedNames)
-            .filter(n => n !== draft.name && !currentValues.includes(n))
-            .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-
-        const tagsContainer = container.createDiv('character-tag-list');
-
-        const renderTags = () => {
-            tagsContainer.empty();
-            for (const name of currentValues) {
-                const tag = tagsContainer.createSpan('character-tag');
-                tag.createSpan({ text: name });
-                const removeBtn = tag.createSpan({ cls: 'character-tag-remove', text: '×' });
-                removeBtn.addEventListener('click', () => {
-                    const idx = currentValues.indexOf(name);
-                    if (idx >= 0) currentValues.splice(idx, 1);
-                    (draft as any)[field.key] = [...currentValues];
-                    this.scheduleSave(draft);
-                    renderTags();
-                    refreshDropdown();
-                });
-            }
-        };
-
-        // Add row: dropdown + add button
-        const addRow = container.createDiv('character-tag-add-row');
-        const select = addRow.createEl('select', { cls: 'character-field-input dropdown character-tag-select' });
-
-        const refreshDropdown = () => {
-            select.empty();
-            select.createEl('option', { text: field.placeholder, value: '' });
-            const remaining = Array.from(mergedNames)
-                .filter(n => n !== draft.name && !currentValues.includes(n))
-                .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-            for (const name of remaining) {
-                select.createEl('option', { text: name, value: name });
-            }
-        };
-        refreshDropdown();
-
-        select.addEventListener('change', () => {
-            const chosen = select.value;
-            if (chosen && !currentValues.includes(chosen)) {
-                currentValues.push(chosen);
-                (draft as any)[field.key] = [...currentValues];
-                this.scheduleSave(draft);
-                renderTags();
-                refreshDropdown();
-            }
-        });
-
-        // Quick-add "+" button to create a new character
-        const addBtn = addRow.createEl('button', {
-            cls: 'clickable-icon character-tag-add-btn',
-            attr: { 'aria-label': 'Create new character and add' },
-        });
-        obsidian.setIcon(addBtn, 'plus');
-        addBtn.addEventListener('click', async () => {
-            // Open a small modal to type a name
-            const modal = new Modal(this.app);
-            modal.titleEl.setText('New Character');
-            let newName = '';
-            new Setting(modal.contentEl)
-                .setName('Name')
-                .addText(text => {
-                    text.setPlaceholder('Character name')
-                        .onChange(v => { newName = v; });
-                    setTimeout(() => text.inputEl.focus(), 50);
-                });
-            const btnRow = modal.contentEl.createDiv('structure-close-row');
-            const createBtn = btnRow.createEl('button', { text: 'Create & Add', cls: 'mod-cta' });
-            createBtn.addEventListener('click', async () => {
-                if (!newName.trim()) return;
-                const trimmed = newName.trim();
-                // Create the character file
-                try {
-                    await this.characterManager.createCharacter(
-                        this.sceneManager.getCharacterFolder(),
-                        trimmed
-                    );
-                } catch (e) {
-                    // Character may already exist as a file — that's fine
-                }
-                // Add to the tag list
-                if (!currentValues.includes(trimmed)) {
-                    currentValues.push(trimmed);
-                    (draft as any)[field.key] = [...currentValues];
-                    this.scheduleSave(draft);
-                    mergedNames.add(trimmed);
-                    renderTags();
-                    refreshDropdown();
-                }
-                modal.close();
-            });
-            modal.open();
-        });
-
-        renderTags();
     }
 
     private renderCustomFields(parent: HTMLElement, draft: Character): void {
@@ -1825,16 +1677,16 @@ export class CharacterView extends ItemView {
         sectionHeader.createSpan({ text: title });
 
         const sectionBody = section.createDiv('character-section-body');
-        if (isCollapsed) sectionBody.style.display = 'none';
+        if (isCollapsed) sectionBody.setCssStyles({ display: 'none' });
 
         sectionHeader.addEventListener('click', () => {
             if (this.collapsedSections.has(title)) {
                 this.collapsedSections.delete(title);
-                sectionBody.style.display = '';
+                sectionBody.setCssStyles({ display: '' });
                 obsidian.setIcon(chevron, 'chevron-down');
             } else {
                 this.collapsedSections.add(title);
-                sectionBody.style.display = 'none';
+                sectionBody.setCssStyles({ display: 'none' });
                 obsidian.setIcon(chevron, 'chevron-right');
             }
         });
@@ -1949,17 +1801,17 @@ export class CharacterView extends ItemView {
         }
 
         const body = wrapper.createDiv('character-gallery-body');
-        if (isCollapsed) body.style.display = 'none';
+        if (isCollapsed) body.setCssStyles({ display: 'none' });
 
         header.addEventListener('click', (e) => {
             if ((e.target as HTMLElement).closest('.character-section-add-field-btn')) return;
             if (this.collapsedSections.has(SECTION_KEY)) {
                 this.collapsedSections.delete(SECTION_KEY);
-                body.style.display = '';
+                body.setCssStyles({ display: '' });
                 obsidian.setIcon(chevron, 'chevron-down');
             } else {
                 this.collapsedSections.add(SECTION_KEY);
-                body.style.display = 'none';
+                body.setCssStyles({ display: 'none' });
                 obsidian.setIcon(chevron, 'chevron-right');
             }
         });
@@ -1980,7 +1832,7 @@ export class CharacterView extends ItemView {
                         cls: 'character-gallery-img',
                         attr: { src, alt: entry.caption || 'Gallery image' }
                     });
-                    img.style.cursor = 'pointer';
+                    img.setCssStyles({ cursor: 'pointer' });
                     img.addEventListener('click', () => {
                         const galleryWidth = wrapper.offsetWidth;
                         this.openGalleryLightbox(gallery, activeIndex, galleryWidth);
@@ -2082,7 +1934,7 @@ export class CharacterView extends ItemView {
     // ── Scene side panel ───────────────────────────────
 
     private renderScenePanel(container: HTMLElement, characterName: string): void {
-        const scenes = this.sceneManager.getFilteredScenes(
+        const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: 'sequence', direction: 'asc' }
         );
@@ -2118,9 +1970,8 @@ export class CharacterView extends ItemView {
 
         // Plotgrid stat (patched async)
         const pgStatEl = statGrid.createDiv('character-stat-item');
-        pgStatEl.style.display = 'none';
+        pgStatEl.setCssStyles({ display: 'none' });
         const pgValEl = pgStatEl.createDiv({ cls: 'character-stat-value', text: '0' });
-        const pgLblEl = pgStatEl.createDiv({ cls: 'character-stat-label', text: 'Plotgrid' });
 
         // Writing progress
         const totalScenes = allCharScenes.length;
@@ -2134,7 +1985,7 @@ export class CharacterView extends ItemView {
             const progressBar = progressSection.createDiv('character-progress-bar');
             const filled = progressBar.createDiv('character-progress-filled');
             const percent = Math.round((completedScenes / totalScenes) * 100);
-            filled.style.width = `${percent}%`;
+            filled.setCssStyles({ width: `${percent}%` });
             progressSection.createSpan({
                 cls: 'character-progress-label',
                 text: `${completedScenes} of ${totalScenes} scenes written (${percent}%)`
@@ -2188,7 +2039,7 @@ export class CharacterView extends ItemView {
 
         // Plotgrid cell appearances (async)
         const pgSection = container.createDiv('character-side-scenes character-side-plotgrid');
-        pgSection.style.display = 'none';
+        pgSection.setCssStyles({ display: 'none' });
 
         if (typeof this.plugin.scanPlotGridCells === 'function') {
             this.plugin.scanPlotGridCells().then(result => {
@@ -2201,11 +2052,11 @@ export class CharacterView extends ItemView {
                 }
                 if (pgRows.size > 0) {
                     // Update the stat counter
-                    pgStatEl.style.display = '';
+                    pgStatEl.setCssStyles({ display: '' });
                     pgValEl.textContent = String(pgRows.size);
 
                     // Show section
-                    pgSection.style.display = '';
+                    pgSection.setCssStyles({ display: '' });
                     pgSection.createEl('h4', { text: 'Plotgrid Appearances' });
                     const sortedRows = [...pgRows].sort();
                     for (const rowLabel of sortedRows) {
@@ -2272,9 +2123,9 @@ export class CharacterView extends ItemView {
     // ── Auto-save ──────────────────────────────────────
 
     private scheduleSave(draft: Character): void {
-        if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+        if (this.autoSaveTimer) window.clearTimeout(this.autoSaveTimer);
         this.pendingSaveDraft = draft;
-        this.autoSaveTimer = setTimeout(async () => {
+        this.autoSaveTimer = window.setTimeout(async () => {
             try {
                 // Record undo snapshot
                 const undoMgr = this.plugin.sceneManager?.undoManager;
@@ -2408,7 +2259,7 @@ export class CharacterView extends ItemView {
     /** Immediately flush any pending debounced save */
     private async flushPendingSave(): Promise<void> {
         if (this.autoSaveTimer) {
-            clearTimeout(this.autoSaveTimer);
+            window.clearTimeout(this.autoSaveTimer);
             this.autoSaveTimer = null;
         }
         if (this.pendingSaveDraft) {
@@ -2434,7 +2285,7 @@ export class CharacterView extends ItemView {
             .addText(text => {
                 text.setPlaceholder('Enter character name\u2026')
                     .onChange(v => (name = v));
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         new Setting(modal.contentEl)
@@ -2609,7 +2460,7 @@ export class CharacterView extends ItemView {
         }
     }
 
-    private renderIntensityCurve(container: HTMLElement, character: string, scenes: Scene[]): void {
+    private renderIntensityCurve(container: HTMLElement, _character: string, scenes: Scene[]): void {
         const section = container.createDiv('character-arc-section');
         section.createEl('h4', { text: 'Character Arc (Intensity)' });
 
@@ -2623,7 +2474,7 @@ export class CharacterView extends ItemView {
         const maxIntensity = 10;
         const intensityRange = maxIntensity - minIntensity;
 
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const svg = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
         svg.setAttribute('width', '100%');
         svg.setAttribute('height', String(height));
@@ -2631,7 +2482,7 @@ export class CharacterView extends ItemView {
 
         for (let v = minIntensity; v <= maxIntensity; v += 5) {
             const y = padY + plotH - ((v - minIntensity) / intensityRange) * plotH;
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            const line = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', String(padX));
             line.setAttribute('x2', String(padX + plotW));
             line.setAttribute('y1', String(y));
@@ -2640,7 +2491,7 @@ export class CharacterView extends ItemView {
             svg.appendChild(line);
         }
 
-        const yLabelLow = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const yLabelLow = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'text');
         yLabelLow.setAttribute('x', String(padX - 6));
         yLabelLow.setAttribute('y', String(padY + plotH));
         yLabelLow.setAttribute('text-anchor', 'end');
@@ -2648,7 +2499,7 @@ export class CharacterView extends ItemView {
         yLabelLow.textContent = String(minIntensity);
         svg.appendChild(yLabelLow);
 
-        const yLabelHigh = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const yLabelHigh = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'text');
         yLabelHigh.setAttribute('x', String(padX - 6));
         yLabelHigh.setAttribute('y', String(padY + 4));
         yLabelHigh.setAttribute('text-anchor', 'end');
@@ -2666,31 +2517,31 @@ export class CharacterView extends ItemView {
 
         if (points.length >= 2) {
             const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const path = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', pathD);
             path.setAttribute('class', 'arc-line');
             svg.appendChild(path);
 
             const areaD = pathD + ` L ${points[points.length - 1].x} ${padY + plotH} L ${points[0].x} ${padY + plotH} Z`;
-            const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const area = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'path');
             area.setAttribute('d', areaD);
             area.setAttribute('class', 'arc-area');
             svg.appendChild(area);
         }
 
         points.forEach(p => {
-            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            const circle = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', String(p.x));
             circle.setAttribute('cy', String(p.y));
             circle.setAttribute('r', '4');
             circle.setAttribute('class', 'arc-dot');
 
-            const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+            const title = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'title');
             title.textContent = `${p.scene.title} \u2014 intensity: ${p.scene.intensity}`;
             circle.appendChild(title);
             svg.appendChild(circle);
 
-            const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            const label = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'text');
             label.setAttribute('x', String(p.x));
             label.setAttribute('y', String(padY + plotH + 14));
             label.setAttribute('text-anchor', 'middle');
@@ -2905,16 +2756,18 @@ export class CharacterView extends ItemView {
         galleryWidth: number
     ): void {
         // Close any existing lightbox
-        document.querySelector('.gallery-lightbox-window')?.remove();
+        activeDocument.querySelector('.gallery-lightbox-window')?.remove();
 
         let currentIndex = startIndex;
         const winWidth = Math.min(Math.round(galleryWidth * 2), window.innerWidth - 40);
         const winHeight = Math.round(winWidth * 3 / 4) + 36 + 28; // 4:3 content + titlebar + caption
 
         // Floating window directly on body (no overlay — non-blocking)
-        const win = document.body.createDiv('gallery-lightbox-window');
-        win.style.width = `${winWidth}px`;
-        win.style.height = `${winHeight}px`;
+        const win = activeDocument.body.createDiv('gallery-lightbox-window');
+        win.setCssStyles({
+            width: `${winWidth}px`,
+            height: `${winHeight}px`,
+        });
 
         // Titlebar (draggable)
         const titlebar = win.createDiv('gallery-lightbox-titlebar');
@@ -2958,15 +2811,15 @@ export class CharacterView extends ItemView {
             imgContainer.empty();
             if (src) {
                 const img = imgContainer.createEl('img', { attr: { src, alt: entry.caption || 'Gallery image' } });
-                img.style.transformOrigin = 'center center';
+                img.setCssStyles({ transformOrigin: 'center center' });
                 const z = getZoom();
-                if (z !== 1) img.style.transform = `scale(${z})`;
+                if (z !== 1) img.setCssStyles({ transform: `scale(${z})` });
             }
             captionEl.textContent = entry.caption || '';
-            captionEl.style.display = entry.caption ? '' : 'none';
+            captionEl.setCssStyles({ display: entry.caption ? '' : 'none' });
             // Hide nav buttons if only one image
-            prevBtn.style.display = gallery.length > 1 ? '' : 'none';
-            nextBtn.style.display = gallery.length > 1 ? '' : 'none';
+            prevBtn.setCssStyles({ display: gallery.length > 1 ? '' : 'none' });
+            nextBtn.setCssStyles({ display: gallery.length > 1 ? '' : 'none' });
         };
         renderContent();
 
@@ -2977,7 +2830,7 @@ export class CharacterView extends ItemView {
             const newZoom = Math.max(0.5, Math.min(5, getZoom() + delta));
             setZoom(newZoom);
             const img = imgContainer.querySelector('img');
-            if (img) img.style.transform = `scale(${newZoom})`;
+            if (img) img.setCssStyles({ transform: `scale(${newZoom})` });
         }, { passive: false });
 
         // Touch pinch-to-zoom
@@ -3001,7 +2854,7 @@ export class CharacterView extends ItemView {
                 const newZoom = Math.max(0.5, Math.min(5, pinchStartZoom * scale));
                 setZoom(newZoom);
                 const img = imgContainer.querySelector('img');
-                if (img) img.style.transform = `scale(${newZoom})`;
+                if (img) img.setCssStyles({ transform: `scale(${newZoom})` });
             }
         }, { passive: false });
 
@@ -3019,16 +2872,20 @@ export class CharacterView extends ItemView {
             dragOffsetX = e.clientX - rect.left;
             dragOffsetY = e.clientY - rect.top;
             // Resolve transform to explicit left/top on first drag
-            win.style.left = `${rect.left}px`;
-            win.style.top = `${rect.top}px`;
-            win.style.transform = 'none';
+            win.setCssStyles({
+                left: `${rect.left}px`,
+                top: `${rect.top}px`,
+                transform: 'none',
+            });
             titlebar.setPointerCapture(e.pointerId);
             e.preventDefault();
         });
         titlebar.addEventListener('pointermove', (e: PointerEvent) => {
             if (!isDragging) return;
-            win.style.left = `${e.clientX - dragOffsetX}px`;
-            win.style.top = `${e.clientY - dragOffsetY}px`;
+            win.setCssStyles({
+                left: `${e.clientX - dragOffsetX}px`,
+                top: `${e.clientY - dragOffsetY}px`,
+            });
         });
         titlebar.addEventListener('pointerup', () => { isDragging = false; });
         titlebar.addEventListener('lostpointercapture', () => { isDragging = false; });
@@ -3054,8 +2911,10 @@ export class CharacterView extends ItemView {
             if (!isResizing) return;
             const newW = Math.max(200, startW + (e.clientX - resizeStartX));
             const newH = Math.max(150, startH + (e.clientY - resizeStartY));
-            win.style.width = `${newW}px`;
-            win.style.height = `${newH}px`;
+            win.setCssStyles({
+                width: `${newW}px`,
+                height: `${newH}px`,
+            });
         });
         resizeHandle.addEventListener('pointerup', () => { isResizing = false; });
         resizeHandle.addEventListener('lostpointercapture', () => { isResizing = false; });
@@ -3067,10 +2926,10 @@ export class CharacterView extends ItemView {
                 win.remove();
             }
         };
-        document.addEventListener('keydown', onKey);
+        activeDocument.addEventListener('keydown', onKey);
 
         const cleanup = () => {
-            document.removeEventListener('keydown', onKey);
+            activeDocument.removeEventListener('keydown', onKey);
         };
     }
 }

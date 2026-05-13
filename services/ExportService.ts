@@ -1,14 +1,23 @@
-import { App, Notice, TFile } from 'obsidian';
-import { Scene, STATUS_CONFIG, SceneStatus, resolveStatusCfg } from '../models/Scene';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { StoryLineProject } from '../models/StoryLineProject';
 import { SceneManager } from './SceneManager';
 import { compareActChapter } from '../utils/actChapter';
 import { CharacterManager } from './CharacterManager';
 import { LocationManager } from './LocationManager';
-import { Character, relationDisplayLabel, getRoleDisplay } from '../models/Character';
-import { StoryWorld, StoryLocation } from '../models/Location';
 import { SLMarkdownToDocxConverter, SLDocxSettings, SLObsidianFontSettings } from './DocxConverter';
 import { SLPdfSettings } from './PdfConverter';
+import { App, Notice, TFile } from 'obsidian';
+import { Scene, resolveStatusCfg } from '../models/Scene';
+import { getRoleDisplay, relationDisplayLabel } from '../models/Character';
+import { StoryLocation } from '../models/Location';
 
 export type ExportFormat = 'md' | 'json' | 'html' | 'csv' | 'docx' | 'pdf';
 export type ExportScope = 'manuscript' | 'outline';
@@ -114,7 +123,7 @@ export class ExportService {
 
     private getSortedScenes(): Scene[] {
         // Spread into a new array so we don't mutate the memoized cache
-        let scenes = [...this.sceneManager.getFilteredScenes(
+        let scenes = [...this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: 'sequence', direction: 'asc' }
         )];
@@ -463,19 +472,24 @@ export class ExportService {
         const filename = `${project.title} - ${scope === 'manuscript' ? 'Manuscript' : 'Outline'} (${this.timestamp()}).html`;
         const filePath = await this.writeExportFile(project, filename, html);
 
-        // Also open print dialog for direct PDF save
-        const printWindow = window.open('', '_blank');
+        // Also open print dialog for direct PDF save.
+        // Use a Blob URL instead of document.write (which is disallowed by Obsidian's review checks).
+        const blob = new Blob([html], { type: 'text/html' });
+        const blobUrl = URL.createObjectURL(blob);
+        const printWindow = window.open(blobUrl, '_blank');
         if (!printWindow) {
+            URL.revokeObjectURL(blobUrl);
             new Notice(`Saved as ${filename} — open it in a browser to print as PDF`);
             return filePath;
         }
 
-        printWindow.document.write(html);
-        printWindow.document.close();
-
-        setTimeout(() => {
-            printWindow.print();
-        }, 400);
+        window.setTimeout(() => {
+            try {
+                printWindow.print();
+            } finally {
+                URL.revokeObjectURL(blobUrl);
+            }
+        }, 800);
 
         new Notice(`Exported to ${filename}`);
         return filePath;
@@ -806,7 +820,8 @@ ${body}
     private stripObsidianTags(text: string): string {
         // Match #word-chars that are NOT at the start of a line (headings)
         // and NOT preceded by & (HTML entities like &#123;)
-        return text.replace(/(?<=\s|^)#([\w\-\/]+)/gm, '$1');
+        // Avoid lookbehind for iOS <16.4 compatibility.
+        return text.replace(/(^|\s)#([\w\-\/]+)/gm, '$1$2');
     }
 
     /**
@@ -821,7 +836,7 @@ ${body}
         s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
         // Italic: *text* or _text_ (but not inside words for _)
         s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
-        s = s.replace(/(?<=\s|^)_(.+?)_(?=\s|$)/g, '<em>$1</em>');
+        s = s.replace(/(^|\s)_(.+?)_(?=\s|$)/g, '$1<em>$2</em>');
         // Inline code: `text`
         s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
         // Strikethrough: ~~text~~
@@ -933,9 +948,9 @@ ${body}
 
     /** Read Obsidian's computed font settings for DOCX export */
     private getObsidianFontSettings(): SLObsidianFontSettings {
-        let editorEl = document.querySelector('.markdown-preview-view, .markdown-source-view');
-        if (!editorEl || !(editorEl instanceof HTMLElement)) {
-            editorEl = document.body;
+        let editorEl = activeDocument.querySelector('.markdown-preview-view, .markdown-source-view');
+        if (!editorEl || !editorEl.instanceOf(HTMLElement)) {
+            editorEl = activeDocument.body;
         }
 
         const computedStyle = window.getComputedStyle(editorEl as HTMLElement);
@@ -986,8 +1001,8 @@ ${body}
 
             let found = false;
             for (const selector of selectors) {
-                const headingEl = document.querySelector(selector);
-                if (headingEl && headingEl instanceof HTMLElement) {
+                const headingEl = activeDocument.querySelector(selector);
+                if (headingEl && headingEl.instanceOf(HTMLElement)) {
                     const hStyle = window.getComputedStyle(headingEl);
                     const hFontSizePx = parseFloat(hStyle.getPropertyValue('font-size') || '16px');
                     let hFontSizePt = Math.round(hFontSizePx * 0.75);
@@ -1081,14 +1096,16 @@ ${body}
 
         return new Promise<Uint8Array | null>((resolve) => {
             try {
-                const webview = document.createElement('webview') as any;
+                const webview = activeDocument.createElement('webview') as any;
 
                 // Hide the webview off-screen
-                webview.style.position = 'fixed';
-                webview.style.left = '-9999px';
-                webview.style.top = '-9999px';
-                webview.style.width = '1px';
-                webview.style.height = '1px';
+                webview.setCssStyles({
+                    position: 'fixed',
+                    left: '-9999px',
+                    top: '-9999px',
+                    width: '1px',
+                    height: '1px',
+                });
 
                 // Security: no node integration inside the webview
                 webview.setAttribute('nodeintegration', 'false');
@@ -1101,7 +1118,7 @@ ${body}
                 const cleanup = () => { try { webview.remove(); } catch { /* noop */ } };
 
                 // Safety timeout (15 s)
-                const timer = setTimeout(() => {
+                const timer = window.setTimeout(() => {
                     console.warn('StoryLine PDF: webview printToPDF timed out, falling back to pdf-lib');
                     cleanup();
                     resolve(null);
@@ -1110,7 +1127,7 @@ ${body}
                 webview.addEventListener('dom-ready', async () => {
                     try {
                         // Short delay for rendering / images
-                        await new Promise(r => setTimeout(r, 500));
+                        await new Promise(r => window.setTimeout(r, 500));
 
                         // Margins are handled via CSS @page in the HTML template
                         // (more reliable than printToPDF margin options across Electron versions).
@@ -1125,24 +1142,24 @@ ${body}
                                 : '<span></span>',
                         });
 
-                        clearTimeout(timer);
+                        window.clearTimeout(timer);
                         cleanup();
                         resolve(new Uint8Array(pdfBuffer));
                     } catch (e) {
                         console.error('StoryLine PDF: printToPDF failed', e);
-                        clearTimeout(timer);
+                        window.clearTimeout(timer);
                         cleanup();
                         resolve(null);
                     }
                 });
 
                 webview.addEventListener('did-fail-load', () => {
-                    clearTimeout(timer);
+                    window.clearTimeout(timer);
                     cleanup();
                     resolve(null);
                 });
 
-                document.body.appendChild(webview);
+                activeDocument.body.appendChild(webview);
             } catch (e) {
                 console.error('StoryLine PDF: webview not available', e);
                 resolve(null);

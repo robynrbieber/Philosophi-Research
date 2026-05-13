@@ -1,6 +1,15 @@
-import { App, TFile, TFolder, parseYaml, stringifyYaml, normalizePath } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { Character, CharacterRelation, CHARACTER_FIELD_KEYS, LEGACY_RELATION_FIELDS_TO_CLEAN, normalizeCharacterRelations, normalizeRoleEntries } from '../models/Character';
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
+import { App, TFile, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
 
 /**
  * Manages character .md files — loading, saving, creating, and deleting
@@ -254,7 +263,7 @@ export class CharacterManager {
         const normalizedFilePath = normalizePath(filePath);
         const file = this.app.vault.getAbstractFileByPath(normalizedFilePath);
         if (file instanceof TFile) {
-            await this.app.vault.trash(file, true);
+            await this.app.fileManager.trashFile(file);
         }
         this.characters.delete(normalizedFilePath);
     }
@@ -308,14 +317,6 @@ export class CharacterManager {
         this.characters.set(newPath, updated);
         return updated;
     }
-
-    // ── Private helpers ────────────────────────────────
-
-    private async parseCharacterFile(file: TFile): Promise<Character | null> {
-        const content = await this.app.vault.read(file);
-        return this.parseCharacterContent(content, file.path);
-    }
-
     /**
      * Parse raw markdown content as a Character.
      * Used by both TFile-based and adapter-based loading.

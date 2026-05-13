@@ -10491,3 +10491,65 @@ body.theme-dark .location-field-input.dropdown {
     margin-left: -8px;
     margin-right: -12px;
 }
+
+/* -- PlotgridView toolbar icon styling (moved from inline <style>) -- */
+.plot-grid-toolbar .icon-button,
+.plot-grid-toolbar .clickable-icon {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    outline: none;
+    padding: 2px;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.plot-grid-toolbar .icon-button:focus,
+.plot-grid-toolbar .clickable-icon:focus {
+    outline: none;
+    box-shadow: none;
+}
+.plot-grid-toolbar .icon-button i[data-lucide],
+.plot-grid-toolbar .icon-button svg,
+.plot-grid-toolbar .clickable-icon i[data-lucide],
+.plot-grid-toolbar .clickable-icon svg {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.plot-grid-toolbar .icon-button:hover,
+.plot-grid-toolbar .clickable-icon:hover {
+    background-color: var(--sl-hover-overlay2);
+    border-radius: 6px;
+}
+.plot-grid-toolbar .icon-button:active i,
+.plot-grid-toolbar .icon-button:active svg,
+.plot-grid-toolbar .clickable-icon:active i,
+.plot-grid-toolbar .clickable-icon:active svg {
+    transform: scale(0.96);
+}
+
+/* -- ManuscriptView focus mode (CSS variables driven from settings) -- */
+body.sl-focus-active-global {
+    /* CSS variables --sl-focus-opacity, --sl-focus-darken-filter, --sl-focus-blur-filter, --sl-focus-bg
+       are set programmatically on the body element when focus mode is active. */
+}
+
+
+/* StoryLine focus-mode static rules; values driven from CSS custom properties set in JS. */
+.sl-manuscript-focus .story-line-toolbar {
+    opacity: var(--sl-focus-toolbar-opacity, 0.25);
+    transition: opacity 0.25s ease;
+}
+body.sl-focus-active-global.sl-focus-has-darken .app-container {
+    background-color: var(--sl-focus-bg, transparent);
+}
+body.sl-focus-active-global .workspace-split.mod-left-split,
+body.sl-focus-active-global .workspace-split.mod-right-split,
+body.sl-focus-active-global .workspace-ribbon,
+body.sl-focus-active-global .mod-root > .workspace-tabs > .workspace-tab-header-container,
+body.sl-focus-active-global .titlebar {
+    filter: var(--sl-focus-filter, none);
+    transition: filter 0.25s ease;
+}

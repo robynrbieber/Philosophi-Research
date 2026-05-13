@@ -1,6 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { App, Notice, normalizePath } from 'obsidian';
 import type SceneCardsPlugin from '../main';
-import { SeriesMetadata, StoryLineProject, deriveProjectFoldersFromFilePath } from '../models/StoryLineProject';
+import { SeriesMetadata, deriveProjectFoldersFromFilePath } from '../models/StoryLineProject';
 
 /**
  * Manages series — groups of book projects sharing a common codex.
@@ -199,7 +208,7 @@ export class SeriesManager {
         // the book folder \u2014 would attempt to move the book into itself.
         if (seriesFolderName.toLowerCase() === bookBaseName.toLowerCase()) {
             throw new Error(
-                `Series folder \"${seriesFolderName}\" has the same name as the book folder. ` +
+                `Series folder "${seriesFolderName}" has the same name as the book folder. ` +
                 `Rename the book or the series before adding.`
             );
         }

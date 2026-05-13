@@ -1,10 +1,18 @@
-import { App, Modal, Setting, DropdownComponent, TextComponent, Notice } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { Scene, SceneStatus, SceneTemplate, BUILTIN_SCENE_TEMPLATES, getStatusOrder, getStatusConfig } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
-import { LocationManager } from '../services/LocationManager';
 import type SceneCardsPlugin from '../main';
 import { renderAutocompleteInput, renderTagPillInput } from './InlineSuggest';
 import { isPureNumericActChapter, nextNumericActChapter } from '../utils/actChapter';
+import { App, Modal, Notice, Setting } from 'obsidian';
 
 /**
  * Modal for quickly creating new scenes
@@ -30,7 +38,7 @@ export class QuickAddModal extends Modal {
         this.sceneManager = sceneManager;
         this.onSubmit = onSubmit;
         this.defaults = defaults || {};
-        this.result.status = plugin.settings.defaultStatus as SceneStatus;
+        this.result.status = plugin.settings.defaultStatus;
         // Apply defaults
         Object.assign(this.result, this.defaults);
     }
@@ -66,7 +74,7 @@ export class QuickAddModal extends Modal {
                     .onChange(value => this.result.title = value);
                 text.inputEl.addClass('story-line-title-input');
                 // Auto-focus
-                setTimeout(() => text.inputEl.focus(), 50);
+                window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         // Act + Chapter row (manual layout — side by side)
@@ -148,7 +156,7 @@ export class QuickAddModal extends Modal {
             container: povContainer,
             value: this.result.pov || '',
             getSuggestions: () => {
-                const characters = this.sceneManager.getAllCharacters();
+                const characters = this.sceneManager.queryService.getAllCharacters();
                 const cm = this.plugin.characterManager;
                 const names = new Map<string, string>();
                 for (const c of characters) names.set(c.toLowerCase(), c);
@@ -182,7 +190,7 @@ export class QuickAddModal extends Modal {
             container: charContainer,
             values: [],
             getSuggestions: () => {
-                const characters = this.sceneManager.getAllCharacters();
+                const characters = this.sceneManager.queryService.getAllCharacters();
                 const cm = this.plugin.characterManager;
                 const names = new Map<string, string>();
                 for (const c of characters) names.set(c.toLowerCase(), c);
@@ -227,7 +235,7 @@ export class QuickAddModal extends Modal {
 
         checkbox.addEventListener('change', () => {
             this.conflictSameAsDescription = checkbox.checked;
-            conflictSetting.settingEl.style.display = checkbox.checked ? 'none' : '';
+            conflictSetting.settingEl.setCssStyles({ display: checkbox.checked ? 'none' : '' });
         });
 
         // Tags / Plotlines
@@ -339,7 +347,7 @@ export class QuickAddModal extends Modal {
         }
 
         // From scene metadata (catches locations not yet profiled)
-        const sceneLocations = this.sceneManager.getUniqueValues('location');
+        const sceneLocations = this.sceneManager.queryService.getUniqueValues('location');
         for (const name of sceneLocations) {
             const key = name.toLowerCase();
             if (!names.has(key)) names.set(key, name);

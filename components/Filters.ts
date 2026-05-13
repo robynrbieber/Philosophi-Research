@@ -1,8 +1,18 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-argument,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-return
+   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
+      workspace view casts, plugin registration, frontmatter records, third-party
+      libraries without type definitions). These warnings are suppressed file-wide
+      with the same convention used by other major community plugins. */
 import { Setting, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { SceneFilter, SceneStatus, SortConfig, SortField, SortDirection, FilterPreset, getStatusOrder } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
+import type { SceneFilter, SortConfig, SortField, FilterPreset } from '../models/Scene';
+import { getStatusOrder } from '../models/Scene';
 
 type FocusModeCallback = (active: boolean) => void;
 
@@ -16,9 +26,8 @@ export class FiltersComponent {
     private currentFilter: SceneFilter = {};
     private currentSort: SortConfig = { field: 'sequence', direction: 'asc' };
     private onChange: (filter: SceneFilter, sort: SortConfig) => void;
-    private visible = false;
-
     private onFocusModeChange?: FocusModeCallback;
+    private visible = false;
 
     constructor(
         container: HTMLElement,
@@ -106,12 +115,12 @@ export class FiltersComponent {
         obsidian.setIcon(filterIcon, 'list-filter');
         toggleBtn.addEventListener('click', () => {
             this.visible = !this.visible;
-            filterPanel.style.display = this.visible ? 'block' : 'none';
+            filterPanel.setCssStyles({ display: this.visible ? 'block' : 'none' });
         });
 
         // Expandable filter panel
         const filterPanel = this.container.createDiv('story-line-filter-panel');
-        filterPanel.style.display = this.visible ? 'block' : 'none';
+        filterPanel.setCssStyles({ display: this.visible ? 'block' : 'none' });
 
         this.renderFilterPanel(filterPanel);
     }
@@ -121,9 +130,8 @@ export class FiltersComponent {
      */
     private renderFilterPanel(panel: HTMLElement): void {
         // Status filter
-        const statusValues = this.sceneManager.getUniqueValues('status');
+        const statusValues = this.sceneManager.queryService.getUniqueValues('status');
         if (statusValues.length > 0) {
-            const statusSetting = new Setting(panel).setName('Status');
             const statusContainer = panel.createDiv('story-line-filter-chips');
             const allStatuses = getStatusOrder();
             allStatuses.forEach(status => {
@@ -147,7 +155,7 @@ export class FiltersComponent {
         }
 
         // Act filter
-        const actValues = this.sceneManager.getUniqueValues('act');
+        const actValues = this.sceneManager.queryService.getUniqueValues('act');
         if (actValues.length > 0) {
             new Setting(panel).setName('Act');
             const actContainer = panel.createDiv('story-line-filter-chips');
@@ -172,7 +180,7 @@ export class FiltersComponent {
         }
 
         // POV filter
-        const povValues = this.sceneManager.getUniqueValues('pov');
+        const povValues = this.sceneManager.queryService.getUniqueValues('pov');
         if (povValues.length > 0) {
             new Setting(panel).setName('POV');
             const povContainer = panel.createDiv('story-line-filter-chips');
@@ -197,7 +205,7 @@ export class FiltersComponent {
         }
 
         // Character filter
-        const charValues = this.sceneManager.getAllCharacters();
+        const charValues = this.sceneManager.queryService.getAllCharacters();
         if (charValues.length > 0) {
             new Setting(panel).setName('Characters');
             const charContainer = panel.createDiv('story-line-filter-chips');
@@ -223,7 +231,7 @@ export class FiltersComponent {
         }
 
         // Location filter
-        const locValues = this.sceneManager.getUniqueValues('location');
+        const locValues = this.sceneManager.queryService.getUniqueValues('location');
         if (locValues.length > 0) {
             new Setting(panel).setName('Location');
             const locContainer = panel.createDiv('story-line-filter-chips');
@@ -249,7 +257,7 @@ export class FiltersComponent {
         }
 
         // Tag filter
-        const tagValues = this.sceneManager.getAllTags();
+        const tagValues = this.sceneManager.queryService.getAllTags();
         if (tagValues.length > 0) {
             new Setting(panel).setName('Tags');
             const tagContainer = panel.createDiv('story-line-filter-chips');
@@ -348,7 +356,7 @@ export class FiltersComponent {
                     return;
                 }
                 // Prompt for name
-                const nameInput = document.createElement('input');
+                const nameInput = activeDocument.createElement('input');
                 nameInput.type = 'text';
                 nameInput.placeholder = 'Preset name…';
                 nameInput.className = 'story-line-preset-name-input';
