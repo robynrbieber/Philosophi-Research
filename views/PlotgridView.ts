@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
-import { ItemView, WorkspaceLeaf, Menu, Modal, TFile, Notice, MarkdownRenderer, Component } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { App, ItemView, WorkspaceLeaf, Menu, Modal, TFile, Notice, MarkdownRenderer, Component } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { CellData, ColumnMeta, RowMeta, PlotGridData } from '../models/PlotGridData';
 import { LocationManager } from '../services/LocationManager';
@@ -455,9 +454,10 @@ export class PlotgridView extends ItemView {
 
         // Initialize Lucide icons replacement for any `data-lucide` placeholders we added above
         try {
-            if (typeof (lucide as any).createIcons === 'function') {
-                const icons = (lucide as any).icons || (lucide as any);
-                try { (lucide as any).createIcons({ icons }); } catch (e) { /* fallback no-op */ }
+            const lucideRec = lucide as unknown as { createIcons?: (opts?: { icons?: unknown }) => void; icons?: unknown };
+            if (typeof lucideRec.createIcons === 'function') {
+                const icons = lucideRec.icons || lucideRec;
+                try { lucideRec.createIcons({ icons }); } catch (e) { /* fallback no-op */ }
             }
         } catch (e) { /* ignore lucide init errors */ }
 
@@ -492,9 +492,10 @@ export class PlotgridView extends ItemView {
                     const svg = holder.querySelector('svg') as SVGElement | null;
                     if (svg) {
                         // Do not hard-set width/height — allow the app's icon sizing to control pixel dimensions so it matches BoardView
-                        (svg as any).setCssStyles({ transition: 'transform 120ms ease, opacity 120ms ease' });
-                        (svg as any).setCssStyles({ opacity: '0.95' });
-                        (svg as any).setCssStyles({ display: 'block' });
+                        const svgEl = svg as unknown as { setCssStyles: (s: Record<string, string>) => void };
+                        svgEl.setCssStyles({ transition: 'transform 120ms ease, opacity 120ms ease' });
+                        svgEl.setCssStyles({ opacity: '0.95' });
+                        svgEl.setCssStyles({ display: 'block' });
                     }
                 }
                 // add hover and active feedback for each button
@@ -539,7 +540,7 @@ export class PlotgridView extends ItemView {
         this.data.zoom = z;
         if (this.canvasEl && this.scrollAreaEl) {
             // Use CSS zoom instead of transform: scale() to preserve position: sticky
-            (this.canvasEl.style as any).zoom = String(z);
+            (this.canvasEl.style as unknown as Record<string, unknown>).zoom = String(z);
             const totalWidth = this.computeTotalWidth();
             this.canvasEl.setCssStyles({ width: totalWidth + 'px' });
         }
@@ -570,7 +571,7 @@ export class PlotgridView extends ItemView {
         const sceneManager = this.plugin?.sceneManager as SceneManager | undefined;
         const activeProject = sceneManager?.activeProject;
         const hasFilter = this.currentFilter && Object.keys(this.currentFilter).some(
-            k => { const v = (this.currentFilter as any)[k]; return v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0); }
+            k => { const v = (this.currentFilter as unknown as Record<string, unknown>)[k]; return v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0); }
         );
         let filteredPaths: Set<string> | null = null;
         if (hasFilter && sceneManager) {
@@ -607,8 +608,8 @@ export class PlotgridView extends ItemView {
                     }
                     return cmp * dir;
                 }
-                const valA = (sceneA as any)[field];
-                const valB = (sceneB as any)[field];
+                const valA = (sceneA as unknown as Record<string, unknown>)[field];
+                const valB = (sceneB as unknown as Record<string, unknown>)[field];
                 if (valA == null && valB == null) return 0;
                 if (valA == null) return 1;
                 if (valB == null) return -1;
@@ -640,14 +641,16 @@ export class PlotgridView extends ItemView {
                 const dividers: Array<{type: 'act'|'chapter', label: string}> = [];
                 if (scene.act !== undefined && String(scene.act) !== String(prevAct)) {
                     const actNum = typeof scene.act === 'number' ? scene.act : parseInt(String(scene.act), 10);
-                    const rawActLabel = !isNaN(actNum) ? (activeProject as any)?.actLabels?.[actNum] || '' : '';
+                    const actLabels = (activeProject as unknown as { actLabels?: Record<number, string> })?.actLabels;
+                    const rawActLabel = !isNaN(actNum) ? (actLabels?.[actNum] || '') : '';
                     const cleanActLabel = rawActLabel.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
                     dividers.push({ type: 'act', label: cleanActLabel ? `Act ${scene.act}: ${cleanActLabel}` : `Act ${scene.act}` });
                     prevChapter = undefined;
                 }
                 if (scene.chapter !== undefined && String(scene.chapter) !== String(prevChapter)) {
                     const chNum = typeof scene.chapter === 'number' ? scene.chapter : parseInt(String(scene.chapter), 10);
-                    const rawChLabel = !isNaN(chNum) ? (activeProject as any)?.chapterLabels?.[chNum] || '' : '';
+                    const chapterLabels = (activeProject as unknown as { chapterLabels?: Record<number, string> })?.chapterLabels;
+                    const rawChLabel = !isNaN(chNum) ? (chapterLabels?.[chNum] || '') : '';
                     const cleanChLabel = rawChLabel.replace(/^Ch(?:apter)?\s*\d+\s*[—:]\s*/i, '');
                     dividers.push({ type: 'chapter', label: cleanChLabel ? `Ch ${scene.chapter}: ${cleanChLabel}` : `Chapter ${scene.chapter}` });
                 }
@@ -699,7 +702,7 @@ export class PlotgridView extends ItemView {
             menu.addItem((it) => it.setTitle('Reset Grid').onClick(() => {
                 class ConfirmModal extends Modal {
                     onConfirm: () => void;
-                    constructor(app: any, onConfirm: () => void) { super(app); this.onConfirm = onConfirm; }
+                    constructor(app: App, onConfirm: () => void) { super(app); this.onConfirm = onConfirm; }
                     onOpen() {
                         const { contentEl } = this;
                         contentEl.createEl('h3', { text: 'Reset Grid' });
@@ -1112,7 +1115,7 @@ export class PlotgridView extends ItemView {
                             // Determine note color
                             let noteBg = '#F6EDB4'; // fallback yellow
                             if (this.plugin) {
-                                const noteColor = (scene as any).corkboardNoteColor;
+                                const noteColor = (scene as unknown as Record<string, unknown>).corkboardNoteColor as string | undefined;
                                 if (noteColor) {
                                     noteBg = noteColor;
                                 } else {
@@ -1624,7 +1627,7 @@ export class PlotgridView extends ItemView {
         // visually mark selection
         // remove any previous header selection classes
         this.canvasEl?.querySelectorAll('.plot-grid-row-header.selected').forEach(n => n.classList.remove('selected'));
-        const sel = this.canvasEl?.querySelectorAll('.plot-grid-cell') || [] as any;
+        const sel = this.canvasEl?.querySelectorAll('.plot-grid-cell') || [];
         sel.forEach((n: Element) => (n as HTMLElement).classList.remove('selected'));
         const header = this.canvasEl?.querySelectorAll('.plot-grid-row-header')[index] as HTMLElement | undefined;
         if (header) header.classList.add('selected');
@@ -1634,7 +1637,7 @@ export class PlotgridView extends ItemView {
         this.selectedCol = index;
         this.selectedRow = null;
         this.canvasEl?.querySelectorAll('.plot-grid-col-header.selected').forEach(n => n.classList.remove('selected'));
-        const sel = this.canvasEl?.querySelectorAll('.plot-grid-cell') || [] as any;
+        const sel = this.canvasEl?.querySelectorAll('.plot-grid-cell') || [];
         sel.forEach((n: Element) => (n as HTMLElement).classList.remove('selected'));
         const header = this.canvasEl?.querySelectorAll('.plot-grid-col-header')[index] as HTMLElement | undefined;
         if (header) header.classList.add('selected');
@@ -1713,7 +1716,7 @@ export class PlotgridView extends ItemView {
             hexEl: HTMLInputElement | null = null;
             onChoose: (c: string | null) => void;
             onPreview?: (c: string | null) => void;
-            constructor(app: any, init: string, onChoose: (c: string | null) => void, onPreview?: (c: string | null) => void) { super(app); this.initVal = init; this.onChoose = onChoose; this.onPreview = onPreview; }
+            constructor(app: App, init: string, onChoose: (c: string | null) => void, onPreview?: (c: string | null) => void) { super(app); this.initVal = init; this.onChoose = onChoose; this.onPreview = onPreview; }
             onOpen() {
                 const { contentEl } = this;
                 const titleEl = contentEl.createEl('h3', { text: 'Choose color' });
@@ -1796,7 +1799,7 @@ export class PlotgridView extends ItemView {
                     padding: '8px 12px',
                     marginTop: '0',
                 });
-                const modalEl = (this as any).modalEl as HTMLElement;
+                const modalEl = (this as unknown as Record<string, unknown>).modalEl as HTMLElement;
                 if (modalEl) {
                     modalEl.setCssStyles({
                         width: '300px',
@@ -2402,7 +2405,7 @@ export class PlotgridView extends ItemView {
             onChoose: (path: string) => void;
             listEl: HTMLDivElement | null = null;
             inputEl: HTMLInputElement | null = null;
-            constructor(app: any, onChoose: (p: string) => void) {
+            constructor(app: App, onChoose: (p: string) => void) {
                 super(app);
                 this.onChoose = onChoose;
             }
@@ -2457,7 +2460,7 @@ export class PlotgridView extends ItemView {
         // eslint-disable-next-line @typescript-eslint/no-this-alias -- nested Modal class needs access to the outer view instance for callbacks
         const view = this;
         class SyncModal extends Modal {
-            constructor(app: any) { super(app); }
+            constructor(app: App) { super(app); }
             onOpen() {
                 const { contentEl } = this;
                 contentEl.createEl('h3', { text: 'Sync from Scenes' });
@@ -2485,7 +2488,7 @@ export class PlotgridView extends ItemView {
                 colSourceSelect.createEl('option', { text: 'Locations', value: 'locations' });
                 // Add codex categories that appear in sidebar
                 const codexMgr = view.plugin?.codexManager;
-                const sidebarCats = (view.plugin as any)?.settings?.codexSidebarCategories as string[] | undefined;
+                const sidebarCats = (view.plugin as unknown as { settings?: { codexSidebarCategories?: string[] } })?.settings?.codexSidebarCategories;
                 if (codexMgr && sidebarCats) {
                     for (const catId of sidebarCats) {
                         const catDef = codexMgr.getCategoryDef(catId);
@@ -2567,7 +2570,7 @@ export class PlotgridView extends ItemView {
         let aliasMap: Map<string, string> | null = null;
         if (colSource === 'characters') {
             const charMgr = this.plugin?.characterManager as CharacterManager | undefined;
-            const manualAliases = (this.plugin as any)?.settings?.characterAliases;
+            const manualAliases = (this.plugin as unknown as { settings?: { characterAliases?: Record<string, string> } })?.settings?.characterAliases;
             if (charMgr) {
                 aliasMap = charMgr.buildAliasMap(manualAliases);
             }
@@ -2765,7 +2768,7 @@ export class PlotgridView extends ItemView {
         this.data.rows = this.data.rows || [];
         this.data.columns = this.data.columns || [];
         this.data.cells = this.data.cells || {};
-        if (typeof (this.data as any).stickyHeaders === 'undefined') (this.data as any).stickyHeaders = true;
+        if (typeof (this.data as unknown as Record<string, unknown>).stickyHeaders === 'undefined') (this.data as unknown as Record<string, unknown>).stickyHeaders = true;
     }
 
     private addRow() {

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 /**
  * Mobile support adapter for StoryLine.
  *
@@ -14,13 +14,13 @@ import { Platform } from 'obsidian';
 export const isMobile: boolean = Platform.isMobile;
 
 /** True only on iOS / iPadOS */
-export const isIOS: boolean = (Platform as any).isIos ?? false;
+export const isIOS: boolean = ((Platform as unknown as Record<string, unknown>).isIos as boolean | undefined) ?? false;
 
 /** True only on Android */
-export const isAndroid: boolean = (Platform as any).isAndroid ?? false;
+export const isAndroid: boolean = ((Platform as unknown as Record<string, unknown>).isAndroid as boolean | undefined) ?? false;
 
 /** True on tablet-sized screens (iPad, Android tablets) */
-export const isTablet: boolean = (Platform as any).isTablet ?? false;
+export const isTablet: boolean = ((Platform as unknown as Record<string, unknown>).isTablet as boolean | undefined) ?? false;
 
 /** True on phone-sized screens */
 export const isPhone: boolean = isMobile && !isTablet;

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { WorkspaceLeaf } from 'obsidian';
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
@@ -152,7 +152,7 @@ function showCodexDropdown(
             await leaf.setViewState({ type: CODEX_VIEW_TYPE, active: true, state: {} });
             plugin.app.workspace.revealLeaf(leaf);
             // Explicitly reset to hub state in case onOpen didn't re-fire
-            const view = leaf.view as any;
+            const view = leaf.view as unknown as { setActiveCategory?: (id: string) => void };
             if (view && typeof view.setActiveCategory === 'function') {
                 view.setActiveCategory('');
             }
@@ -175,7 +175,7 @@ function showCodexDropdown(
     );
     for (const id of enabledIds) {
         const builtin = getBuiltinCodexCategory(id);
-        const custom = customDefs.find((c: any) => c.id === id);
+        const custom = customDefs.find((c: { id: string }) => c.id === id);
         const def = builtin || custom;
         if (def) {
             // Codex category — navigate to CodexView with this category active
@@ -187,7 +187,7 @@ function showCodexDropdown(
                     await leaf.setViewState({ type: CODEX_VIEW_TYPE, active: true, state: {} });
                     plugin.app.workspace.revealLeaf(leaf);
                     // Find the CodexView instance and set its category
-                    const view = leaf.view as any;
+                    const view = leaf.view as unknown as { setActiveCategory?: (id: string) => void };
                     if (view && typeof view.setActiveCategory === 'function') {
                         view.setActiveCategory(id);
                     }

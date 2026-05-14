@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { ItemView, WorkspaceLeaf, TFile, MarkdownView } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { EventRef, ItemView, WorkspaceLeaf, TFile, MarkdownView } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { InspectorComponent } from '../components/Inspector';
@@ -111,7 +111,7 @@ export class SceneInspectorView extends ItemView {
         // Suppress during the cooldown window after an edit so the
         // Manuscript rebuild doesn't clobber the inspector mid-interaction.
         this.registerEvent(
-            (this.app.workspace as any).on('storyline:manuscript-focus', (filePath: string) => {
+            (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on('storyline:manuscript-focus', (filePath: string) => {
                 if (Date.now() - this.lastEditTime < 2000) return;
                 const scene = this.sceneManager.getScene(filePath);
                 if (scene) {
@@ -123,7 +123,7 @@ export class SceneInspectorView extends ItemView {
 
         // Listen for scene-focus from any StoryLine view (Board, Timeline, Plotgrid, etc.)
         this.registerEvent(
-            (this.app.workspace as any).on('storyline:scene-focus', (filePath: string) => {
+            (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on('storyline:scene-focus', (filePath: string) => {
                 if (Date.now() - this.lastEditTime < 2000) return;
                 const scene = this.sceneManager.getScene(filePath);
                 if (scene) {

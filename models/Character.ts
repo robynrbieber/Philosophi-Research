@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 /**
  * Character data model - represents a character profile stored as a markdown file
  * in the project's Characters/ folder.
@@ -250,7 +250,7 @@ export function normalizeRoleEntries(raw: unknown): RoleEntry[] {
             continue;
         }
         if (item && typeof item === 'object') {
-            const obj = item as Record<string, unknown>;
+            const obj = item as unknown as Record<string, unknown>;
             const role = typeof obj.role === 'string' ? obj.role.trim() : '';
             if (!role) continue;
             const entry: RoleEntry = { role };
@@ -277,7 +277,7 @@ export function normalizeRoleEntries(raw: unknown): RoleEntry[] {
  */
 export function getRoleList(role: string | string[] | undefined): string[];
 export function getRoleList(character: Pick<Character, 'role' | 'roles'>): string[];
-export function getRoleList(input: any): string[] {
+export function getRoleList(input: unknown): string[] {
     // Character object overload — prefer Tier 2 roles[] if present.
     if (input && typeof input === 'object' && !Array.isArray(input) && ('role' in input || 'roles' in input)) {
         const c = input as Pick<Character, 'role' | 'roles'>;
@@ -313,15 +313,15 @@ function getRoleListFromRaw(role: string | string[] | undefined): string[] {
 /** Render the role field as a human-readable comma-separated string. */
 export function getRoleDisplay(role: string | string[] | undefined): string;
 export function getRoleDisplay(character: Pick<Character, 'role' | 'roles'>): string;
-export function getRoleDisplay(input: any): string {
-    return getRoleList(input).join(', ');
+export function getRoleDisplay(input: unknown): string {
+    return (getRoleList as (v: unknown) => string[])(input).join(', ');
 }
 
 /** First role (used for sort / category ordering). */
 export function getPrimaryRole(role: string | string[] | undefined): string;
 export function getPrimaryRole(character: Pick<Character, 'role' | 'roles'>): string;
-export function getPrimaryRole(input: any): string {
-    return getRoleList(input)[0] ?? '';
+export function getPrimaryRole(input: unknown): string {
+    return (getRoleList as (v: unknown) => string[])(input)[0] ?? '';
 }
 
 /**

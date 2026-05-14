@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { ItemView, WorkspaceLeaf, TFile, Notice, Modal, Setting } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { ButtonComponent, ItemView, Modal, Notice, Setting, TFile, TextComponent, WorkspaceLeaf } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { LOCATION_VIEW_TYPE } from '../constants';
 import { Scene, resolveStatusCfg } from '../models/Scene';
@@ -169,7 +169,7 @@ export class LocationView extends ItemView {
             if (this.sortBy === opt.value) el.selected = true;
         }
         sortSelect.addEventListener('change', () => {
-            this.sortBy = sortSelect.value as any;
+            this.sortBy = sortSelect.value as 'type' | 'name' | 'created' | 'modified';
             this.renderOverview(container);
         });
 
@@ -223,20 +223,20 @@ export class LocationView extends ItemView {
         }
 
         // Apply sort
-        const sortItems = (arr: any[]) => {
+        const sortItems = <T extends { name: string; locationType?: string; modified?: string; created?: string }>(arr: T[]) => {
             if (this.sortBy === 'modified') {
-                arr.sort((a: any, b: any) => (b.modified ?? '').localeCompare(a.modified ?? ''));
+                arr.sort((a, b) => (b.modified ?? '').localeCompare(a.modified ?? ''));
             } else if (this.sortBy === 'created') {
-                arr.sort((a: any, b: any) => (b.created ?? '').localeCompare(a.created ?? ''));
+                arr.sort((a, b) => (b.created ?? '').localeCompare(a.created ?? ''));
             } else if (this.sortBy === 'type') {
-                arr.sort((a: any, b: any) => {
+                arr.sort((a, b) => {
                     const ta = a.locationType || '';
                     const tb = b.locationType || '';
                     if (ta !== tb) return ta.localeCompare(tb);
                     return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
                 });
             } else {
-                arr.sort((a: any, b: any) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+                arr.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
             }
         };
         sortItems(worlds);
@@ -807,7 +807,7 @@ export class LocationView extends ItemView {
             });
         }
 
-        const value = (draft as any)[field.key] ?? '';
+        const value = String((draft as unknown as Record<string, unknown>)[field.key] ?? '');
 
         if (field.key === 'locationType') {
             const select = row.createEl('select', { cls: 'location-field-input dropdown' });
@@ -850,7 +850,7 @@ export class LocationView extends ItemView {
                             this.plugin.settings.customLocationTypes = list;
                             await this.plugin.saveSettings();
                         }
-                        (draft as any)[field.key] = name.toLowerCase();
+                        (draft as unknown as Record<string, unknown>)[field.key] = name.toLowerCase();
                         this.scheduleSave(draft);
                         if (this.rootContainer) this.renderDetail(this.rootContainer);
                     } else {
@@ -859,7 +859,7 @@ export class LocationView extends ItemView {
                     }
                     return;
                 }
-                (draft as any)[field.key] = select.value;
+                (draft as unknown as Record<string, unknown>)[field.key] = select.value;
                 this.scheduleSave(draft);
             });
         } else if (field.multiline) {
@@ -869,7 +869,7 @@ export class LocationView extends ItemView {
             });
             textarea.value = value;
             textarea.addEventListener('input', () => {
-                (draft as any)[field.key] = textarea.value;
+                (draft as unknown as Record<string, unknown>)[field.key] = textarea.value;
                 this.scheduleSave(draft);
             });
         } else {
@@ -880,7 +880,7 @@ export class LocationView extends ItemView {
             });
             input.value = value;
             input.addEventListener('input', () => {
-                (draft as any)[field.key] = input.value;
+                (draft as unknown as Record<string, unknown>)[field.key] = input.value;
                 this.scheduleSave(draft);
             });
 
@@ -1295,7 +1295,7 @@ export class LocationView extends ItemView {
 
         // Characters that appear here (canonicalized via alias map)
         const charMgr = this.plugin.characterManager as CharacterManager | undefined;
-        const manualAliases = (this.plugin as any)?.settings?.characterAliases;
+        const manualAliases = this.plugin.settings?.characterAliases;
         const aliasMap = charMgr ? charMgr.buildAliasMap(manualAliases) : null;
         const resolveName = (name: string): string => {
             if (!aliasMap) return name;
@@ -1391,7 +1391,7 @@ export class LocationView extends ItemView {
             new Setting(modal.contentEl)
                 .setName('Type name')
                 .setDesc('e.g. Planet, Star System, Galaxy, Dimension…')
-                .addText((text: any) => {
+                .addText((text: TextComponent) => {
                     text.setPlaceholder('Planet');
                     text.onChange((v: string) => (name = v));
                     window.setTimeout(() => text.inputEl?.focus(), 0);
@@ -1407,7 +1407,7 @@ export class LocationView extends ItemView {
                     });
                 });
             new Setting(modal.contentEl)
-                .addButton((btn: any) => {
+                .addButton((btn: ButtonComponent) => {
                     btn.setButtonText('Add').setCta().onClick(() => {
                         const trimmed = name.trim();
                         if (!trimmed) {
@@ -1418,7 +1418,7 @@ export class LocationView extends ItemView {
                         resolve(trimmed);
                     });
                 })
-                .addButton((btn: any) => {
+                .addButton((btn: ButtonComponent) => {
                     btn.setButtonText('Cancel').onClick(() => {
                         modal.close();
                         resolve(null);
@@ -1439,8 +1439,8 @@ export class LocationView extends ItemView {
                 if (undoMgr && this.undoSnapshot) {
                     undoMgr.recordUpdate(
                         draft.filePath,
-                        this.undoSnapshot as unknown as Record<string, any>,
-                        draft as unknown as Record<string, any>,
+                        this.undoSnapshot as unknown as unknown as Record<string, unknown>,
+                        draft as unknown as unknown as Record<string, unknown>,
                         `Update ${draft.type} "${draft.name}"`,
                         'location'
                     );

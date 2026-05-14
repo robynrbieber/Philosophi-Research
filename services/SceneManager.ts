@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { StoryLineProject, deriveProjectFolders, deriveProjectFoldersFromFilePath } from '../models/StoryLineProject';
 import { MetadataParser } from './MetadataParser';
 import { UndoManager } from './UndoManager';
@@ -6,7 +6,7 @@ import { SceneQueryService, ISceneStore } from './SceneQueryService';
 import { formatActChapterPrefix, sanitizeActChapterForPath } from '../utils/actChapter';
 import type SceneCardsPlugin from '../main';
 import { App, Notice, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
-import { BeatSheetTemplate, FilterPreset, Scene, SceneFilter, SortConfig, getStatusOrder } from '../models/Scene';
+import { BeatSheetTemplate, FilterPreset, Scene, SceneFilter, SceneStatus, SortConfig, getStatusOrder } from '../models/Scene';
 
 /**
  * Manages CRUD operations, indexing, and project management for scenes.
@@ -309,7 +309,7 @@ export class SceneManager implements ISceneStore {
         const folders = deriveProjectFolders(rootPath, safeName);
         const now = new Date().toISOString().split('T')[0];
 
-        const frontmatter: Record<string, any> = {
+        const frontmatter: Record<string, unknown> = {
             type: 'storyline',
             title,
             created: now,
@@ -745,7 +745,7 @@ export class SceneManager implements ISceneStore {
         // Issue #77 \u2014 seed universalFields with template defaults for any
         // scene-category fields that have a defaultValue and aren't already set.
         if (!isNote) {
-            sceneData.universalFields = this.seedSceneUniversalDefaults(sceneData.universalFields);
+            sceneData.universalFields = this.seedSceneUniversalDefaults(sceneData.universalFields) as Record<string, string | string[]> | undefined;
         }
 
         // Issue #77 \u2014 parse the user's "Default scene frontmatter" YAML
@@ -785,7 +785,7 @@ export class SceneManager implements ISceneStore {
         const oldSnap = this.scenes.get(filePath);
         if (oldSnap) {
             const label = `Update "${oldSnap.title}"`;
-            this.undoManager.recordUpdate(filePath, oldSnap, updates, label);
+            this.undoManager.recordUpdate(filePath, oldSnap as unknown as Record<string, unknown>, updates, label);
         }
 
         await MetadataParser.updateFrontmatter(this.app, file, updates);
@@ -945,13 +945,13 @@ export class SceneManager implements ISceneStore {
 
         const today = new Date().toISOString().split('T')[0];
         const content = await this.app.vault.read(file);
-        const fm = MetadataParser.extractFrontmatter(content) || {};
+        const fm = (MetadataParser.extractFrontmatter(content) || {}) as Partial<Scene> & Record<string, unknown>;
 
         const updates: Partial<Scene> = {
             type: 'scene',
-            title: fm.title || file.basename,
-            status: fm.status || 'idea',
-            created: fm.created || today,
+            title: String(fm.title || file.basename),
+            status: (fm.status || 'idea') as Scene['status'],
+            created: String(fm.created || today),
             corkboardNote: false,
             plotgridOrigin: undefined,
         };
@@ -1462,7 +1462,7 @@ export class SceneManager implements ISceneStore {
             const positions: Record<string, { x: number; y: number; z?: number; h?: number }> = {};
             if (raw.corkboardPositions && typeof raw.corkboardPositions === 'object') {
                 for (const [key, value] of Object.entries(raw.corkboardPositions)) {
-                    const v = value as any;
+                    const v = value as { x?: unknown; y?: unknown; z?: unknown; h?: unknown };
                     const x = Number(v?.x);
                     const y = Number(v?.y);
                     const z = Number(v?.z);
@@ -1490,7 +1490,7 @@ export class SceneManager implements ISceneStore {
             if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
             const z = Number(pos?.z);
             const entry: { x: number; y: number; z?: number; h?: number } = Number.isFinite(z) ? { x, y, z } : { x, y };
-            const h = Number((pos as any)?.h);
+            const h = Number((pos as unknown as Record<string, unknown>)?.h);
             if (Number.isFinite(h) && h > 0) entry.h = h;
             cleaned[path] = entry;
         }
@@ -1524,7 +1524,7 @@ export class SceneManager implements ISceneStore {
 
         const content = await this.app.vault.read(file);
         const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-        let existingFm: Record<string, any> = {};
+        let existingFm: Record<string, unknown> = {};
         let body = content;
 
         if (fmMatch) {
@@ -1663,13 +1663,13 @@ export class SceneManager implements ISceneStore {
      * frontmatter. Returns `undefined` when the setting is empty or invalid
      * so the caller can skip the merge cleanly.
      */
-    private parseDefaultSceneFrontmatter(): Record<string, any> | undefined {
+    private parseDefaultSceneFrontmatter(): Record<string, unknown> | undefined {
         const raw = this.plugin.settings.defaultSceneFrontmatter;
         if (!raw || !raw.trim()) return undefined;
         try {
             const parsed = parseYaml(raw);
             if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                return parsed as Record<string, any>;
+                return parsed as unknown as Record<string, unknown>;
             }
         } catch (err) {
             console.warn('StoryLine: invalid YAML in defaultSceneFrontmatter setting', err);
@@ -1682,13 +1682,13 @@ export class SceneManager implements ISceneStore {
      * scene-category template that defines one, without overwriting any
      * value the caller already supplied.
      */
-    private seedSceneUniversalDefaults(existing: Record<string, any> | undefined): Record<string, any> | undefined {
+    private seedSceneUniversalDefaults(existing: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
         const templates = this.plugin?.fieldTemplates?.getAll?.() ?? [];
         const sceneTemplates = templates.filter(t => (t.category || 'character') === 'scene' && t.defaultValue);
         if (sceneTemplates.length === 0) return existing;
-        const out: Record<string, any> = { ...(existing || {}) };
+        const out: Record<string, unknown> = { ...(existing || {}) };
         for (const t of sceneTemplates) {
-            if (out[t.id] !== undefined && out[t.id] !== '' && !(Array.isArray(out[t.id]) && out[t.id].length === 0)) continue;
+            if (out[t.id] !== undefined && out[t.id] !== '' && !(Array.isArray(out[t.id]) && (out[t.id] as unknown[]).length === 0)) continue;
             const dv = t.defaultValue!;
             if (t.type === 'multi-select') {
                 out[t.id] = dv.split(',').map(s => s.trim()).filter(Boolean);
@@ -1792,14 +1792,14 @@ export class SceneManager implements ISceneStore {
         // Union tags (deduplicated)
         const tagSet = new Set<string>();
         for (const s of scenes) {
-            if (s.tags) s.tags.forEach(t => tagSet.add(t));
+            if (s.tags) (s.tags as string[]).forEach((t: string) => tagSet.add(t));
         }
 
         // Keep lower (earlier) status
         const lowestStatus = scenes.reduce((lowest, s) => {
             const statusOrder = getStatusOrder();
-            const idxCurrent = statusOrder.indexOf(s.status as any);
-            const idxLowest = statusOrder.indexOf(lowest as any);
+            const idxCurrent = statusOrder.indexOf(s.status as SceneStatus);
+            const idxLowest = statusOrder.indexOf(lowest as SceneStatus);
             // -1 means not found; treat as highest so it doesn't win
             const safeCurrent = idxCurrent >= 0 ? idxCurrent : statusOrder.length;
             const safeLowest = idxLowest >= 0 ? idxLowest : statusOrder.length;

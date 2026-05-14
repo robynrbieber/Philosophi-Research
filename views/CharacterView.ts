@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import * as obsidian from 'obsidian';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
@@ -241,7 +241,7 @@ export class CharacterView extends ItemView {
             if (this.sortBy === opt.value) el.selected = true;
         }
         sortSelect.addEventListener('change', () => {
-            this.sortBy = sortSelect.value as any;
+            this.sortBy = sortSelect.value as 'name' | 'role' | 'created' | 'modified';
             this.renderCharacterOverview(container);
         });
 
@@ -457,7 +457,7 @@ export class CharacterView extends ItemView {
         // Short description snippet — per-character tagline field selector, with auto fallback
         const taglineKey = char.tagline; // a field key like 'personality', 'occupation', etc.
         const autoSnippet = char.personality || char.occupation || getRoleDisplay(char.role) || '';
-        const snippet = (taglineKey ? ((char as any)[taglineKey] || '') : '') || autoSnippet;
+        const snippet = (taglineKey ? String((char as unknown as Record<string, unknown>)[taglineKey] || '') : '') || autoSnippet;
         if (snippet) {
             card.createEl('p', { cls: 'character-card-snippet', text: snippet });
         }
@@ -994,8 +994,9 @@ export class CharacterView extends ItemView {
 
         // Coerce array shapes (e.g. role: string[]) to a comma-separated string
         // for input rendering. Issue #72 Tier 1.
-        let value: any = (draft as any)[field.key] ?? '';
-        if (Array.isArray(value)) value = value.map(v => String(v).trim()).filter(Boolean).join(', ');
+        let value: string = String((draft as unknown as Record<string, unknown>)[field.key] ?? '');
+        const rawValue: unknown = (draft as unknown as Record<string, unknown>)[field.key];
+        if (Array.isArray(rawValue)) value = rawValue.map(v => String(v).trim()).filter(Boolean).join(', ');
 
         if (field.key === 'relations') {
             this.renderRelationsField(row, draft);
@@ -1018,7 +1019,7 @@ export class CharacterView extends ItemView {
                 if (value === opt.key) el.selected = true;
             }
             select.addEventListener('change', () => {
-                (draft as any)[field.key] = select.value;
+                (draft as unknown as Record<string, unknown>)[field.key] = select.value;
                 this.scheduleSave(draft);
             });
             return;
@@ -1044,12 +1045,12 @@ export class CharacterView extends ItemView {
                 const raw = input.value;
                 // Persist as array when comma-separated, else single string
                 if (raw.includes(',')) {
-                    (draft as any)[field.key] = raw
+                    (draft as unknown as Record<string, unknown>)[field.key] = raw
                         .split(',')
                         .map(s => s.trim())
                         .filter(Boolean);
                 } else {
-                    (draft as any)[field.key] = raw;
+                    (draft as unknown as Record<string, unknown>)[field.key] = raw;
                 }
                 this.scheduleSave(draft);
             });
@@ -1074,7 +1075,7 @@ export class CharacterView extends ItemView {
             // Initial sizing after paint
             window.setTimeout(autoGrow, 0);
             textarea.addEventListener('input', () => {
-                (draft as any)[field.key] = textarea.value;
+                (draft as unknown as Record<string, unknown>)[field.key] = textarea.value;
                 this.scheduleSave(draft);
                 autoGrow();
             });
@@ -1086,7 +1087,7 @@ export class CharacterView extends ItemView {
             });
             input.value = value;
             input.addEventListener('input', () => {
-                (draft as any)[field.key] = input.value;
+                (draft as unknown as Record<string, unknown>)[field.key] = input.value;
                 this.scheduleSave(draft);
             });
 
@@ -2124,8 +2125,8 @@ export class CharacterView extends ItemView {
                 if (undoMgr && this.undoSnapshot) {
                     undoMgr.recordUpdate(
                         draft.filePath,
-                        this.undoSnapshot as unknown as Record<string, any>,
-                        draft as unknown as Record<string, any>,
+                        this.undoSnapshot as unknown as unknown as Record<string, unknown>,
+                        draft as unknown as unknown as Record<string, unknown>,
                         `Update character "${draft.name}"`,
                         'character'
                     );

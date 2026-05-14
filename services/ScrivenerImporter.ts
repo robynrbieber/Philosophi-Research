@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 /**
  * ScrivenerImporter — import a .scriv project into StoryLine.
  *
@@ -20,8 +20,8 @@ import type { SeriesMetadata } from '../models/StoryLineProject';
 import { App, Modal, Notice, Setting, normalizePath, stringifyYaml } from 'obsidian';
 
 // Node modules — only available on desktop
-const fs = (window as any).require?.('fs') as typeof import('fs') | undefined;
-const nodePath = (window as any).require?.('path') as typeof import('path') | undefined;
+const fs = ((window as unknown as { require?: (m: string) => unknown }).require)?.('fs') as typeof import('fs') | undefined;
+const nodePath = ((window as unknown as { require?: (m: string) => unknown }).require)?.('path') as typeof import('path') | undefined;
 
 // ────────────────────────────────────────────────────
 //  Interfaces
@@ -1125,8 +1125,8 @@ export class ScrivenerImporter {
                             break;
                     }
                 }
-            } catch (err: any) {
-                warnings.push(`Failed to import "${item.title}": ${err?.message || String(err)}`);
+            } catch (err: unknown) {
+                warnings.push(`Failed to import "${item.title}": ${(err instanceof Error ? err.message : String(err))}`);
             }
         }
 
@@ -1434,7 +1434,7 @@ export class ScrivenerImporter {
     ): Promise<void> {
         await this.ensureFolder(sceneFolder);
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = {
+        const fm: Record<string, unknown> = {
             type: 'scene',
             title,
             status: mapStatus(item.statusTitle),
@@ -1445,7 +1445,7 @@ export class ScrivenerImporter {
         if (item.synopsis) fm.subtitle = item.synopsis;
         if (item.labelTitle) fm.tags = [item.labelTitle];
         if (item.keywords?.length) {
-            fm.tags = [...(fm.tags || []), ...item.keywords];
+            fm.tags = [...((fm.tags as string[] | undefined) || []), ...item.keywords];
         }
 
         // Preserve Scrivener folder hierarchy as part/chapter
@@ -1484,7 +1484,7 @@ export class ScrivenerImporter {
     ): Promise<void> {
         await this.ensureFolder(charFolder);
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = {
+        const fm: Record<string, unknown> = {
             type: 'character',
             name,
             created: now,
@@ -1510,7 +1510,7 @@ export class ScrivenerImporter {
     ): Promise<void> {
         await this.ensureFolder(locFolder);
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = {
+        const fm: Record<string, unknown> = {
             type: 'location',
             name,
             created: now,
@@ -1540,7 +1540,7 @@ export class ScrivenerImporter {
             : researchFolder;
         await this.ensureFolder(targetFolder);
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = {
+        const fm: Record<string, unknown> = {
             type: 'research',
             researchType: 'note',
             title,
@@ -1626,7 +1626,7 @@ export class ScrivenerImporter {
         // For images and PDFs: create a companion markdown note that embeds/links it
         if (EMBEDDABLE_EXTENSIONS.has(ext)) {
             const now = new Date().toISOString().split('T')[0];
-            const fm: Record<string, any> = {
+            const fm: Record<string, unknown> = {
                 type: 'research',
                 researchType: IMAGE_EXTENSIONS.has(ext) ? 'image' : 'file',
                 title,
@@ -1655,7 +1655,7 @@ export class ScrivenerImporter {
         const catFolder = normalizePath(`${codexFolder}/${categoryLabel}`);
         await this.ensureFolder(catFolder);
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = {
+        const fm: Record<string, unknown> = {
             type: categoryId,
             name,
             created: now,

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { App, Notice, normalizePath } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SeriesMetadata, deriveProjectFoldersFromFilePath } from '../models/StoryLineProject';
@@ -325,7 +325,7 @@ export class SeriesManager {
      * Shows a notice if link format is not "shortest path".
      */
     checkLinkSettings(): void {
-        const vaultConfig = (this.app.vault as any).config ?? {};
+        const vaultConfig = ((this.app.vault as unknown as { config?: Record<string, unknown> }).config) ?? {};
 
         // Obsidian stores the "Automatically update internal links" toggle
         // under the internal key `promptDelete`. When it is `true`, auto-update

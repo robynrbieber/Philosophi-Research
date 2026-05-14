@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { ItemView, WorkspaceLeaf, Modal, Setting, Notice } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { App, ItemView, WorkspaceLeaf, Modal, Setting, Notice, TFile } from 'obsidian';
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
@@ -252,7 +252,7 @@ export class CodexView extends ItemView {
             if (this.sortBy === opt.value) el.selected = true;
         }
         sortSelect.addEventListener('change', () => {
-            this.sortBy = sortSelect.value as any;
+            this.sortBy = sortSelect.value as 'type' | 'name' | 'created' | 'modified';
             this.renderList(listContainer);
         });
 
@@ -476,7 +476,7 @@ export class CodexView extends ItemView {
             const file = this.app.vault.getAbstractFileByPath(draft.image);
             if (file) {
                 const img = portraitArea.createEl('img', {
-                    attr: { src: this.app.vault.getResourcePath(file as any) },
+                    attr: { src: this.app.vault.getResourcePath(file as TFile) },
                 });
                 img.addClass('codex-detail-img');
             }
@@ -1809,7 +1809,7 @@ export class CodexView extends ItemView {
 class AddCustomFieldModal extends Modal {
     private callback: (name: string) => void;
 
-    constructor(app: any, callback: (name: string) => void) {
+    constructor(app: App, callback: (name: string) => void) {
         super(app);
         this.callback = callback;
     }

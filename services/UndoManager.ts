@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { App, TFile, Notice } from 'obsidian';
 import { Scene } from '../models/Scene';
 import { MetadataParser } from './MetadataParser';
@@ -24,9 +24,9 @@ interface UndoAction {
     label: string;
     filePath: string;
     /** For 'update': the field values *before* the change */
-    oldValues?: Record<string, any>;
+    oldValues?: Record<string, unknown>;
     /** For 'update': the field values *after* the change */
-    newValues?: Record<string, any>;
+    newValues?: Record<string, unknown>;
     /** For 'delete': full file content so we can re-create the file */
     fileContent?: string;
     /** For 'create': we store the content so undo can delete, redo can re-create */
@@ -68,13 +68,13 @@ export class UndoManager {
      */
     recordUpdate(
         filePath: string,
-        oldSnap: Record<string, any>,
-        newUpdates: Record<string, any>,
+        oldSnap: Record<string, unknown>,
+        newUpdates: Record<string, unknown>,
         label?: string,
         domain: UndoDomain = 'scene'
     ): void {
         // Only store the fields that are actually changing
-        const oldValues: Record<string, any> = {};
+        const oldValues: Record<string, unknown> = {};
         for (const key of Object.keys(newUpdates)) {
             oldValues[key] = oldSnap[key];
         }

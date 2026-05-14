@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 import { App, TFile, parseYaml, stringifyYaml } from 'obsidian';
 import { Scene, SceneStatus, TIMELINE_MODES, TimelineMode } from '../models/Scene';
@@ -42,16 +42,16 @@ export function setWordcountExclusions(opts: { comments?: boolean; checklists?: 
     if (typeof opts.comments === 'boolean') _excludeCommentsFromWordcount = opts.comments;
     if (typeof opts.checklists === 'boolean') _excludeChecklistFromWordcount = opts.checklists;
 }
-function wrapScalar(v: any): any {
+function wrapScalar(v: unknown): unknown {
     if (!_writeSceneFieldsAsWikilinks) return v;
     if (v === undefined || v === null || v === '') return v;
     return toWikilink(String(v));
 }
-function wrapArray(arr: any): any {
+function wrapArray(arr: unknown): unknown {
     if (!_writeSceneFieldsAsWikilinks) return arr;
     if (!Array.isArray(arr)) return arr;
     return arr
-        .map((s: any) => toWikilink(String(s)))
+        .map((s: unknown) => toWikilink(String(s)))
         .filter((s): s is string => !!s);
 }
 
@@ -72,10 +72,11 @@ export class MetadataParser {
      * Parse markdown content into a Scene object
      */
     static parseContent(content: string, filePath: string): Scene | null {
-        const frontmatter = this.extractFrontmatter(content);
-        if (!frontmatter || frontmatter.type !== 'scene') {
+        const fmRaw = this.extractFrontmatter(content);
+        if (!fmRaw || fmRaw.type !== 'scene') {
             return null;
         }
+        const frontmatter = fmRaw as Partial<Scene> & Record<string, unknown>;
 
         const body = this.extractBody(content);
 
@@ -86,13 +87,13 @@ export class MetadataParser {
             act: frontmatter.act,
             chapter: frontmatter.chapter,
             sequence: frontmatter.sequence,
-            chronologicalOrder: frontmatter.chronologicalOrder ?? frontmatter.chronological_order,
+            chronologicalOrder: frontmatter.chronologicalOrder ?? (frontmatter.chronological_order as number | undefined),
             pov: this.cleanWikilink(frontmatter.pov),
             characters: this.parseCharacters(frontmatter.characters),
             location: this.cleanWikilink(frontmatter.location),
             timeline: frontmatter.timeline,
-            storyDate: frontmatter.storyDate ?? frontmatter.story_date,
-            storyTime: frontmatter.storyTime ?? frontmatter.story_time,
+            storyDate: frontmatter.storyDate ?? (frontmatter.story_date as string | undefined),
+            storyTime: frontmatter.storyTime ?? (frontmatter.story_time as string | undefined),
             status: this.parseStatus(frontmatter.status),
             conflict: frontmatter.conflict,
             emotion: frontmatter.emotion,
@@ -106,11 +107,11 @@ export class MetadataParser {
             modified: frontmatter.modified,
             body,
             notes: frontmatter.notes,
-            corkboardNote: this.parseBooleanFlag(frontmatter.corkboardNote ?? frontmatter.corkboard_note),
-            corkboardNoteColor: frontmatter.corkboardNoteColor ?? frontmatter.corkboard_note_color,
+            corkboardNote: this.parseBooleanFlag(frontmatter.corkboardNote ?? (frontmatter.corkboard_note as boolean | undefined)),
+            corkboardNoteColor: frontmatter.corkboardNoteColor ?? (frontmatter.corkboard_note_color as string | undefined),
             corkboardNoteImage: frontmatter.corkboardNoteImage,
             corkboardNoteCaption: frontmatter.corkboardNoteCaption,
-            plotgridOrigin: frontmatter.plotgridOrigin ?? frontmatter.plotgrid_origin,
+            plotgridOrigin: frontmatter.plotgridOrigin ?? (frontmatter.plotgrid_origin as string | undefined),
             timeline_mode: this.parseTimelineMode(frontmatter.timeline_mode),
             timeline_strand: frontmatter.timeline_strand,
             subtitle: frontmatter.subtitle,
@@ -118,8 +119,10 @@ export class MetadataParser {
             codexLinks: this.parseCodexLinks(frontmatter.codexLinks),
             universalFields: hydrateUniversalFieldsFromTopLevel(
                 frontmatter,
-                frontmatter.universalFields && typeof frontmatter.universalFields === 'object' ? frontmatter.universalFields : undefined,
-            ),
+                frontmatter.universalFields && typeof frontmatter.universalFields === 'object'
+                    ? (frontmatter.universalFields as Record<string, string | string[]>)
+                    : undefined,
+            ) as Record<string, string | string[]> | undefined,
             beatsheet: frontmatter.beatsheet,
         };
     }
@@ -127,7 +130,7 @@ export class MetadataParser {
     /**
      * Extract frontmatter from markdown content
      */
-    static extractFrontmatter(content: string): Record<string, any> | null {
+    static extractFrontmatter(content: string): Record<string, unknown> | null {
         const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
         if (!match) return null;
         try {
@@ -171,7 +174,10 @@ export class MetadataParser {
             if (key === 'color' && !value) { delete frontmatter[key]; continue; }
             if (key === 'beatsheet' && !value) { delete frontmatter[key]; continue; }
             if (key === 'codexLinks') {
-                if (value && typeof value === 'object' && Object.keys(value).some(k => Array.isArray((value as any)[k]) && (value as any)[k].length > 0)) {
+                if (value && typeof value === 'object' && Object.keys(value).some(k => {
+                    const arr = (value as Record<string, unknown>)[k];
+                    return Array.isArray(arr) && arr.length > 0;
+                })) {
                     frontmatter[key] = value;
                 } else {
                     delete frontmatter[key];
@@ -207,7 +213,7 @@ export class MetadataParser {
         frontmatter.wordcount = this.countWords(finalBody);
 
         // Issue #71 — mirror universal fields to top-level YAML keys
-        mirrorUniversalFieldsToTopLevel(frontmatter, frontmatter.universalFields);
+        mirrorUniversalFieldsToTopLevel(frontmatter, frontmatter.universalFields as Record<string, unknown> | undefined);
 
         const newContent = `---\n${stringifyYaml(frontmatter)}---\n\n${finalBody}`;
         await app.vault.modify(file, newContent);
@@ -224,9 +230,9 @@ export class MetadataParser {
     static generateSceneContent(
         scene: Partial<Scene>,
         _template?: string,
-        extraFrontmatter?: Record<string, any>,
+        extraFrontmatter?: Record<string, unknown>,
     ): string {
-        const fm: Record<string, any> = {
+        const fm: Record<string, unknown> = {
             type: 'scene',
             title: scene.title || 'Untitled Scene',
         };
@@ -345,20 +351,20 @@ export class MetadataParser {
     /**
      * Parse characters array, cleaning wikilinks
      */
-    private static parseCharacters(chars: any): string[] | undefined {
+    private static parseCharacters(chars: unknown): string[] | undefined {
         if (!Array.isArray(chars)) return undefined;
         return chars
-            .map((c: any) => this.cleanWikilink(String(c)) ?? '')
+            .map((c: unknown) => this.cleanWikilink(String(c)) ?? '')
             .filter(s => s.length > 0);
     }
 
     /**
      * Parse an array of strings, cleaning wikilinks
      */
-    private static parseStringArray(arr: any): string[] | undefined {
+    private static parseStringArray(arr: unknown): string[] | undefined {
         if (!Array.isArray(arr)) return undefined;
         return arr
-            .map((s: any) => this.cleanWikilink(String(s)) ?? '')
+            .map((s: unknown) => this.cleanWikilink(String(s)) ?? '')
             .filter(s => s.length > 0);
     }
 
@@ -381,14 +387,14 @@ export class MetadataParser {
      * Parse codexLinks: Record<string, string[]> from frontmatter.
      * Accepts { categoryId: ['EntryName', ...] } or undefined.
      */
-    private static parseCodexLinks(raw: any): Record<string, string[]> | undefined {
+    private static parseCodexLinks(raw: unknown): Record<string, string[]> | undefined {
         if (!raw || typeof raw !== 'object') return undefined;
         const result: Record<string, string[]> = {};
         let hasAny = false;
         for (const [key, val] of Object.entries(raw)) {
             if (Array.isArray(val)) {
                 const arr = val
-                    .map((v: any) => this.cleanWikilink(String(v)) ?? '')
+                    .map((v: unknown) => this.cleanWikilink(String(v)) ?? '')
                     .filter(Boolean);
                 if (arr.length > 0) {
                     result[key] = arr;

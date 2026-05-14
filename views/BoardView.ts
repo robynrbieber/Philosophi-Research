@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { ItemView, WorkspaceLeaf, Menu, Notice, TFile, Modal, Setting, MarkdownRenderer } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Scene, SceneFilter, SortConfig, BoardGroupBy, SceneStatus, SceneTemplate, BUILTIN_BEAT_SHEETS, getStatusOrder, getStatusConfig, resolveStatusCfg } from '../models/Scene';
@@ -2000,7 +1998,7 @@ export class BoardView extends ItemView {
                                     const newTags = [...(scene.tags || [])];
                                     if (!newTags.includes(tag)) {
                                         newTags.push(tag);
-                                        await this.sceneManager.updateScene(fp, { tags: newTags } as any);
+                                        await this.sceneManager.updateScene(fp, { tags: newTags });
                                     }
                                 }
                             }
@@ -2037,7 +2035,7 @@ export class BoardView extends ItemView {
                                         const tags = [...(scene.tags || [])];
                                         if (!tags.includes(newTag)) {
                                             tags.push(newTag);
-                                            await this.sceneManager.updateScene(fp, { tags } as any);
+                                            await this.sceneManager.updateScene(fp, { tags });
                                         }
                                     }
                                 }
@@ -2819,7 +2817,7 @@ export class BoardView extends ItemView {
             .addText(text => {
                 text.setPlaceholder('1,2,3,4,5');
                 text.inputEl.addClass('structure-input');
-                (text.inputEl as any)._ref = text;
+                (text.inputEl as unknown as Record<string, unknown>)._ref = text;
             })
             .addButton(btn => {
                 btn.setButtonText('Add').setCta().onClick(async () => {
@@ -2925,7 +2923,7 @@ export class BoardView extends ItemView {
                                 title,
                                 chapter: ch,
                                 sequence: ch,
-                                status: 'idea' as any,
+                                status: 'idea' as SceneStatus,
                             });
                         }
                     }
@@ -2982,7 +2980,7 @@ export class BoardView extends ItemView {
                     statusMap[def.label] = id;
                 }
                 const statusVal = statusMap[presetColumn] || presetColumn.toLowerCase();
-                defaults.status = statusVal as any;
+                defaults.status = statusVal as SceneStatus;
             } else if (this.groupBy === 'pov') {
                 if (presetColumn !== 'No POV') defaults.pov = presetColumn;
             }

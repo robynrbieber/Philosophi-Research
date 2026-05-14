@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 import { App, TFile, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
 import { CodexCategoryDef, CodexEntry, getBuiltinCodexCategory } from '../models/Codex';
@@ -219,7 +219,7 @@ export class CodexManager {
         }
 
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = {
+        const fm: Record<string, unknown> = {
             type: catDef.id,
             name,
             created: now,
@@ -257,7 +257,7 @@ export class CodexManager {
         const existingFm = this.extractFrontmatter(content) || {};
         const body = this.extractBody(content);
 
-        const fm: Record<string, any> = { ...existingFm };
+        const fm: Record<string, unknown> = { ...existingFm };
         fm.type = entry.type;
         fm.name = entry.name;
         fm.modified = new Date().toISOString().split('T')[0];
@@ -374,7 +374,7 @@ export class CodexManager {
         const fm = this.extractFrontmatter(content);
         // If frontmatter is missing entirely, only accept when folder-based
         // fallback applies (file lives inside the category folder — issue #74).
-        const safeFm: Record<string, any> = fm ?? {};
+        const safeFm = (fm ?? {}) as Partial<CodexEntry> & Record<string, unknown>;
         if (!fm && !folderFallback) return null;
 
         // Accept entries whose type matches the category id.
@@ -389,17 +389,17 @@ export class CodexManager {
         const entry: CodexEntry = {
             filePath,
             type: catDef.id,
-            name: safeFm.name || basename,
+            name: String(safeFm.name || basename),
             image: safeFm.image,
             gallery: this.parseGallery(safeFm.gallery),
             created: safeFm.created,
             modified: safeFm.modified,
             notes: body || undefined,
-            custom: safeFm.custom && typeof safeFm.custom === 'object' ? safeFm.custom : undefined,
+            custom: safeFm.custom && typeof safeFm.custom === 'object' ? safeFm.custom as Record<string, string> : undefined,
             universalFields: hydrateUniversalFieldsFromTopLevel(
                 safeFm,
-                safeFm.universalFields && typeof safeFm.universalFields === 'object' ? safeFm.universalFields : undefined,
-            ),
+                safeFm.universalFields && typeof safeFm.universalFields === 'object' ? safeFm.universalFields as Record<string, unknown> : undefined,
+            ) as Record<string, string | string[]> | undefined,
             books: Array.isArray(safeFm.books) ? safeFm.books.map(String) : undefined,
         };
 
@@ -414,7 +414,7 @@ export class CodexManager {
         return entry;
     }
 
-    private extractFrontmatter(content: string): Record<string, any> | null {
+    private extractFrontmatter(content: string): Record<string, unknown> | null {
         // Strip BOM + invisible zero-width characters before matching
         const clean = content.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '');
         const match = clean.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -433,7 +433,7 @@ export class CodexManager {
     }
 
     private parseGallery(
-        value: any,
+        value: unknown,
     ): Array<{ path: string; caption: string }> | undefined {
         if (!Array.isArray(value)) return undefined;
         const parsed: Array<{ path: string; caption: string }> = [];

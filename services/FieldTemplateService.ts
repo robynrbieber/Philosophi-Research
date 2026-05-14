@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { App, normalizePath } from 'obsidian';
 
 // ═══════════════════════════════════════════════════════
@@ -310,7 +310,7 @@ export function getActiveTemplates(): UniversalFieldTemplate[] {
  * top-level YAML key that may have been written as `[[Note]]` for a
  * folder-sourced field.
  */
-export function stripWikilinks(value: any): any {
+export function stripWikilinks(value: unknown): unknown {
     const strip = (s: string): string => {
         const m = s.match(/^\[\[([^\]]+)\]\]$/);
         if (!m) return s;
@@ -332,7 +332,7 @@ export function stripWikilinks(value: any): any {
  * names to keep the dropdown UI matching its options. Already-wikilinked
  * input is left untouched.
  */
-function wrapAsWikilinks(value: any): any {
+function wrapAsWikilinks(value: unknown): unknown {
     const wrap = (s: string): string => {
         const trimmed = s.trim();
         if (!trimmed) return s;
@@ -357,9 +357,9 @@ function wrapAsWikilinks(value: any): any {
  * option strings.
  */
 export function hydrateUniversalFieldsFromTopLevel(
-    fm: Record<string, any>,
-    universalFields: Record<string, any> | undefined,
-): Record<string, any> | undefined {
+    fm: Record<string, unknown>,
+    universalFields: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
     const templates = getActiveTemplates();
     if (!templates.length) return universalFields;
     let result = universalFields ? { ...universalFields } : undefined;
@@ -387,8 +387,8 @@ export function hydrateUniversalFieldsFromTopLevel(
  * Properties / Bases / Dataview.
  */
 export function mirrorUniversalFieldsToTopLevel(
-    fm: Record<string, any>,
-    universalFields: Record<string, any> | undefined,
+    fm: Record<string, unknown>,
+    universalFields: Record<string, unknown> | undefined,
 ): void {
     if (!_topLevelMirrorEnabled) return;
     const templates = getActiveTemplates();

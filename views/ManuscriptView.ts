@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { ItemView, WorkspaceLeaf, WorkspaceSplit, MarkdownRenderer, TFile, setIcon } from 'obsidian';
 import { EditorView, Decoration } from '@codemirror/view';
 import { RangeSetBuilder, StateEffect, Compartment } from '@codemirror/state';
@@ -226,7 +226,7 @@ export class ManuscriptView extends ItemView {
             // Find which embedded leaf owns the focused element
             const target = e.target as HTMLElement;
             for (const [_path, leaf] of this.embeddedLeaves) {
-                const splitEl = (leaf as any).containerEl?.parentElement;
+                const splitEl = (leaf as unknown as { containerEl?: { parentElement?: HTMLElement | null } }).containerEl?.parentElement;
                 if (splitEl?.contains(target)) {
                     this.activeLeaf = leaf;
                     // In focus mode, highlight the active scene block
@@ -437,8 +437,8 @@ export class ManuscriptView extends ItemView {
 
         try {
             // Create a detached WorkspaceSplit to host the embedded leaf
-            const split = new (WorkspaceSplit as any)(this.app.workspace, 'vertical');
-            const splitEl: HTMLElement = (split as any).containerEl;
+            const split = new (WorkspaceSplit as unknown as new (workspace: unknown, dir: string) => WorkspaceSplit)(this.app.workspace, 'vertical');
+            const splitEl: HTMLElement = (split as unknown as { containerEl: HTMLElement }).containerEl;
             container.appendChild(splitEl);
             splitEl.classList.add('sl-manuscript-embedded-split');
 
@@ -557,7 +557,7 @@ export class ManuscriptView extends ItemView {
 
     /** Get the CM6 EditorView from an embedded workspace leaf */
     private getCmView(leaf: WorkspaceLeaf): EditorView | null {
-        const editor = (leaf.view as any)?.editor;
+        const editor = (leaf.view as unknown as { editor?: { cm?: EditorView } })?.editor;
         return editor?.cm ?? null;
     }
 

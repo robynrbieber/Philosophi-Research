@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import type SceneCardsPlugin from './main';
 import { SLDocxSettings, SL_DEFAULT_DOCX_SETTINGS } from './services/DocxConverter';
 import { SLPdfSettings, SL_DEFAULT_PDF_SETTINGS } from './services/PdfConverter';
@@ -870,7 +868,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.plugin.settings.hideFrontmatter = value;
                     await this.plugin.saveSettings();
                     // Apply Obsidian\'s built-in "Properties in document" setting
-                    (this.app.vault as any).setConfig?.('propertiesInDocument', value ? 'hidden' : 'visible');
+                    (this.app.vault as unknown as { setConfig?: (k: string, v: string) => void }).setConfig?.('propertiesInDocument', value ? 'hidden' : 'visible');
                 }));
 
         // ═══════════════════════════════════════════
@@ -976,7 +974,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             .setDesc('Enter a name for the new status (e.g. "Sent to Team")')
             .addText(text => {
                 text.setPlaceholder('Status name…');
-                (text.inputEl as any)._ref = text;
+                (text.inputEl as unknown as Record<string, unknown>)._ref = text;
             })
             .addButton(btn => {
                 btn.setButtonText('Add').setCta().onClick(async () => {
@@ -987,7 +985,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     if (!id) return;
                     const existing = getStatusOrder();
                     if (existing.includes(id)) {
-                        new (obsidian as any).Notice(`Status "${id}" already exists.`);
+                        new (obsidian as unknown as { Notice: new (msg: string) => void }).Notice(`Status "${id}" already exists.`);
                         return;
                     }
                     if (!this.plugin.settings.customStatuses) this.plugin.settings.customStatuses = [];
@@ -1552,16 +1550,16 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                         if (!value) {
                             // Turning OFF: restore global colour defaults,
                             // then remove projectColors from plotlines.json
-                            const g = (this.plugin as any)._globalColorDefaults;
+                            const g = (this.plugin as unknown as { _globalColorDefaults: Partial<SceneCardsSettings> })._globalColorDefaults;
                             if (g && Object.keys(g).length > 0) {
-                                this.plugin.settings.colorScheme = g.colorScheme;
-                                this.plugin.settings.plotlineHue = g.plotlineHue;
-                                this.plugin.settings.plotlineSaturation = g.plotlineSaturation;
-                                this.plugin.settings.plotlineLightness = g.plotlineLightness;
-                                this.plugin.settings.stickyNoteTheme = g.stickyNoteTheme;
-                                this.plugin.settings.stickyNoteHue = g.stickyNoteHue;
-                                this.plugin.settings.stickyNoteSaturation = g.stickyNoteSaturation;
-                                this.plugin.settings.stickyNoteLightness = g.stickyNoteLightness;
+                                if (g.colorScheme !== undefined) this.plugin.settings.colorScheme = g.colorScheme;
+                                if (g.plotlineHue !== undefined) this.plugin.settings.plotlineHue = g.plotlineHue;
+                                if (g.plotlineSaturation !== undefined) this.plugin.settings.plotlineSaturation = g.plotlineSaturation;
+                                if (g.plotlineLightness !== undefined) this.plugin.settings.plotlineLightness = g.plotlineLightness;
+                                if (g.stickyNoteTheme !== undefined) this.plugin.settings.stickyNoteTheme = g.stickyNoteTheme;
+                                if (g.stickyNoteHue !== undefined) this.plugin.settings.stickyNoteHue = g.stickyNoteHue;
+                                if (g.stickyNoteSaturation !== undefined) this.plugin.settings.stickyNoteSaturation = g.stickyNoteSaturation;
+                                if (g.stickyNoteLightness !== undefined) this.plugin.settings.stickyNoteLightness = g.stickyNoteLightness;
                                 this.plugin.settings.stickyNoteOverrides = { ...(g.stickyNoteOverrides || {}) };
                             }
                         }
@@ -1883,7 +1881,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .setButtonText('Rename…')
                 .setDisabled(!activeProject)
                 .onClick(() => {
-                    (this.plugin.app as any).commands.executeCommandById('storyline:rename-project');
+                    (this.plugin.app as unknown as { commands: { executeCommandById: (id: string) => void } }).commands.executeCommandById('storyline:rename-project');
                 }));
 
         new Setting(containerEl)
@@ -1893,7 +1891,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .setButtonText('Create Series…')
                 .setDisabled(!activeProject || !!activeProject.seriesId)
                 .onClick(() => {
-                    (this.plugin.app as any).commands.executeCommandById('storyline:create-series');
+                    (this.plugin.app as unknown as { commands: { executeCommandById: (id: string) => void } }).commands.executeCommandById('storyline:create-series');
                 }));
 
         new Setting(containerEl)
@@ -1902,7 +1900,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             .addButton(btn => btn
                 .setButtonText('Manage Series…')
                 .onClick(() => {
-                    (this.plugin as any).openSeriesManagementModal();
+                    (this.plugin as unknown as { openSeriesManagementModal: () => void }).openSeriesManagementModal();
                 }));
 
         // ═══════════════════════════════════════════
@@ -2744,7 +2742,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 })
                 .setValue(ds.pageSize)
                 .onChange(async (value) => {
-                    this.plugin.settings.docxSettings.pageSize = value as any;
+                    this.plugin.settings.docxSettings.pageSize = value as SLDocxSettings['pageSize'];
                     await this.plugin.saveSettings();
                 }));
 
@@ -2790,7 +2788,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 })
                 .setValue(ps.fontFamily)
                 .onChange(async (value) => {
-                    this.plugin.settings.pdfSettings.fontFamily = value as any;
+                    this.plugin.settings.pdfSettings.fontFamily = value as SLPdfSettings['fontFamily'];
                     await this.plugin.saveSettings();
                 }));
 
@@ -2823,7 +2821,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 })
                 .setValue(ps.pageSize)
                 .onChange(async (value) => {
-                    this.plugin.settings.pdfSettings.pageSize = value as any;
+                    this.plugin.settings.pdfSettings.pageSize = value as SLPdfSettings['pageSize'];
                     await this.plugin.saveSettings();
                 }));
 
@@ -2885,7 +2883,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
     /** Render the Import section (desktop-only Scrivener import) */
     private renderImportSettings(containerEl: HTMLElement): void {
-        const nodeFsAvailable = !!(window as any).require?.('fs');
+        const nodeFsAvailable = !!(window as unknown as { require?: (m: string) => unknown }).require?.('fs');
         if (!nodeFsAvailable) return;   // hide entirely on mobile
 
         const details = containerEl.createEl('details', { cls: 'story-line-import-settings' });
@@ -2907,8 +2905,8 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .onClick(async () => {
                     try {
                         await this.pickAndImportScrivener();
-                    } catch (err: any) {
-                        new Notice('Import failed: ' + (err?.message || String(err)));
+                    } catch (err: unknown) {
+                        new Notice('Import failed: ' + (err instanceof Error ? err.message : String(err)));
                     }
                 }));
     }
@@ -2922,16 +2920,22 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         }
 
         // Use Electron dialog to pick a .scriv folder
-        let remote: any;
+        let remote: { dialog: { showOpenDialog: (opts: unknown) => Promise<{ canceled: boolean; filePaths?: string[] }> } } | undefined;
+        const win = window as unknown as { require?: (m: string) => unknown };
         try {
-            remote = (window as any).require('@electron/remote');
+            remote = win.require?.('@electron/remote') as typeof remote;
         } catch {
             try {
-                remote = (window as any).require('electron').remote;
+                remote = (win.require?.('electron') as { remote: typeof remote })?.remote;
             } catch {
                 new Notice('Could not access the file dialog. Desktop only.');
                 return;
             }
+        }
+
+        if (!remote) {
+            new Notice('Could not access the file dialog. Desktop only.');
+            return;
         }
 
         const result = await remote.dialog.showOpenDialog({

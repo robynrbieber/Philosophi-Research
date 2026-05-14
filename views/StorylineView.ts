@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { ItemView, WorkspaceLeaf, TFile, Setting, Notice, Menu, Modal } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { ButtonComponent, ItemView, Menu, MenuItem, Modal, Notice, Setting, TFile, TextComponent, WorkspaceLeaf } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Scene } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
@@ -90,19 +90,19 @@ export class StorylineView extends ItemView {
         attachTooltip(sortBtn, 'Sort plotlines');
         sortBtn.addEventListener('click', (e) => {
             const menu = new Menu();
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle(`${this.sortMode === 'alpha' ? '✓ ' : ''}Alphabetical`)
                     .onClick(() => { this.sortMode = 'alpha'; this.refresh(); });
             });
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle(`${this.sortMode === 'scenes-desc' ? '✓ ' : ''}Most scenes first`)
                     .onClick(() => { this.sortMode = 'scenes-desc'; this.refresh(); });
             });
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle(`${this.sortMode === 'scenes-asc' ? '✓ ' : ''}Fewest scenes first`)
                     .onClick(() => { this.sortMode = 'scenes-asc'; this.refresh(); });
             });
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle(`${this.sortMode === 'reading-order' ? '✓ ' : ''}Reading order (chapter #)`)
                     .onClick(() => { this.sortMode = 'reading-order'; this.refresh(); });
             });
@@ -130,7 +130,7 @@ export class StorylineView extends ItemView {
                 const allTags = this.sceneManager.queryService.getAllTags().sort();
                 const menu = new Menu();
                 // Show All / Hide All
-                menu.addItem((item: any) => {
+                menu.addItem((item: MenuItem) => {
                     item.setTitle('Show all')
                         .setIcon('eye')
                         .onClick(() => {
@@ -141,7 +141,7 @@ export class StorylineView extends ItemView {
                 menu.addSeparator();
                 for (const tag of allTags) {
                     const isHidden = this.hiddenPlotlines.has(tag);
-                    menu.addItem((item: any) => {
+                    menu.addItem((item: MenuItem) => {
                         item.setTitle(`${isHidden ? '   ' : '✓ '}${this.formatPlotlineName(tag)}`)
                             .onClick(() => {
                                 if (isHidden) {
@@ -756,13 +756,13 @@ export class StorylineView extends ItemView {
             e.preventDefault();
             e.stopPropagation();
             const menu = new Menu();
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle('Change color')
                     .setIcon('palette')
                     .onClick(() => colorInput.click());
             });
             if (this.plugin.settings.tagColors[plotline]) {
-                menu.addItem((item: any) => {
+                menu.addItem((item: MenuItem) => {
                     item.setTitle('Reset color')
                         .setIcon('rotate-ccw')
                         .onClick(async () => {
@@ -772,18 +772,18 @@ export class StorylineView extends ItemView {
                         });
                 });
             }
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle('Rename plotline')
                     .setIcon('pencil')
                     .onClick(() => this.openRenamePlotlineModal(plotline));
             });
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle('Add scenes')
                     .setIcon('plus')
                     .onClick(() => this.openAddSceneToPlotlineModal(plotline, scenes, allScenes));
             });
             menu.addSeparator();
-            menu.addItem((item: any) => {
+            menu.addItem((item: MenuItem) => {
                 item.setTitle('Delete plotline')
                     .setIcon('trash-2')
                     .onClick(() => this.confirmDeletePlotline(plotline, scenes.length));
@@ -907,7 +907,7 @@ export class StorylineView extends ItemView {
         if (allTags.length > 0) {
             for (const tag of allTags) {
                 const hasTag = sceneTags.has(tag);
-                menu.addItem((item: any) => {
+                menu.addItem((item: MenuItem) => {
                     item.setTitle(`${hasTag ? '✓ ' : '   '}${this.formatPlotlineName(tag)}`)
                         .onClick(async () => {
                             const newTags = hasTag
@@ -921,7 +921,7 @@ export class StorylineView extends ItemView {
             menu.addSeparator();
         }
 
-        menu.addItem((item: any) => {
+        menu.addItem((item: MenuItem) => {
             item.setTitle('+ Create new plotline…')
                 .setIcon('plus')
                 .onClick(() => this.openNewPlotlineForScene(scene));
@@ -941,13 +941,13 @@ export class StorylineView extends ItemView {
         new Setting(modal.contentEl)
             .setName('Plotline name')
             .setDesc(`Current tag: "${plotline}". The tag will be updated in all scenes that use it.`)
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(plotline);
                 text.onChange((v: string) => (newName = v));
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Rename').setCta().onClick(async () => {
                     const slug = newName.trim().toLowerCase().replace(/\s+/g, '-');
                     if (!slug || slug === plotline) {
@@ -973,10 +973,10 @@ export class StorylineView extends ItemView {
         });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Cancel').onClick(() => modal.close());
             })
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Delete').setWarning().onClick(async () => {
                     const count = await this.sceneManager.deleteTag(plotline);
                     new Notice(`Removed plotline from ${count} scene${count !== 1 ? 's' : ''}`);
@@ -997,13 +997,13 @@ export class StorylineView extends ItemView {
         new Setting(modal.contentEl)
             .setName('Plotline name')
             .setDesc(`Will be added to "${scene.title || 'Untitled'}"`)
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setPlaceholder('e.g. main-mystery');
                 text.onChange((v: string) => (tagName = v));
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Create & Assign').setCta().onClick(async () => {
                     if (!tagName.trim()) return;
                     const slug = tagName.trim().toLowerCase().replace(/\s+/g, '-');
@@ -1026,7 +1026,7 @@ export class StorylineView extends ItemView {
         new Setting(modal.contentEl)
             .setName('Plotline name')
             .setDesc('Enter a name for the plotline. It will be stored as a tag on each assigned scene.')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setPlaceholder('e.g. love-triangle');
                 text.onChange((v: string) => (tagName = v));
             });
@@ -1052,7 +1052,7 @@ export class StorylineView extends ItemView {
         });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Create Plotline').setCta().onClick(async () => {
                     if (!tagName.trim()) return;
                     const slug = tagName.trim().toLowerCase().replace(/\s+/g, '-');
@@ -1100,7 +1100,7 @@ export class StorylineView extends ItemView {
         }
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Add to Plotline').setCta().onClick(async () => {
                     for (const path of selectedPaths) {
                         const scene = this.sceneManager.getScene(path);

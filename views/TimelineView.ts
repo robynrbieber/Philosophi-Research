@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { openConfirmModal } from '../components/ConfirmModal';
 import { SceneManager } from '../services/SceneManager';
 import { SceneCardComponent } from '../components/SceneCard';
@@ -11,9 +11,9 @@ import type SceneCardsPlugin from '../main';
 import { TIMELINE_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
 import { attachTooltip } from '../components/Tooltip';
-import { ItemView, Menu, Modal, Notice, Setting, TFile, WorkspaceLeaf } from 'obsidian';
+import { ButtonComponent, DropdownComponent, ItemView, Menu, Modal, Notice, Setting, TFile, TextComponent, WorkspaceLeaf } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { BUILTIN_BEAT_SHEETS, Scene, TIMELINE_MODES, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+import { BUILTIN_BEAT_SHEETS, Scene, SceneStatus, TIMELINE_MODES, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 
 /**
  * Timeline ordering mode
@@ -348,12 +348,12 @@ export class TimelineView extends ItemView {
         // Attach auto-scroll helpers to the main-area element so entries can call them
         const mainArea = track.closest('.story-line-main-area');
         if (mainArea) {
-            (mainArea as any)._slAutoScroll = startAutoScroll;
-            (mainArea as any)._slStopAutoScroll = stopAutoScroll;
+            (mainArea as unknown as Record<string, unknown>)._slAutoScroll = startAutoScroll;
+            (mainArea as unknown as Record<string, unknown>)._slStopAutoScroll = stopAutoScroll;
         }
 
         // Store dropIndex on the track so drop handlers in child entries can read it
-        (track as any)._slDropIndex = null;
+        (track as unknown as Record<string, unknown>)._slDropIndex = null;
 
         const refreshDropIndicators = () => {
             const entries = track.querySelectorAll('.timeline-entry');
@@ -457,7 +457,7 @@ export class TimelineView extends ItemView {
                     });
                 }
             } else if (item.kind === 'scene') {
-                this.renderTimelineEntry(track, item.scene, item.globalIdx, scenes, dragIndex, dropIndex, refreshDropIndicators, handleDrop, (di) => { dragIndex = di; }, (di) => { dropIndex = di; (track as any)._slDropIndex = di; }, item.dateInvalid, item.timeInvalid);
+                this.renderTimelineEntry(track, item.scene, item.globalIdx, scenes, dragIndex, dropIndex, refreshDropIndicators, handleDrop, (di) => { dragIndex = di; }, (di) => { dropIndex = di; (track as unknown as Record<string, unknown>)._slDropIndex = di; }, item.dateInvalid, item.timeInvalid);
             } else {
                 // empty-act placeholder
                 const divider = track.createDiv('timeline-act-divider');
@@ -787,7 +787,7 @@ export class TimelineView extends ItemView {
             entry.classList.remove('dragging');
             refreshDropIndicators();
             // Stop auto-scroll on drag end
-            (entry.closest('.story-line-main-area') as any)?._slStopAutoScroll?.();
+            (entry.closest('.story-line-main-area') as unknown as { _slStopAutoScroll?: () => void } | null)?._slStopAutoScroll?.();
         });
         entry.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -797,7 +797,7 @@ export class TimelineView extends ItemView {
             setDropIndex(computed);
             refreshDropIndicators();
             // Auto-scroll near edges
-            (entry.closest('.story-line-main-area') as any)?._slAutoScroll?.(e.clientY);
+            (entry.closest('.story-line-main-area') as unknown as { _slAutoScroll?: (y: number) => void } | null)?._slAutoScroll?.(e.clientY);
         });
         entry.addEventListener('dragleave', () => {
             setDropIndex(null);
@@ -806,12 +806,12 @@ export class TimelineView extends ItemView {
         entry.addEventListener('drop', async (e) => {
             e.preventDefault();
             // Stop auto-scroll
-            (entry.closest('.story-line-main-area') as any)?._slStopAutoScroll?.();
+            (entry.closest('.story-line-main-area') as unknown as { _slStopAutoScroll?: () => void } | null)?._slStopAutoScroll?.();
             const fromStr = e.dataTransfer?.getData('text/plain');
             if (fromStr !== undefined && fromStr !== null) {
                 const from = Number(fromStr);
                 // Use the computed dropIndex (midpoint-aware) instead of entry index
-                const actualDrop = (entry.closest('.timeline-track') as any)?._slDropIndex ?? i;
+                const actualDrop = ((entry.closest('.timeline-track') as unknown as { _slDropIndex?: number } | null)?._slDropIndex) ?? i;
                 await handleDrop(from, actualDrop);
             }
         });
@@ -1481,7 +1481,7 @@ export class TimelineView extends ItemView {
                                 title,
                                 chapter: ch,
                                 sequence: ch,
-                                status: 'idea' as any,
+                                status: 'idea' as SceneStatus,
                             });
                         }
                     }
@@ -1532,7 +1532,7 @@ export class TimelineView extends ItemView {
         new Setting(modal.contentEl)
             .setName('Date / Day')
             .setDesc('E.g. 2026-02-17, Day 1, Monday, Chapter 3…')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(storyDate)
                     .setPlaceholder('e.g. Day 1')
                     .onChange((v: string) => (storyDate = v));
@@ -1542,7 +1542,7 @@ export class TimelineView extends ItemView {
         new Setting(modal.contentEl)
             .setName('Time')
             .setDesc('E.g. 14:00, morning, evening, night…')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(storyTime)
                     .setPlaceholder('e.g. evening')
                     .onChange((v: string) => (storyTime = v));
@@ -1552,7 +1552,7 @@ export class TimelineView extends ItemView {
         new Setting(modal.contentEl)
             .setName('Timeline note')
             .setDesc('Free-form note about when this happens in the story')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(timeline)
                     .setPlaceholder('e.g. After the party')
                     .onChange((v: string) => (timeline = v));
@@ -1562,7 +1562,7 @@ export class TimelineView extends ItemView {
         new Setting(modal.contentEl)
             .setName('Chronological order')
             .setDesc('The order this event happens in story time (for non-linear narratives)')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(chronoOrder)
                     .setPlaceholder('e.g. 5')
                     .onChange((v: string) => (chronoOrder = v));
@@ -1575,7 +1575,7 @@ export class TimelineView extends ItemView {
         new Setting(modeSection)
             .setName('Timeline mode')
             .setDesc('How the plugin handles this scene\'s temporal position')
-            .addDropdown((dd: any) => {
+            .addDropdown((dd: DropdownComponent) => {
                 for (const m of TIMELINE_MODES) {
                     dd.addOption(m, TIMELINE_MODE_LABELS[m]);
                 }
@@ -1591,7 +1591,7 @@ export class TimelineView extends ItemView {
         const strandSetting = new Setting(modeSection)
             .setName('Timeline strand')
             .setDesc('Name for this timeline strand (e.g. "1943", "Outer frame", "Sarah\'s past")')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(timelineStrand)
                     .setPlaceholder('e.g. 1943')
                     .onChange((v: string) => (timelineStrand = v));
@@ -1600,7 +1600,7 @@ export class TimelineView extends ItemView {
         strandSetting.settingEl.setCssStyles({ display: (timelineMode === 'parallel' || timelineMode === 'frame') ? '' : 'none' });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Save').setCta().onClick(async () => {
                     const updates: Partial<Scene> = {};
                     updates.storyDate = storyDate.trim() || undefined;

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { App, TFile, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
 import {
     StoryWorld, StoryLocation, WorldOrLocation,
@@ -75,16 +75,17 @@ export class LocationManager {
     private parseAndStoreContent(content: string, filePath: string, folderFallback = false): void {
         const fm = this.extractFrontmatter(content);
         if (!fm && !folderFallback) return;
-        const safeFm = (fm ?? {}) as Record<string, any>;
+        const safeFm = (fm ?? {}) as Partial<StoryWorld> & Partial<StoryLocation> & Record<string, unknown>;
 
         // Resolve effective type — explicit `type:` wins; otherwise fall back
         // to 'location' for Codex/Locations residents (issue #74).
-        let effectiveType = safeFm.type;
-        if (effectiveType !== 'world' && effectiveType !== 'location') {
-            if (!folderFallback) return;
-            effectiveType = 'location';
+        let effectiveType: 'world' | 'location' = 'location';
+        if (safeFm.type === 'world' || safeFm.type === 'location') {
+            effectiveType = safeFm.type as 'world' | 'location';
+        } else if (!folderFallback) {
+            return;
         }
-        const fmEff: Record<string, any> = safeFm;
+        const fmEff = safeFm;
 
         const body = this.extractBody(content);
         const basename = filePath.split('/').pop()?.replace(/\.md$/i, '') ?? filePath;
@@ -105,11 +106,15 @@ export class LocationManager {
                 economy: fmEff.economy,
                 history: fmEff.history,
                 books: this.parseStringList(fmEff.books),
-                custom: fmEff.custom && typeof fmEff.custom === 'object' ? fmEff.custom : undefined,
+                custom: fmEff.custom && typeof fmEff.custom === 'object'
+                    ? (fmEff.custom as Record<string, string>)
+                    : undefined,
                 universalFields: hydrateUniversalFieldsFromTopLevel(
                     fmEff,
-                    fmEff.universalFields && typeof fmEff.universalFields === 'object' ? fmEff.universalFields : undefined,
-                ),
+                    fmEff.universalFields && typeof fmEff.universalFields === 'object'
+                        ? (fmEff.universalFields as Record<string, string | string[]>)
+                        : undefined,
+                ) as Record<string, string | string[]> | undefined,
                 created: fmEff.created,
                 modified: fmEff.modified,
                 notes: body || undefined,
@@ -132,11 +137,15 @@ export class LocationManager {
                 connectedLocations: fmEff.connectedLocations,
                 mapNotes: fmEff.mapNotes,
                 books: this.parseStringList(fmEff.books),
-                custom: fmEff.custom && typeof fmEff.custom === 'object' ? fmEff.custom : undefined,
+                custom: fmEff.custom && typeof fmEff.custom === 'object'
+                    ? (fmEff.custom as Record<string, string>)
+                    : undefined,
                 universalFields: hydrateUniversalFieldsFromTopLevel(
                     fmEff,
-                    fmEff.universalFields && typeof fmEff.universalFields === 'object' ? fmEff.universalFields : undefined,
-                ),
+                    fmEff.universalFields && typeof fmEff.universalFields === 'object'
+                        ? (fmEff.universalFields as Record<string, string | string[]>)
+                        : undefined,
+                ) as Record<string, string | string[]> | undefined,
                 created: fmEff.created,
                 modified: fmEff.modified,
                 notes: body || undefined,
@@ -224,7 +233,7 @@ export class LocationManager {
         }
 
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = { type: 'world', name, created: now, modified: now };
+        const fm: Record<string, unknown> = { type: 'world', name, created: now, modified: now };
         await this.app.vault.create(filePath, `---\n${stringifyYaml(fm)}---\n`);
 
         // Also create a subfolder for locations in this world
@@ -252,7 +261,7 @@ export class LocationManager {
         }
 
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = { type: 'location', name, created: now, modified: now };
+        const fm: Record<string, unknown> = { type: 'location', name, created: now, modified: now };
         if (worldName) fm.world = worldName;
         if (parentName) fm.parent = parentName;
         await this.app.vault.create(filePath, `---\n${stringifyYaml(fm)}---\n`);
@@ -287,7 +296,7 @@ export class LocationManager {
         const existingFm = this.extractFrontmatter(content) || {};
         const body = this.extractBody(content);
 
-        const fm: Record<string, any> = { ...existingFm };
+        const fm: Record<string, unknown> = { ...existingFm };
         fm.type = item.type;
         fm.name = item.name;
         fm.modified = new Date().toISOString().split('T')[0];
@@ -295,7 +304,7 @@ export class LocationManager {
 
         for (const key of fieldKeys) {
             if (key === 'name') continue;
-            const val = (item as any)[key];
+            const val = (item as unknown as Record<string, unknown>)[key];
             if (val !== undefined && val !== null && val !== '' && !(Array.isArray(val) && val.length === 0)) {
                 fm[key] = val;
             } else {
@@ -369,7 +378,7 @@ export class LocationManager {
     }
     // ── Helpers ────────────────────────────────────────
 
-    private extractFrontmatter(content: string): Record<string, any> | null {
+    private extractFrontmatter(content: string): Record<string, unknown> | null {
         // Strip BOM + invisible zero-width characters before matching
         const clean = content.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '');
         const match = clean.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -385,7 +394,7 @@ export class LocationManager {
         return match ? match[1].trim() : '';
     }
 
-    private parseGallery(value: any): Array<{ path: string; caption: string }> | undefined {
+    private parseGallery(value: unknown): Array<{ path: string; caption: string }> | undefined {
         if (!Array.isArray(value)) return undefined;
         const parsed: Array<{ path: string; caption: string }> = [];
         for (const item of value) {
@@ -398,7 +407,7 @@ export class LocationManager {
         return parsed.length ? parsed : undefined;
     }
 
-    private parseStringList(value: any): string[] | undefined {
+    private parseStringList(value: unknown): string[] | undefined {
         if (Array.isArray(value)) {
             const parsed = value.map(v => String(v).trim()).filter(Boolean);
             return parsed.length ? parsed : undefined;

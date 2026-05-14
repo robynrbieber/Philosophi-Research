@@ -1,8 +1,8 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
-import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath, setIcon, FuzzySuggestModal } from 'obsidian';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { App, ButtonComponent, DropdownComponent, FuzzySuggestModal, Modal, Notice, Plugin, Setting, TFile, TextComponent, ToggleComponent, WorkspaceLeaf, normalizePath, parseYaml, setIcon } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
+import { asRecord, asString, asNumber, asBool, isRecord } from './utils/narrow';
+import type { FilterPreset } from './models/Scene';
 import { SceneManager } from './services/SceneManager';
 import { registerCustomStatuses } from './models/Scene';
 import { setWriteSceneFieldsAsWikilinks, setWordcountExclusions } from './services/MetadataParser';
@@ -65,7 +65,7 @@ export default class SceneCardsPlugin extends Plugin {
     /** Set to true once System/ migration is confirmed — guards saveSettings stripping */
     private _systemMigrationDone = false;
     /** Snapshot of colour settings from data.json (global defaults) */
-    private _globalColorDefaults: Record<string, any> = {};
+    private _globalColorDefaults: Partial<SceneCardsSettings> = {};
     locationManager!: LocationManager;
     characterManager!: CharacterManager;
     codexManager!: CodexManager;
@@ -121,20 +121,23 @@ export default class SceneCardsPlugin extends Plugin {
         // API surface varies between Obsidian versions.
         for (const ext of ['json', 'docx']) {
             try {
-                // eslint-disable-next-line @typescript-eslint/no-this-alias -- needed for `any` cast to access version-dependent API
-                const pluginAny: any = this;
+                // eslint-disable-next-line @typescript-eslint/no-this-alias -- needed for cast to access version-dependent API
+                const pluginAny = this as unknown as Record<string, unknown>;
                 let alreadyRegistered = false;
 
                 const regOnPlugin = pluginAny.registeredExtensions;
-                const regOnVault = (this.app as any)?.vault?.registeredExtensions;
+                const regOnVault = (this.app.vault as unknown as Record<string, unknown>)?.registeredExtensions;
                 if (Array.isArray(regOnPlugin)) alreadyRegistered = regOnPlugin.includes(ext);
                 if (!alreadyRegistered && Array.isArray(regOnVault)) alreadyRegistered = regOnVault.includes(ext);
 
                 if (!alreadyRegistered) {
                     if (typeof pluginAny.registerExtensions === 'function') {
-                        pluginAny.registerExtensions([ext]);
-                    } else if (typeof (this.app as any).registerExtensions === 'function') {
-                        (this.app as any).registerExtensions([ext]);
+                        (pluginAny.registerExtensions as (e: string[]) => void)([ext]);
+                    } else {
+                        const appReg = (this.app as unknown as Record<string, unknown>).registerExtensions;
+                        if (typeof appReg === 'function') {
+                            (appReg as (e: string[]) => void)([ext]);
+                        }
                     }
                 }
             } catch (e) {
@@ -190,7 +193,7 @@ export default class SceneCardsPlugin extends Plugin {
             try {
             // Apply frontmatter visibility setting
             if (this.settings.hideFrontmatter) {
-                (this.app.vault as any).setConfig?.('propertiesInDocument', 'hidden');
+                (this.app.vault as unknown as { setConfig?: (k: string, v: string) => void }).setConfig?.('propertiesInDocument', 'hidden');
             }
 
             await this.bootstrapProjects();
@@ -389,8 +392,8 @@ export default class SceneCardsPlugin extends Plugin {
                 try {
                     await this.seriesManager.removeProjectFromSeries();
                     this.refreshOpenViews();
-                } catch (e: any) {
-                    new Notice(e?.message ?? String(e), 10000);
+                } catch (e: unknown) {
+                    new Notice((e instanceof Error ? e.message : String(e)), 10000);
                 }
             },
         });
@@ -422,9 +425,10 @@ export default class SceneCardsPlugin extends Plugin {
                     new Notice('Scrivener import is only available on desktop.');
                     return;
                 }
-                let remote: any;
-                try { remote = (window as any).require('@electron/remote'); }
-                catch { try { remote = (window as any).require('electron').remote; } catch { /* */ } }
+                let remote: { dialog: { showOpenDialog: (opts: unknown) => Promise<{ canceled: boolean; filePaths?: string[] }> } } | undefined;
+                const win = window as unknown as { require?: (m: string) => unknown };
+                try { remote = win.require?.('@electron/remote') as typeof remote; }
+                catch { try { remote = (win.require?.('electron') as { remote: typeof remote })?.remote; } catch { /* */ } }
                 if (!remote) { new Notice('File dialog not available.'); return; }
 
                 const result = await remote.dialog.showOpenDialog({
@@ -446,8 +450,8 @@ export default class SceneCardsPlugin extends Plugin {
                     const parts = [`${r.scenesImported} scenes`, `${r.charactersImported} characters`, `${r.locationsImported} locations`];
                     if (r.filesImported > 0) parts.push(`${r.filesImported} files`);
                     new Notice(`Imported "${r.projectTitle}": ${parts.join(', ')}`, 8000);
-                } catch (err: any) {
-                    new Notice('Import failed: ' + (err?.message || String(err)));
+                } catch (err: unknown) {
+                    new Notice('Import failed: ' + (err instanceof Error ? err.message : String(err)));
                 }
             },
         });
@@ -609,14 +613,19 @@ export default class SceneCardsPlugin extends Plugin {
         if (!this.settings.showFormattingToolbar) return;
 
         // Skip if Editing Toolbar plugin is installed
-        if ((this.app as any).plugins?.getPlugin?.('editing-toolbar')) return;
+        const plugins = (this.app as unknown as { plugins?: { getPlugin?: (id: string) => unknown } }).plugins;
+        if (plugins?.getPlugin?.('editing-toolbar')) return;
 
         // Only inject into markdown views in source/live-preview mode
-        const view = leaf.view as any;
+        const view = leaf.view as unknown as {
+            getViewType?: () => string;
+            file?: TFile | null;
+            editor?: { cm?: import('@codemirror/view').EditorView | null };
+        };
         if (view?.getViewType?.() !== 'markdown') return;
 
         // Only inject for files that belong to the active project
-        const file = view.file as TFile | null;
+        const file = view.file ?? null;
         if (!file) return;
         const sf = this.sceneManager?.activeProject?.sceneFolder;
         const projectRoot = sf ? sf.replace(/\/Scenes$/, '') : undefined;
@@ -627,7 +636,7 @@ export default class SceneCardsPlugin extends Plugin {
         if (!cm) return;
 
         // Find the view-content container to insert the toolbar
-        const viewContent = (leaf as any).containerEl?.querySelector('.view-content');
+        const viewContent = (leaf as unknown as { containerEl?: HTMLElement }).containerEl?.querySelector('.view-content');
         if (!viewContent) return;
 
         // Create and inject the toolbar at the top of view-content
@@ -731,7 +740,7 @@ export default class SceneCardsPlugin extends Plugin {
             comments: this.settings.excludeCommentsFromWordcount !== false,
             checklists: this.settings.excludeChecklistFromWordcount === true,
         });
-        const toSave: Record<string, any> = { ...this.settings };
+        const toSave: Record<string, unknown> = { ...this.settings };
         if (this._systemMigrationDone) {
             // Strip per-project data from the global data.json payload
             for (const key of SceneCardsPlugin.PROJECT_DATA_KEYS) {
@@ -1051,7 +1060,7 @@ export default class SceneCardsPlugin extends Plugin {
      * Read a JSON file from the current project's System/ folder.
      * Returns an empty object if the file doesn't exist or is invalid.
      */
-    private async readSystemJson(filename: string): Promise<Record<string, any>> {
+    private async readSystemJson(filename: string): Promise<Record<string, unknown>> {
         try {
             const adapter = this.app.vault.adapter;
             const filePath = `${this.getProjectSystemFolder()}/${filename}`;
@@ -1067,7 +1076,7 @@ export default class SceneCardsPlugin extends Plugin {
      * Write a JSON object to a file in the current project's System/ folder.
      * Creates the System/ folder if it doesn't exist.
      */
-    private async writeSystemJson(filename: string, data: Record<string, any>): Promise<void> {
+    private async writeSystemJson(filename: string, data: Record<string, unknown>): Promise<void> {
         try {
             const adapter = this.app.vault.adapter;
             const systemFolder = this.getProjectSystemFolder();
@@ -1090,64 +1099,58 @@ export default class SceneCardsPlugin extends Plugin {
         const stats = await this.readSystemJson('stats.json');
 
         // Overlay per-project data onto settings (used as working copy)
-        if (plotlines.tagColors && typeof plotlines.tagColors === 'object') {
-            this.settings.tagColors = plotlines.tagColors;
-        } else {
-            this.settings.tagColors = {};
-        }
-        if (plotlines.tagTypeOverrides && typeof plotlines.tagTypeOverrides === 'object') {
-            this.settings.tagTypeOverrides = plotlines.tagTypeOverrides;
-        } else {
-            this.settings.tagTypeOverrides = {};
-        }
+        this.settings.tagColors = isRecord(plotlines.tagColors)
+            ? (plotlines.tagColors as Record<string, string>)
+            : {};
+        this.settings.tagTypeOverrides = isRecord(plotlines.tagTypeOverrides)
+            ? (plotlines.tagTypeOverrides as Record<string, string>)
+            : {};
 
         // Per-project colour overrides (if the project has them stored)
-        if (plotlines.projectColors && typeof plotlines.projectColors === 'object') {
-            const pc = plotlines.projectColors;
+        if (isRecord(plotlines.projectColors)) {
+            const pc = asRecord(plotlines.projectColors);
             // Flag this project as having per-project colours
             this.settings.useProjectColors = true;
-            if (pc.colorScheme) this.settings.colorScheme = pc.colorScheme;
+            if (pc.colorScheme) this.settings.colorScheme = pc.colorScheme as typeof this.settings.colorScheme;
             if (typeof pc.plotlineHue === 'number') this.settings.plotlineHue = pc.plotlineHue;
             if (typeof pc.plotlineSaturation === 'number') this.settings.plotlineSaturation = pc.plotlineSaturation;
             if (typeof pc.plotlineLightness === 'number') this.settings.plotlineLightness = pc.plotlineLightness;
-            if (pc.stickyNoteTheme) this.settings.stickyNoteTheme = pc.stickyNoteTheme;
+            if (pc.stickyNoteTheme) this.settings.stickyNoteTheme = pc.stickyNoteTheme as typeof this.settings.stickyNoteTheme;
             if (typeof pc.stickyNoteHue === 'number') this.settings.stickyNoteHue = pc.stickyNoteHue;
             if (typeof pc.stickyNoteSaturation === 'number') this.settings.stickyNoteSaturation = pc.stickyNoteSaturation;
             if (typeof pc.stickyNoteLightness === 'number') this.settings.stickyNoteLightness = pc.stickyNoteLightness;
-            if (pc.stickyNoteOverrides && typeof pc.stickyNoteOverrides === 'object') {
-                this.settings.stickyNoteOverrides = pc.stickyNoteOverrides;
+            if (isRecord(pc.stickyNoteOverrides)) {
+                this.settings.stickyNoteOverrides = pc.stickyNoteOverrides as Record<number, string>;
             }
         } else {
             // No per-project overrides — restore the global colour defaults
             this.settings.useProjectColors = false;
             const g = this._globalColorDefaults;
             if (g && Object.keys(g).length > 0) {
-                this.settings.colorScheme = g.colorScheme;
-                this.settings.plotlineHue = g.plotlineHue;
-                this.settings.plotlineSaturation = g.plotlineSaturation;
-                this.settings.plotlineLightness = g.plotlineLightness;
-                this.settings.stickyNoteTheme = g.stickyNoteTheme;
-                this.settings.stickyNoteHue = g.stickyNoteHue;
-                this.settings.stickyNoteSaturation = g.stickyNoteSaturation;
-                this.settings.stickyNoteLightness = g.stickyNoteLightness;
+                if (g.colorScheme !== undefined) this.settings.colorScheme = g.colorScheme;
+                if (g.plotlineHue !== undefined) this.settings.plotlineHue = g.plotlineHue;
+                if (g.plotlineSaturation !== undefined) this.settings.plotlineSaturation = g.plotlineSaturation;
+                if (g.plotlineLightness !== undefined) this.settings.plotlineLightness = g.plotlineLightness;
+                if (g.stickyNoteTheme !== undefined) this.settings.stickyNoteTheme = g.stickyNoteTheme;
+                if (g.stickyNoteHue !== undefined) this.settings.stickyNoteHue = g.stickyNoteHue;
+                if (g.stickyNoteSaturation !== undefined) this.settings.stickyNoteSaturation = g.stickyNoteSaturation;
+                if (g.stickyNoteLightness !== undefined) this.settings.stickyNoteLightness = g.stickyNoteLightness;
                 this.settings.stickyNoteOverrides = { ...(g.stickyNoteOverrides || {}) };
             }
         }
 
-        if (characters.characterAliases && typeof characters.characterAliases === 'object') {
-            this.settings.characterAliases = characters.characterAliases;
-        } else {
-            this.settings.characterAliases = {};
-        }
+        this.settings.characterAliases = isRecord(characters.characterAliases)
+            ? (characters.characterAliases as Record<string, string>)
+            : {};
         if (Array.isArray(characters.ignoredCharacters)) {
-            this.settings.ignoredCharacters = characters.ignoredCharacters;
+            this.settings.ignoredCharacters = characters.ignoredCharacters as string[];
         } else {
             this.settings.ignoredCharacters = [];
         }
 
         // Writing tracker data
-        if (stats.writingTrackerData) {
-            this.writingTracker.importData(stats.writingTrackerData);
+        if (isRecord(stats.writingTrackerData)) {
+            this.writingTracker.importData(stats.writingTrackerData as unknown as Parameters<typeof this.writingTracker.importData>[0]);
         }
 
         // System files are now the source of truth
@@ -1161,7 +1164,7 @@ export default class SceneCardsPlugin extends Plugin {
     async saveProjectSystemData(): Promise<void> {
         if (!this.sceneManager?.activeProject) return;
 
-        const plotlinesPayload: Record<string, any> = {
+        const plotlinesPayload: Record<string, unknown> = {
             tagColors: this.settings.tagColors || {},
             tagTypeOverrides: this.settings.tagTypeOverrides || {},
         };
@@ -1407,14 +1410,15 @@ export default class SceneCardsPlugin extends Plugin {
         const leaf = leaves[0];
         // Check the sidebar containing this leaf is not collapsed
         const root = leaf.getRoot();
-        if ((root as any).collapsed) return false;
+        if ((root as unknown as Record<string, unknown>).collapsed) return false;
         // Check this leaf is the active tab in its parent (not hidden behind another tab)
-        const parent = (leaf as any).parentSplit ?? (leaf as any).parent;
+        const parent = ((leaf as unknown as Record<string, unknown>).parentSplit
+            ?? (leaf as unknown as Record<string, unknown>).parent) as { children?: unknown[]; currentTab?: unknown; activeTab?: unknown } | undefined;
         if (parent && typeof parent.children !== 'undefined') {
-            const activeChild = (parent as any).currentTab ?? (parent as any).activeTab;
+            const activeChild = parent.currentTab ?? parent.activeTab;
             if (activeChild !== undefined && activeChild !== leaf) {
                 // parent tracks a numeric index — compare by index
-                const idx = (parent.children as any[]).indexOf(leaf);
+                const idx = (parent.children as unknown[]).indexOf(leaf);
                 if (typeof activeChild === 'number' ? activeChild !== idx : true) return false;
             }
         }
@@ -1592,7 +1596,7 @@ export default class SceneCardsPlugin extends Plugin {
     invalidateCorkboardCache(): void {
         const leaves = this.app.workspace.getLeavesOfType(BOARD_VIEW_TYPE);
         for (const leaf of leaves) {
-            const view = leaf.view as unknown as Record<string, unknown>;
+            const view = leaf.view as unknown as unknown as Record<string, unknown>;
             if (typeof view?.invalidateCorkboardLayout === 'function') {
                 (view as unknown as { invalidateCorkboardLayout(): void }).invalidateCorkboardLayout();
             }
@@ -1606,7 +1610,7 @@ export default class SceneCardsPlugin extends Plugin {
     async flushCorkboardPositions(): Promise<void> {
         const leaves = this.app.workspace.getLeavesOfType(BOARD_VIEW_TYPE);
         for (const leaf of leaves) {
-            const view = leaf.view as unknown as Record<string, unknown>;
+            const view = leaf.view as unknown as unknown as Record<string, unknown>;
             if (typeof view?.flushPendingCorkboardPersist === 'function') {
                 await (view as unknown as { flushPendingCorkboardPersist(): Promise<void> }).flushPendingCorkboardPersist();
             }
@@ -1662,12 +1666,12 @@ export default class SceneCardsPlugin extends Plugin {
         for (const viewType of viewTypes) {
             const leaves = this.app.workspace.getLeavesOfType(viewType);
             for (const leaf of leaves) {
-                const view = leaf.view;
-                if (view && 'refresh' in view && typeof (view as Record<string, unknown>).refresh === 'function') {
-                    (view as unknown as { refresh(): void }).refresh();
+                const view = leaf.view as unknown as { refresh?: () => void };
+                if (view && typeof view.refresh === 'function') {
+                    view.refresh();
                 }
                 // Update the tab title so it reflects the new project name immediately
-                (leaf as any).updateHeader?.();
+                (leaf as unknown as { updateHeader?: () => void }).updateHeader?.();
             }
         }
     }
@@ -1700,12 +1704,12 @@ export default class SceneCardsPlugin extends Plugin {
     /**
      * Debounce utility
      */
-    private debounce<T extends (...args: any[]) => any>(
+    private debounce<T extends (...args: unknown[]) => unknown>(
         func: T,
         wait: number
     ): T {
         let timeout: number | null = null;
-        return ((...args: any[]) => {
+        return ((...args: unknown[]) => {
             if (timeout) window.clearTimeout(timeout);
             timeout = window.setTimeout(() => func(...args), wait);
         }) as unknown as T;
@@ -1729,8 +1733,17 @@ export default class SceneCardsPlugin extends Plugin {
      * After successful migration the legacy keys are removed from data.json.
      */
     private async migrateProjectDataFromSettings(): Promise<void> {
-        const raw: any = await this.loadData();
-        if (!raw) return;
+        const rawAny: unknown = await this.loadData();
+        if (!rawAny || !isRecord(rawAny)) return;
+        const raw = rawAny as Record<string, unknown> & {
+            definedActs?: Record<string, unknown>;
+            definedChapters?: Record<string, unknown>;
+            filterPresets?: unknown[];
+            activeProjectFile?: string;
+            rows?: unknown[];
+            columns?: unknown[];
+            cells?: unknown[];
+        };
 
         let dirty = false;
         const adapter = this.app.vault.adapter;
@@ -1765,7 +1778,7 @@ export default class SceneCardsPlugin extends Plugin {
         if (Array.isArray(raw.filterPresets) && raw.filterPresets.length > 0) {
             const activeProject = this.sceneManager.activeProject;
             if (activeProject && activeProject.filterPresets.length === 0) {
-                activeProject.filterPresets = raw.filterPresets;
+                activeProject.filterPresets = raw.filterPresets as FilterPreset[];
                 await this.sceneManager.saveProjectFrontmatter(activeProject);
             }
         }
@@ -1822,7 +1835,7 @@ export default class SceneCardsPlugin extends Plugin {
                         } catch { /* unreadable — allow overwrite */ }
                     }
                     if (!existingHasData) {
-                        const pgData: Record<string, any> = {};
+                        const pgData: Record<string, unknown> = {};
                         if (Array.isArray(raw.rows)) pgData.rows = raw.rows;
                         if (Array.isArray(raw.columns)) pgData.columns = raw.columns;
                         if (raw.cells && typeof raw.cells === 'object') pgData.cells = raw.cells;
@@ -1841,13 +1854,13 @@ export default class SceneCardsPlugin extends Plugin {
             {
                 try {
                     const path = `${sysFolder}/plotlines.json`;
-                    let existing: Record<string, any> = {};
+                    let existing: Record<string, unknown> = {};
                     if (await adapter.exists(path)) {
                         try { existing = JSON.parse(await adapter.read(path)); } catch { /* */ }
                     }
                     // Merge: use raw (data.json) values if present, else keep existing System file values,
                     // else fall back to in-memory settings (which have defaults).
-                    const merged: Record<string, any> = {
+                    const merged: Record<string, unknown> = {
                         tagColors: raw.tagColors ?? existing.tagColors ?? this.settings.tagColors ?? {},
                         tagTypeOverrides: raw.tagTypeOverrides ?? existing.tagTypeOverrides ?? this.settings.tagTypeOverrides ?? {},
                     };
@@ -1861,11 +1874,11 @@ export default class SceneCardsPlugin extends Plugin {
             {
                 try {
                     const path = `${sysFolder}/characters.json`;
-                    let existing: Record<string, any> = {};
+                    let existing: Record<string, unknown> = {};
                     if (await adapter.exists(path)) {
                         try { existing = JSON.parse(await adapter.read(path)); } catch { /* */ }
                     }
-                    const merged: Record<string, any> = {
+                    const merged: Record<string, unknown> = {
                         characterAliases: raw.characterAliases ?? existing.characterAliases ?? this.settings.characterAliases ?? {},
                         ignoredCharacters: raw.ignoredCharacters ?? existing.ignoredCharacters ?? this.settings.ignoredCharacters ?? [],
                     };
@@ -1879,11 +1892,11 @@ export default class SceneCardsPlugin extends Plugin {
             {
                 try {
                     const path = `${sysFolder}/stats.json`;
-                    let existing: Record<string, any> = {};
+                    let existing: Record<string, unknown> = {};
                     if (await adapter.exists(path)) {
                         try { existing = JSON.parse(await adapter.read(path)); } catch { /* */ }
                     }
-                    const merged: Record<string, any> = {
+                    const merged: Record<string, unknown> = {
                         writingTrackerData: raw.writingTrackerData ?? existing.writingTrackerData ?? null,
                     };
                     if (merged.writingTrackerData) {
@@ -2010,8 +2023,8 @@ export default class SceneCardsPlugin extends Plugin {
     /**
      * Open a modal to create a new StoryLine project
      */
-    async openNewProjectModal(): Promise<any | null> {
-        return new Promise((resolve) => {
+    async openNewProjectModal(): Promise<StoryLineProject | null> {
+        return new Promise<StoryLineProject | null>((resolve) => {
             const modal = new Modal(this.app);
             modal.titleEl.setText('New StoryLine Project');
             let title = '';
@@ -2023,7 +2036,7 @@ export default class SceneCardsPlugin extends Plugin {
             const seriesNameSetting = new Setting(modal.contentEl)
                 .setName('Series name')
                 .setDesc('Characters, locations, and codex entries will be shared across all books in this series.')
-                .addText((text: any) => {
+                .addText((text: TextComponent) => {
                     text.setPlaceholder('My Trilogy');
                     text.onChange((v: string) => (seriesName = v));
                 });
@@ -2032,7 +2045,7 @@ export default class SceneCardsPlugin extends Plugin {
             new Setting(modal.contentEl)
                 .setName('Create as series')
                 .setDesc('Wrap this book in a series folder with a shared Codex.')
-                .addToggle((toggle: any) => {
+                .addToggle((toggle: ToggleComponent) => {
                     toggle.setValue(false);
                     toggle.onChange((v: boolean) => {
                         createAsSeries = v;
@@ -2044,7 +2057,7 @@ export default class SceneCardsPlugin extends Plugin {
             new Setting(modal.contentEl)
                 .setName('Book title')
                 .setDesc('The title of this book. Each book gets its own scenes folder.')
-                .addText((text: any) => {
+                .addText((text: TextComponent) => {
                     text.setPlaceholder('My Novel');
                     text.onChange((v: string) => (title = v));
                 });
@@ -2052,13 +2065,13 @@ export default class SceneCardsPlugin extends Plugin {
             new Setting(modal.contentEl)
                 .setName('Location')
                 .setDesc(`Leave empty to use default (${this.settings.storyLineRoot}). Or enter a vault folder path like "Writing/Novels".`)
-                .addText((text: any) => {
+                .addText((text: TextComponent) => {
                     text.setPlaceholder(this.settings.storyLineRoot);
                     text.onChange((v: string) => (customFolder = v.trim()));
                 });
 
             new Setting(modal.contentEl)
-                .addButton((btn: any) => {
+                .addButton((btn: ButtonComponent) => {
                     btn.setButtonText('Create').setCta().onClick(async () => {
                         if (!title.trim()) return;
                         if (createAsSeries && !seriesName.trim()) {
@@ -2079,13 +2092,13 @@ export default class SceneCardsPlugin extends Plugin {
                             try { await this.activateView(BOARD_VIEW_TYPE); } catch { /* non-critical */ }
                             modal.close();
                             resolve(project);
-                        } catch (err: any) {
-                            new Notice(err?.message ?? String(err), 10000);
+                        } catch (err: unknown) {
+                            new Notice((err instanceof Error ? err.message : String(err)), 10000);
                             resolve(null);
                         }
                     });
                 })
-                .addButton((btn: any) => {
+                .addButton((btn: ButtonComponent) => {
                     btn.setButtonText('Cancel').onClick(() => {
                         modal.close();
                         resolve(null);
@@ -2112,13 +2125,13 @@ export default class SceneCardsPlugin extends Plugin {
         new Setting(modal.contentEl)
             .setName('New project name')
             .setDesc('All scenes from the current project will be copied.')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(newTitle);
                 text.onChange((v: string) => (newTitle = v));
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Fork').setCta().onClick(async () => {
                     if (!newTitle.trim()) return;
                     const forked = await this.sceneManager.forkProject(activeProject, newTitle.trim());
@@ -2154,14 +2167,14 @@ export default class SceneCardsPlugin extends Plugin {
         new Setting(modal.contentEl)
             .setName('Series name')
             .setDesc(`"${project.title}" will become the first book in this series. Its codex will be shared.`)
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setPlaceholder('My Trilogy');
                 text.onChange((v: string) => (seriesName = v));
                 window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Create Series').setCta().onClick(async () => {
                     if (!seriesName.trim()) {
                         new Notice('Please enter a series name.');
@@ -2171,8 +2184,8 @@ export default class SceneCardsPlugin extends Plugin {
                     try {
                         await this.seriesManager.createSeriesFromProject(seriesName.trim());
                         this.refreshOpenViews();
-                    } catch (e: any) {
-                        new Notice(e?.message ?? String(e), 10000);
+                    } catch (e: unknown) {
+                        new Notice((e instanceof Error ? e.message : String(e)), 10000);
                     }
                 });
             });
@@ -2204,7 +2217,7 @@ export default class SceneCardsPlugin extends Plugin {
         new Setting(modal.contentEl)
             .setName('Series')
             .setDesc(`"${project.title}" will be added to the selected series. Its codex will be merged into the shared series codex.`)
-            .addDropdown((dropdown: any) => {
+            .addDropdown((dropdown: DropdownComponent) => {
                 for (const s of seriesList) {
                     dropdown.addOption(s.folder, `${s.meta.name} (${s.meta.bookOrder.length} books)`);
                 }
@@ -2212,14 +2225,14 @@ export default class SceneCardsPlugin extends Plugin {
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Add to Series').setCta().onClick(async () => {
                     modal.close();
                     try {
                         await this.seriesManager.addProjectToSeries(selectedFolder);
                         this.refreshOpenViews();
-                    } catch (e: any) {
-                        new Notice(e?.message ?? String(e), 10000);
+                    } catch (e: unknown) {
+                        new Notice((e instanceof Error ? e.message : String(e)), 10000);
                     }
                 });
             });
@@ -2241,14 +2254,14 @@ export default class SceneCardsPlugin extends Plugin {
         new Setting(modal.contentEl)
             .setName('New title')
             .setDesc('The project file and folder will be renamed. All links are updated automatically.')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(project.title);
                 text.onChange((v: string) => (newTitle = v));
                 window.setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Rename').setCta().onClick(async () => {
                     if (!newTitle.trim() || newTitle.trim() === project.title) {
                         modal.close();
@@ -2260,8 +2273,8 @@ export default class SceneCardsPlugin extends Plugin {
                         new Notice(`Project renamed to "${newTitle.trim()}"`);
                         modal.close();
                         this.refreshOpenViews();
-                    } catch (e: any) {
-                        new Notice(e?.message ?? String(e), 10000);
+                    } catch (e: unknown) {
+                        new Notice((e instanceof Error ? e.message : String(e)), 10000);
                     }
                 });
             });
@@ -2282,7 +2295,7 @@ class ProjectSwitcherModal extends FuzzySuggestModal<StoryLineProject> {
     private projects: StoryLineProject[];
     private onChoose: (project: StoryLineProject) => void;
 
-    constructor(app: any, projects: StoryLineProject[], onChoose: (project: StoryLineProject) => void) {
+    constructor(app: App, projects: StoryLineProject[], onChoose: (project: StoryLineProject) => void) {
         super(app);
         this.projects = projects;
         this.onChoose = onChoose;
@@ -2307,7 +2320,7 @@ class ProjectSwitcherModal extends FuzzySuggestModal<StoryLineProject> {
  */
 class ProjectSelectModal extends Modal {
     plugin: SceneCardsPlugin;
-    constructor(app: any, plugin: SceneCardsPlugin) {
+    constructor(app: App, plugin: SceneCardsPlugin) {
         super(app);
         this.plugin = plugin;
         this.titleEl.setText('Open StoryLine Project');
@@ -2330,7 +2343,7 @@ class ProjectSelectModal extends Modal {
         openBtn.addEventListener('click', async () => {
             const val = select.value;
             const projects = this.plugin.sceneManager.getProjects();
-            const selected = projects.find((p: any) => p.filePath === val);
+            const selected = projects.find((p: StoryLineProject) => p.filePath === val);
             if (!selected) {
                 new Notice('No project selected');
                 return;
@@ -2368,7 +2381,7 @@ class ProjectSelectModal extends Modal {
                     const opt = select.createEl('option', { text: label });
                     opt.setAttr('value', p.filePath);
                 }
-                if (projects.length > 0) select.value = (created && created.filePath) || projects[0].filePath;
+                if (projects.length > 0) select.value = projects[0].filePath;
             } catch (err) {
                 new Notice('Failed to refresh projects: ' + String(err));
             }
@@ -2461,11 +2474,15 @@ class ProjectSelectModal extends Modal {
                         const content = await adapter.read(pf.path);
                         // Re-scan and try to find / adopt this project
                         await this.plugin.sceneManager.scanProjects();
-                        let project = this.plugin.sceneManager.getProjects().find((p: any) => p.filePath === pf.path);
+                        let project = this.plugin.sceneManager.getProjects().find((p: StoryLineProject) => p.filePath === pf.path);
                         if (!project) {
-                            const parsed = (this.plugin.sceneManager as any).parseProjectContent(content, pf.path);
+                            const sm = this.plugin.sceneManager as unknown as {
+                                parseProjectContent: (content: string, path: string) => StoryLineProject | null;
+                                projects: Map<string, StoryLineProject>;
+                            };
+                            const parsed = sm.parseProjectContent(content, pf.path);
                             if (parsed) {
-                                (this.plugin.sceneManager as any).projects.set(pf.path, parsed);
+                                sm.projects.set(pf.path, parsed);
                                 project = parsed;
                             }
                         }
@@ -2506,7 +2523,7 @@ class ProjectSelectModal extends Modal {
                 }
                 if (projects.length > 0) {
                     const active = this.plugin.sceneManager.activeProject;
-                    select.value = (active && projects.some((p: any) => p.filePath === active.filePath))
+                    select.value = (active && projects.some((p: StoryLineProject) => p.filePath === active.filePath))
                         ? active.filePath
                         : projects[0].filePath;
                 }
@@ -2523,7 +2540,7 @@ class ProjectSelectModal extends Modal {
 class SeriesManagementModal extends Modal {
     plugin: SceneCardsPlugin;
 
-    constructor(app: any, plugin: SceneCardsPlugin) {
+    constructor(app: App, plugin: SceneCardsPlugin) {
         super(app);
         this.plugin = plugin;
         this.titleEl.setText('Manage Series');
@@ -2615,14 +2632,14 @@ class SeriesManagementModal extends Modal {
         new Setting(modal.contentEl)
             .setName('Series name')
             .setDesc('The series folder will also be renamed. All links are updated automatically.')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(meta.name);
                 text.onChange((v: string) => (newName = v));
                 window.setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Rename').setCta().onClick(async () => {
                     if (!newName.trim() || newName.trim() === meta.name) {
                         modal.close();
@@ -2662,8 +2679,8 @@ class SeriesManagementModal extends Modal {
                         modal.close();
                         this.plugin.refreshOpenViews();
                         this.render();
-                    } catch (e: any) {
-                        new Notice(e?.message ?? String(e), 10000);
+                    } catch (e: unknown) {
+                        new Notice((e instanceof Error ? e.message : String(e)), 10000);
                     }
                 });
             });
@@ -2699,8 +2716,8 @@ class SeriesManagementModal extends Modal {
                 text: `Remove "${bookName}" from "${meta.name}"? The shared codex will be copied into the book's local folder.`,
             });
             new Setting(m.contentEl)
-                .addButton((btn: any) => btn.setButtonText('Remove').setWarning().onClick(() => { m.close(); resolve(true); }))
-                .addButton((btn: any) => btn.setButtonText('Cancel').onClick(() => { m.close(); resolve(false); }));
+                .addButton((btn: ButtonComponent) => btn.setButtonText('Remove').setWarning().onClick(() => { m.close(); resolve(true); }))
+                .addButton((btn: ButtonComponent) => btn.setButtonText('Cancel').onClick(() => { m.close(); resolve(false); }));
             m.open();
         });
         if (!confirm) return;
@@ -2709,8 +2726,8 @@ class SeriesManagementModal extends Modal {
         await this.plugin.sceneManager.setActiveProject(bookProject);
         try {
             await this.plugin.seriesManager.removeProjectFromSeries();
-        } catch (e: any) {
-            new Notice(e?.message ?? String(e), 10000);
+        } catch (e: unknown) {
+            new Notice((e instanceof Error ? e.message : String(e)), 10000);
         }
         // Restore previous active project if it wasn't the removed one
         if (previousActive && previousActive.filePath !== bookProject.filePath) {
@@ -2740,14 +2757,14 @@ class SeriesManagementModal extends Modal {
         new Setting(modal.contentEl)
             .setName('New title')
             .setDesc('The book folder and project file will be renamed. All links are updated automatically.')
-            .addText((text: any) => {
+            .addText((text: TextComponent) => {
                 text.setValue(bookProject.title);
                 text.onChange((v: string) => (newTitle = v));
                 window.setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Rename').setCta().onClick(async () => {
                     if (!newTitle.trim() || newTitle.trim() === bookProject.title) {
                         modal.close();
@@ -2760,8 +2777,8 @@ class SeriesManagementModal extends Modal {
                         modal.close();
                         this.plugin.refreshOpenViews();
                         this.render();
-                    } catch (e: any) {
-                        new Notice(e?.message ?? String(e), 10000);
+                    } catch (e: unknown) {
+                        new Notice((e instanceof Error ? e.message : String(e)), 10000);
                     }
                 });
             });
@@ -2785,7 +2802,7 @@ class SeriesManagementModal extends Modal {
         new Setting(modal.contentEl)
             .setName('Project')
             .setDesc('Select a standalone project to add to this series.')
-            .addDropdown((dropdown: any) => {
+            .addDropdown((dropdown: DropdownComponent) => {
                 for (const p of projects) {
                     dropdown.addOption(p.filePath, p.title);
                 }
@@ -2793,7 +2810,7 @@ class SeriesManagementModal extends Modal {
             });
 
         new Setting(modal.contentEl)
-            .addButton((btn: any) => {
+            .addButton((btn: ButtonComponent) => {
                 btn.setButtonText('Add to Series').setCta().onClick(async () => {
                     const bookProject = projects.find(p => p.filePath === selectedPath);
                     if (!bookProject) return;
@@ -2803,8 +2820,8 @@ class SeriesManagementModal extends Modal {
                     await this.plugin.sceneManager.setActiveProject(bookProject);
                     try {
                         await this.plugin.seriesManager.addProjectToSeries(folder);
-                    } catch (e: any) {
-                        new Notice(e?.message ?? String(e), 10000);
+                    } catch (e: unknown) {
+                        new Notice((e instanceof Error ? e.message : String(e)), 10000);
                         return;
                     }
                     // Restore previous active project

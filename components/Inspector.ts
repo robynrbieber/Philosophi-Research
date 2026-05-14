@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { Modal, App, FuzzySuggestModal, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { openConfirmModal } from './ConfirmModal';
@@ -179,7 +179,7 @@ export class InspectorComponent {
                 if (file) {
                     await this.plugin.app.fileManager.renameFile(file, newPath);
                 }
-                await this.sceneManager.updateScene(newPath, { title: val } as any);
+                await this.sceneManager.updateScene(newPath, { title: val });
                 scene.title = val;
                 scene.filePath = newPath;
 
@@ -201,7 +201,7 @@ export class InspectorComponent {
         subtitleInput.setCssStyles({ fontStyle: 'italic' });
         subtitleInput.addEventListener('change', async () => {
             const val = subtitleInput.value.trim() || undefined;
-            await this.sceneManager.updateScene(scene.filePath, { subtitle: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { subtitle: val });
             scene.subtitle = val;
         });
 
@@ -231,7 +231,7 @@ export class InspectorComponent {
             if (typeof val === 'string' && actChapterHasIllegalPathChars(val)) {
                 new Notice(`Act name contains characters that aren't allowed in folder names; they'll be replaced with "-".`);
             }
-            await this.sceneManager.updateScene(scene.filePath, { act: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { act: val });
             scene.act = val;
         });
 
@@ -246,7 +246,7 @@ export class InspectorComponent {
             if (typeof val === 'string' && actChapterHasIllegalPathChars(val)) {
                 new Notice(`Chapter name contains characters that aren't allowed in folder names; they'll be replaced with "-".`);
             }
-            await this.sceneManager.updateScene(scene.filePath, { chapter: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { chapter: val });
             scene.chapter = val;
         });
 
@@ -258,7 +258,7 @@ export class InspectorComponent {
         seqInput.value = scene.sequence !== undefined ? String(scene.sequence) : '';
         seqInput.addEventListener('change', async () => {
             const val = seqInput.value.trim() ? Number(seqInput.value) : undefined;
-            await this.sceneManager.updateScene(scene.filePath, { sequence: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { sequence: val });
             scene.sequence = val;
         });
 
@@ -270,7 +270,7 @@ export class InspectorComponent {
         chronoInput.value = scene.chronologicalOrder !== undefined ? String(scene.chronologicalOrder) : '';
         chronoInput.addEventListener('change', async () => {
             const val = chronoInput.value.trim() ? Number(chronoInput.value) : undefined;
-            await this.sceneManager.updateScene(scene.filePath, { chronologicalOrder: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { chronologicalOrder: val });
             scene.chronologicalOrder = val;
         });
 
@@ -347,7 +347,7 @@ export class InspectorComponent {
                 return Array.from(names.values()).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
             },
             onChange: async (val) => {
-                await this.sceneManager.updateScene(scene.filePath, { pov: val } as any);
+                await this.sceneManager.updateScene(scene.filePath, { pov: val });
                 scene.pov = val;
             },
             placeholder: 'Search characters…',
@@ -374,7 +374,7 @@ export class InspectorComponent {
                 return Array.from(names.values()).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
             },
             onChange: async (values) => {
-                await this.sceneManager.updateScene(scene.filePath, { characters: values } as any);
+                await this.sceneManager.updateScene(scene.filePath, { characters: values });
                 scene.characters = values;
             },
             placeholder: 'Add character…',
@@ -391,7 +391,7 @@ export class InspectorComponent {
             value: scene.location || '',
             getSuggestions: () => this.getLocationNames(),
             onChange: async (val) => {
-                await this.sceneManager.updateScene(scene.filePath, { location: val } as any);
+                await this.sceneManager.updateScene(scene.filePath, { location: val });
                 scene.location = val;
             },
             placeholder: 'Search locations…',
@@ -419,7 +419,7 @@ export class InspectorComponent {
         }
         tmSelect.addEventListener('change', async () => {
             const val = tmSelect.value as TimelineMode;
-            await this.sceneManager.updateScene(scene.filePath, { timeline_mode: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { timeline_mode: val });
             scene.timeline_mode = val;
         });
 
@@ -430,7 +430,7 @@ export class InspectorComponent {
         strandInput.value = scene.timeline_strand || '';
         strandInput.addEventListener('change', async () => {
             const val = strandInput.value.trim() || undefined;
-            await this.sceneManager.updateScene(scene.filePath, { timeline_strand: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { timeline_strand: val });
             scene.timeline_strand = val;
         });
 
@@ -449,7 +449,7 @@ export class InspectorComponent {
         dateInput.value = scene.storyDate || scene.timeline || '';
         dateInput.addEventListener('change', async () => {
             const val = dateInput.value.trim() || undefined;
-            await this.sceneManager.updateScene(scene.filePath, { storyDate: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { storyDate: val });
             scene.storyDate = val;
         });
 
@@ -460,7 +460,7 @@ export class InspectorComponent {
         timeInput.value = scene.storyTime || '';
         timeInput.addEventListener('change', async () => {
             const val = timeInput.value.trim() || undefined;
-            await this.sceneManager.updateScene(scene.filePath, { storyTime: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { storyTime: val });
             scene.storyTime = val;
         });
 
@@ -488,7 +488,7 @@ export class InspectorComponent {
         targetInput.value = scene.target_wordcount ? String(scene.target_wordcount) : '';
         targetInput.addEventListener('change', async () => {
             const val = targetInput.value.trim() ? Number(targetInput.value) : undefined;
-            await this.sceneManager.updateScene(scene.filePath, { target_wordcount: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { target_wordcount: val });
             scene.target_wordcount = val;
         });
 
@@ -530,7 +530,7 @@ export class InspectorComponent {
                 });
                 removeBtn.addEventListener('click', async () => {
                     const updated = (scene.tags || []).filter((_, i) => i !== idx);
-                    await this.sceneManager.updateScene(scene.filePath, { tags: updated } as any);
+                    await this.sceneManager.updateScene(scene.filePath, { tags: updated });
                     scene.tags = updated;
                     renderTagChips();
                 });
@@ -554,7 +554,7 @@ export class InspectorComponent {
                     if (raw) {
                         const newTags = raw.split(',').map(t => t.trim()).filter(Boolean);
                         const updated = [...(scene.tags || []), ...newTags.filter(t => !(scene.tags || []).includes(t))];
-                        await this.sceneManager.updateScene(scene.filePath, { tags: updated } as any);
+                        await this.sceneManager.updateScene(scene.filePath, { tags: updated });
                         scene.tags = updated;
                     }
                     input.remove();
@@ -582,7 +582,7 @@ export class InspectorComponent {
             });
             descInput.addEventListener('change', async () => {
                 const val = descInput.value;
-                await this.sceneManager.updateScene(scene.filePath, { body: val } as any);
+                await this.sceneManager.updateScene(scene.filePath, { body: val });
                 scene.body = val;
             });
         }
@@ -605,7 +605,7 @@ export class InspectorComponent {
         });
         conflictInput.addEventListener('change', async () => {
             const val = conflictInput.value.trim() || undefined;
-            await this.sceneManager.updateScene(scene.filePath, { conflict: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { conflict: val });
             scene.conflict = val;
         });
 
@@ -620,7 +620,7 @@ export class InspectorComponent {
         styleInput(emotionInput);
         emotionInput.addEventListener('change', async () => {
             const val = emotionInput.value.trim() || undefined;
-            await this.sceneManager.updateScene(scene.filePath, { emotion: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { emotion: val });
             scene.emotion = val;
         });
 
@@ -650,7 +650,7 @@ export class InspectorComponent {
         });
         slider.addEventListener('change', async () => {
             const val = Number(slider.value);
-            await this.sceneManager.updateScene(scene.filePath, { intensity: val } as any);
+            await this.sceneManager.updateScene(scene.filePath, { intensity: val });
         });
         // Set initial color class
         const initVal = scene.intensity ?? 0;
@@ -797,7 +797,7 @@ export class InspectorComponent {
             ta.value = String(value);
             ta.addEventListener('change', async () => {
                 scene.universalFields![tpl.id] = ta.value.trim() || '';
-                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } });
             });
         } else if (tpl.type === 'dropdown') {
             const sel = row.createEl('select', { cls: 'inspector-universal-select' });
@@ -808,7 +808,7 @@ export class InspectorComponent {
             }
             sel.addEventListener('change', async () => {
                 scene.universalFields![tpl.id] = sel.value;
-                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } });
             });
         } else if (tpl.type === 'multi-select') {
             const raw = scene.universalFields[tpl.id];
@@ -827,7 +827,7 @@ export class InspectorComponent {
                         const idx = selected.indexOf(item);
                         if (idx >= 0) selected.splice(idx, 1);
                         scene.universalFields![tpl.id] = [...selected];
-                        await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+                        await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } });
                         renderPills();
                     });
                 }
@@ -847,7 +847,7 @@ export class InspectorComponent {
                     if (!selected.includes(val)) {
                         selected.push(val);
                         scene.universalFields![tpl.id] = [...selected];
-                        await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+                        await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } });
                         renderPills();
                     }
                     msInput.value = '';
@@ -863,7 +863,7 @@ export class InspectorComponent {
             input.value = String(value);
             input.addEventListener('change', async () => {
                 scene.universalFields![tpl.id] = input.value.trim();
-                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } } as any);
+                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } });
             });
         }
     }
@@ -889,12 +889,12 @@ export class InspectorComponent {
                 const removeBtn = chip.createEl('button', { cls: 'inspector-sp-remove clickable-icon', text: '×' });
                 removeBtn.addEventListener('click', async () => {
                     const updated = (scene.payoff_scenes || []).filter(s => s !== target);
-                    await this.sceneManager.updateScene(scene.filePath, { payoff_scenes: updated } as any);
+                    await this.sceneManager.updateScene(scene.filePath, { payoff_scenes: updated });
                     // Also remove reverse link
                     const targetScene = this.sceneManager.getAllScenes().find(s => s.title === target);
                     if (targetScene && targetScene.setup_scenes?.includes(scene.title)) {
                         const rev = targetScene.setup_scenes.filter(s => s !== scene.title);
-                        await this.sceneManager.updateScene(targetScene.filePath, { setup_scenes: rev } as any);
+                        await this.sceneManager.updateScene(targetScene.filePath, { setup_scenes: rev });
                     }
                     // Refresh inspector
                     const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
@@ -924,12 +924,12 @@ export class InspectorComponent {
                 const removeBtn = chip.createEl('button', { cls: 'inspector-sp-remove clickable-icon', text: '×' });
                 removeBtn.addEventListener('click', async () => {
                     const updated = (scene.setup_scenes || []).filter(s => s !== source);
-                    await this.sceneManager.updateScene(scene.filePath, { setup_scenes: updated } as any);
+                    await this.sceneManager.updateScene(scene.filePath, { setup_scenes: updated });
                     // Also remove reverse link
                     const sourceScene = this.sceneManager.getAllScenes().find(s => s.title === source);
                     if (sourceScene && sourceScene.payoff_scenes?.includes(scene.title)) {
                         const rev = sourceScene.payoff_scenes.filter(s => s !== scene.title);
-                        await this.sceneManager.updateScene(sourceScene.filePath, { payoff_scenes: rev } as any);
+                        await this.sceneManager.updateScene(sourceScene.filePath, { payoff_scenes: rev });
                     }
                     const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
                     if (fresh) this.show(fresh);
@@ -971,26 +971,26 @@ export class InspectorComponent {
                 const currentPayoff = scene.payoff_scenes ? [...scene.payoff_scenes] : [];
                 if (!currentPayoff.includes(picked.title)) {
                     currentPayoff.push(picked.title);
-                    await this.sceneManager.updateScene(scene.filePath, { payoff_scenes: currentPayoff } as any);
+                    await this.sceneManager.updateScene(scene.filePath, { payoff_scenes: currentPayoff });
                 }
                 // Add reverse link: picked scene is set up by this scene
                 const pickedSetup = picked.setup_scenes ? [...picked.setup_scenes] : [];
                 if (!pickedSetup.includes(scene.title)) {
                     pickedSetup.push(scene.title);
-                    await this.sceneManager.updateScene(picked.filePath, { setup_scenes: pickedSetup } as any);
+                    await this.sceneManager.updateScene(picked.filePath, { setup_scenes: pickedSetup });
                 }
             } else {
                 // "This scene is set up by picked scene"
                 const currentSetup = scene.setup_scenes ? [...scene.setup_scenes] : [];
                 if (!currentSetup.includes(picked.title)) {
                     currentSetup.push(picked.title);
-                    await this.sceneManager.updateScene(scene.filePath, { setup_scenes: currentSetup } as any);
+                    await this.sceneManager.updateScene(scene.filePath, { setup_scenes: currentSetup });
                 }
                 // Add reverse link: picked scene pays off in this scene
                 const pickedPayoff = picked.payoff_scenes ? [...picked.payoff_scenes] : [];
                 if (!pickedPayoff.includes(scene.title)) {
                     pickedPayoff.push(scene.title);
-                    await this.sceneManager.updateScene(picked.filePath, { payoff_scenes: pickedPayoff } as any);
+                    await this.sceneManager.updateScene(picked.filePath, { payoff_scenes: pickedPayoff });
                 }
             }
             // Refresh inspector with updated scene data
@@ -1036,7 +1036,7 @@ export class InspectorComponent {
                 onChange: async (values) => {
                     if (!scene.codexLinks) scene.codexLinks = {};
                     scene.codexLinks[catId] = values;
-                    await this.sceneManager.updateScene(scene.filePath, { codexLinks: scene.codexLinks } as any);
+                    await this.sceneManager.updateScene(scene.filePath, { codexLinks: scene.codexLinks });
                 },
                 placeholder: `Add ${catDef.label.toLowerCase()}…`,
             });
@@ -1163,7 +1163,7 @@ export class InspectorComponent {
                                 if (!arr.some(n => n.toLowerCase() === low)) {
                                     arr.push(tagName);
                                     scene.codexLinks[catId] = arr;
-                                    await this.sceneManager.updateScene(scene.filePath, { codexLinks: scene.codexLinks } as any);
+                                    await this.sceneManager.updateScene(scene.filePath, { codexLinks: scene.codexLinks });
                                 }
                             }
                             // Also set the type override for display
@@ -1204,7 +1204,7 @@ export class InspectorComponent {
         // Save on blur (when the user leaves the field) so typing isn't interrupted
         textarea.addEventListener('change', async () => {
             const val = textarea.value.trim();
-            await this.sceneManager.updateScene(scene.filePath, { notes: val || undefined } as any);
+            await this.sceneManager.updateScene(scene.filePath, { notes: val || undefined });
             scene.notes = val || undefined;
         });
     }

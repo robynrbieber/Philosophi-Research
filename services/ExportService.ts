@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { StoryLineProject } from '../models/StoryLineProject';
 import { SceneManager } from './SceneManager';
 import { compareActChapter } from '../utils/actChapter';
@@ -69,7 +69,7 @@ export class ExportService {
      * Handles boolean, string ("true"/"false") and numeric YAML values.
      */
     private isCorkboardNoteScene(scene: Scene): boolean {
-        const v: unknown = (scene as any).corkboardNote;
+        const v: unknown = (scene as unknown as Record<string, unknown>).corkboardNote;
         if (v === true) return true;
         if (typeof v === 'string') return v.trim().toLowerCase() === 'true';
         if (typeof v === 'number') return v === 1;
@@ -353,7 +353,7 @@ export class ExportService {
         scenes: Scene[],
         scope: ExportScope,
     ): Promise<string> {
-        let data: any;
+        let data: Record<string, unknown>;
 
         if (scope === 'manuscript') {
             data = {
@@ -400,7 +400,7 @@ export class ExportService {
                     timeline_strand: s.timeline_strand,
                 })),
                 characters: this.characterManager.getAllCharacters().map(c => {
-                    const obj: Record<string, any> = { name: c.name };
+                    const obj: Record<string, unknown> = { name: c.name };
                     if (c.role) obj.role = Array.isArray(c.role) ? c.role : c.role;
                     if (c.age) obj.age = c.age;
                     if (c.occupation) obj.occupation = c.occupation;
@@ -420,7 +420,7 @@ export class ExportService {
                     return obj;
                 }),
                 worlds: this.locationManager.getAllWorlds().map(w => {
-                    const obj: Record<string, any> = { name: w.name };
+                    const obj: Record<string, unknown> = { name: w.name };
                     if (w.description) obj.description = w.description;
                     if (w.geography) obj.geography = w.geography;
                     if (w.culture) obj.culture = w.culture;
@@ -431,7 +431,7 @@ export class ExportService {
                     return obj;
                 }),
                 locations: this.locationManager.getAllLocations().map(l => {
-                    const obj: Record<string, any> = { name: l.name };
+                    const obj: Record<string, unknown> = { name: l.name };
                     if (l.locationType) obj.type = l.locationType;
                     if (l.world) obj.world = l.world;
                     if (l.parent) obj.parent = l.parent;
@@ -1084,11 +1084,17 @@ ${body}
      */
     private async tryElectronPrintToPdf(html: string, settings: SLPdfSettings): Promise<Uint8Array | null> {
         // Only works in Electron (desktop Obsidian)
-        if (typeof (window as any).require !== 'function') return null;
+        if (typeof (window as unknown as Record<string, unknown>).require !== 'function') return null;
 
         return new Promise<Uint8Array | null>((resolve) => {
             try {
-                const webview = activeDocument.createElement('webview') as any;
+                const webview = activeDocument.createElement('webview') as unknown as {
+                    setCssStyles: (s: Record<string, string>) => void;
+                    setAttribute: (k: string, v: string) => void;
+                    addEventListener: (ev: string, cb: (...args: unknown[]) => void) => void;
+                    remove: () => void;
+                    printToPDF: (opts: Record<string, unknown>) => Promise<Uint8Array>;
+                };
 
                 // Hide the webview off-screen
                 webview.setCssStyles({
@@ -1151,7 +1157,7 @@ ${body}
                     resolve(null);
                 });
 
-                activeDocument.body.appendChild(webview);
+                activeDocument.body.appendChild(webview as unknown as Node);
             } catch (e) {
                 console.error('StoryLine PDF: webview not available', e);
                 resolve(null);

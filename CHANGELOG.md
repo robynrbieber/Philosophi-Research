@@ -2,7 +2,7 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
-## Version 1.10.3
+## Version 1.10.4
 
 ### Why this release
 

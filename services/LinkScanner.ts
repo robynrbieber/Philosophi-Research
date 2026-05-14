@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 /**
  * LinkScanner — extracts [[wikilinks]] AND plain-text character/location
  * mentions from scene body text and classifies each as a known character,
@@ -170,9 +170,9 @@ export class LinkScanner {
                 this.charCanonical.set(firstName, c.name);
             }
 
-            if ((c as any).nickname) {
+            if ((c as unknown as Record<string, unknown>).nickname) {
                 // Support multiple comma-separated nicknames
-                const nicknames = String((c as any).nickname)
+                const nicknames = String((c as unknown as Record<string, unknown>).nickname)
                     .split(',')
                     .map((n: string) => n.trim())
                     .filter(Boolean);
@@ -438,10 +438,10 @@ export class LinkScanner {
         // Scan characters
         for (const c of this.characterManager.getAllCharacters()) {
             const textFields = [
-                (c as any).backstory, (c as any).appearance, (c as any).personality,
-                (c as any).internalMotivation, (c as any).externalMotivation,
-                (c as any).strengths, (c as any).flaws, (c as any).fears,
-                (c as any).belief, (c as any).misbelief, (c as any).notes,
+                (c as unknown as Record<string, unknown>).backstory, (c as unknown as Record<string, unknown>).appearance, (c as unknown as Record<string, unknown>).personality,
+                (c as unknown as Record<string, unknown>).internalMotivation, (c as unknown as Record<string, unknown>).externalMotivation,
+                (c as unknown as Record<string, unknown>).strengths, (c as unknown as Record<string, unknown>).flaws, (c as unknown as Record<string, unknown>).fears,
+                (c as unknown as Record<string, unknown>).belief, (c as unknown as Record<string, unknown>).misbelief, (c as unknown as Record<string, unknown>).notes,
             ].filter(Boolean).join('\n');
             addRefs(c.name, 'character', c.filePath, textFields);
         }

@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { Character, CharacterRelation, CHARACTER_FIELD_KEYS, LEGACY_RELATION_FIELDS_TO_CLEAN, normalizeCharacterRelations, normalizeRoleEntries } from '../models/Character';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { Character, CharacterRelation, CharacterRelationCategory, CHARACTER_FIELD_KEYS, LEGACY_RELATION_FIELDS_TO_CLEAN, normalizeCharacterRelations, normalizeRoleEntries } from '../models/Character';
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 import { App, TFile, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
 
@@ -161,7 +161,7 @@ export class CharacterManager {
         }
 
         const now = new Date().toISOString().split('T')[0];
-        const fm: Record<string, any> = {
+        const fm: Record<string, unknown> = {
             type: 'character',
             name,
             created: now,
@@ -198,7 +198,7 @@ export class CharacterManager {
         const body = this.extractBody(content);
 
         // Build frontmatter from character object
-        const fm: Record<string, any> = { ...existingFm };
+        const fm: Record<string, unknown> = { ...existingFm };
         fm.type = 'character';
         fm.name = character.name;
         fm.modified = new Date().toISOString().split('T')[0];
@@ -320,7 +320,7 @@ export class CharacterManager {
         // or has been overwritten (e.g. by a Templater template). Otherwise
         // require the discriminator to match.
         if (!fm && !folderFallback) return null;
-        const safeFm = (fm ?? {}) as Record<string, any>;
+        const safeFm = (fm ?? {}) as Partial<Character> & Record<string, unknown>;
         if (safeFm.type !== 'character' && !folderFallback) return null;
 
         const body = this.extractBody(content);
@@ -352,7 +352,7 @@ export class CharacterManager {
             strengths: safeFm.strengths,
             flaws: safeFm.flaws,
             fears: safeFm.fears,
-            belief: safeFm.belief || safeFm.coreBeliefs,
+            belief: safeFm.belief || (safeFm.coreBeliefs as string | undefined),
             misbelief: safeFm.misbelief,
             formativeMemories: safeFm.formativeMemories,
             accomplishments: safeFm.accomplishments,
@@ -364,11 +364,15 @@ export class CharacterManager {
             habits: safeFm.habits,
             props: safeFm.props,
             books: this.parseStringList(safeFm.books),
-            custom: safeFm.custom && typeof safeFm.custom === 'object' ? safeFm.custom : undefined,
+            custom: safeFm.custom && typeof safeFm.custom === 'object'
+                ? (safeFm.custom as Record<string, string>)
+                : undefined,
             universalFields: hydrateUniversalFieldsFromTopLevel(
                 safeFm,
-                safeFm.universalFields && typeof safeFm.universalFields === 'object' ? safeFm.universalFields : undefined,
-            ),
+                safeFm.universalFields && typeof safeFm.universalFields === 'object'
+                    ? (safeFm.universalFields as Record<string, string | string[]>)
+                    : undefined,
+            ) as Record<string, string | string[]> | undefined,
             created: safeFm.created,
             modified: safeFm.modified,
             notes: body || undefined,
@@ -377,7 +381,7 @@ export class CharacterManager {
         return character;
     }
 
-    private extractFrontmatter(content: string): Record<string, any> | null {
+    private extractFrontmatter(content: string): Record<string, unknown> | null {
         // Strip BOM + invisible zero-width characters before matching
         const clean = content.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '');
         const match = clean.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -395,7 +399,7 @@ export class CharacterManager {
         return match ? match[1].trim() : '';
     }
 
-    private parseStringList(value: any): string[] | undefined {
+    private parseStringList(value: unknown): string[] | undefined {
         if (Array.isArray(value)) {
             const parsed = value.map(v => String(v).trim()).filter(Boolean);
             return parsed.length ? parsed : undefined;
@@ -408,24 +412,25 @@ export class CharacterManager {
         return parsed.length ? parsed : undefined;
     }
 
-    private parseRelations(value: any): CharacterRelation[] | undefined {
+    private parseRelations(value: unknown): CharacterRelation[] | undefined {
         if (!Array.isArray(value)) return undefined;
         const parsed: CharacterRelation[] = [];
         for (const item of value) {
             if (!item || typeof item !== 'object') continue;
-            const category = typeof (item as any).category === 'string' ? (item as any).category : '';
-            const type = typeof (item as any).type === 'string' ? (item as any).type : '';
-            const target = typeof (item as any).target === 'string' ? (item as any).target : '';
+            const rec = item as Record<string, unknown>;
+            const category = typeof rec.category === 'string' ? rec.category : '';
+            const type = typeof rec.type === 'string' ? rec.type : '';
+            const target = typeof rec.target === 'string' ? rec.target : '';
             if (!category || !type || !target) continue;
-            parsed.push({ category: category as any, type, target });
+            parsed.push({ category: category as CharacterRelationCategory, type, target });
         }
         return parsed.length ? parsed : undefined;
     }
 
-    private buildLegacyRelations(fm: Record<string, any>): CharacterRelation[] {
+    private buildLegacyRelations(fm: Record<string, unknown>): CharacterRelation[] {
         const out: CharacterRelation[] = [];
         const addMany = (key: keyof Character, category: CharacterRelation['category'], type: string) => {
-            const names = this.parseStringList((fm as any)[key]);
+            const names = this.parseStringList((fm as unknown as Record<string, unknown>)[key]);
             if (!names) return;
             for (const target of names) {
                 out.push({ category, type, target });
@@ -508,7 +513,7 @@ export class CharacterManager {
         await this.app.vault.createFolder(folderPath);
     }
 
-    private parseGallery(value: any): Array<{ path: string; caption: string }> | undefined {
+    private parseGallery(value: unknown): Array<{ path: string; caption: string }> | undefined {
         if (!Array.isArray(value)) return undefined;
         const parsed: Array<{ path: string; caption: string }> = [];
         for (const item of value) {
