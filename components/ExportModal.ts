@@ -37,6 +37,7 @@ export class ExportModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
         contentEl.addClass('storyline-export-modal');
+        this.modalEl.addClass('mod-storyline-export');
 
         contentEl.createEl('h2', { text: 'Export Project' });
 

@@ -6,6 +6,7 @@ import { LocationManager } from '../services/LocationManager';
 import type { SceneFilter, SortConfig } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
+import { coerceString } from '../utils/narrow';
 import { InspectorComponent } from '../components/Inspector';
 import { openManageSnapshotsModal } from '../components/ViewSnapshotModal';
 import { QuickAddModal } from '../components/QuickAddModal';
@@ -614,7 +615,7 @@ export class PlotgridView extends ItemView {
                 if (valA == null) return 1;
                 if (valB == null) return -1;
                 if (typeof valA === 'number' && typeof valB === 'number') return (valA - valB) * dir;
-                return String(valA).localeCompare(String(valB)) * dir;
+                return coerceString(valA).localeCompare(coerceString(valB)) * dir;
             });
         }
 

@@ -2,6 +2,7 @@
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 import { App, TFile, parseYaml, stringifyYaml } from 'obsidian';
 import { Scene, SceneStatus, TIMELINE_MODES, TimelineMode } from '../models/Scene';
+import { coerceString } from '../utils/narrow';
 
 /**
  * Issue #73 — frontmatter scene fields that point at other entities (scenes,
@@ -45,13 +46,14 @@ export function setWordcountExclusions(opts: { comments?: boolean; checklists?: 
 function wrapScalar(v: unknown): unknown {
     if (!_writeSceneFieldsAsWikilinks) return v;
     if (v === undefined || v === null || v === '') return v;
-    return toWikilink(String(v));
+    const s = coerceString(v);
+    return s ? toWikilink(s) : v;
 }
 function wrapArray(arr: unknown): unknown {
     if (!_writeSceneFieldsAsWikilinks) return arr;
     if (!Array.isArray(arr)) return arr;
     return arr
-        .map((s: unknown) => toWikilink(String(s)))
+        .map((s: unknown) => toWikilink(coerceString(s)))
         .filter((s): s is string => !!s);
 }
 

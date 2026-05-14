@@ -2,6 +2,7 @@
 import { Character, CharacterRelation, CharacterRelationCategory, CHARACTER_FIELD_KEYS, LEGACY_RELATION_FIELDS_TO_CLEAN, normalizeCharacterRelations, normalizeRoleEntries } from '../models/Character';
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 import { App, TFile, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
+import { coerceString } from '../utils/narrow';
 
 /**
  * Manages character .md files — loading, saving, creating, and deleting
@@ -401,11 +402,13 @@ export class CharacterManager {
 
     private parseStringList(value: unknown): string[] | undefined {
         if (Array.isArray(value)) {
-            const parsed = value.map(v => String(v).trim()).filter(Boolean);
+            const parsed = value.map(v => coerceString(v).trim()).filter(Boolean);
             return parsed.length ? parsed : undefined;
         }
         if (value == null || value === '') return undefined;
-        const parsed = String(value)
+        const str = coerceString(value);
+        if (!str) return undefined;
+        const parsed = str
             .split(',')
             .map((s: string) => s.trim())
             .filter(Boolean);

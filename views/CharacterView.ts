@@ -20,6 +20,7 @@ import { ItemView, Modal, Notice, Setting, TFile, WorkspaceLeaf } from 'obsidian
 import { CHARACTER_CATEGORIES, CHARACTER_ROLES, Character, CharacterFieldDef, CharacterRelation, CharacterRelationCategory, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, RoleEntry, TagType, computeReciprocalUpdates, extractCharacterLocationTags, extractCharacterProps, getPrimaryRole, getRoleDisplay, getRoleList, normalizeCharacterRelations } from '../models/Character';
 import { CHARACTER_VIEW_TYPE } from '../constants';
 import { Scene, resolveStatusCfg } from '../models/Scene';
+import { coerceString } from '../utils/narrow';
 
 /**
  * Character View - rich character cards with full profile editing.
@@ -457,7 +458,7 @@ export class CharacterView extends ItemView {
         // Short description snippet — per-character tagline field selector, with auto fallback
         const taglineKey = char.tagline; // a field key like 'personality', 'occupation', etc.
         const autoSnippet = char.personality || char.occupation || getRoleDisplay(char.role) || '';
-        const snippet = (taglineKey ? String((char as unknown as Record<string, unknown>)[taglineKey] || '') : '') || autoSnippet;
+        const snippet = (taglineKey ? coerceString((char as unknown as Record<string, unknown>)[taglineKey]) : '') || autoSnippet;
         if (snippet) {
             card.createEl('p', { cls: 'character-card-snippet', text: snippet });
         }
@@ -994,9 +995,9 @@ export class CharacterView extends ItemView {
 
         // Coerce array shapes (e.g. role: string[]) to a comma-separated string
         // for input rendering. Issue #72 Tier 1.
-        let value: string = String((draft as unknown as Record<string, unknown>)[field.key] ?? '');
         const rawValue: unknown = (draft as unknown as Record<string, unknown>)[field.key];
-        if (Array.isArray(rawValue)) value = rawValue.map(v => String(v).trim()).filter(Boolean).join(', ');
+        let value: string = coerceString(rawValue);
+        if (Array.isArray(rawValue)) value = rawValue.map(v => coerceString(v).trim()).filter(Boolean).join(', ');
 
         if (field.key === 'relations') {
             this.renderRelationsField(row, draft);

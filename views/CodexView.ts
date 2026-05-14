@@ -474,9 +474,9 @@ export class CodexView extends ItemView {
         const portraitArea = container.createDiv('codex-detail-portrait');
         if (draft.image) {
             const file = this.app.vault.getAbstractFileByPath(draft.image);
-            if (file) {
+            if (file instanceof TFile) {
                 const img = portraitArea.createEl('img', {
-                    attr: { src: this.app.vault.getResourcePath(file as TFile) },
+                    attr: { src: this.app.vault.getResourcePath(file) },
                 });
                 img.addClass('codex-detail-img');
             }

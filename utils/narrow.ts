@@ -33,4 +33,16 @@ export function asBool(v: unknown, fallback = false): boolean {
 export function asTyped<T>(v: unknown, fallback: T): T {
     return v === undefined || v === null ? fallback : (v as T);
 }
+
+/**
+ * Safely coerce an unknown value to a string. Strings pass through; numbers
+ * and booleans are stringified. Anything else (objects, arrays, null, undefined)
+ * returns the fallback. Avoids the "[object Object]" trap that the Obsidian
+ * reviewer linter flags when calling `String(unknown)` directly.
+ */
+export function coerceString(v: unknown, fallback = ''): string {
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+    return fallback;
+}
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return -- end bulk-suppression */

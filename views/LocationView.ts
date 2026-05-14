@@ -3,6 +3,7 @@ import { ButtonComponent, ItemView, Modal, Notice, Setting, TFile, TextComponent
 import * as obsidian from 'obsidian';
 import { LOCATION_VIEW_TYPE } from '../constants';
 import { Scene, resolveStatusCfg } from '../models/Scene';
+import { coerceString } from '../utils/narrow';
 import {
     StoryWorld, StoryLocation, WorldOrLocation,
     WORLD_CATEGORIES, LOCATION_CATEGORIES, LOCATION_TYPES,
@@ -807,7 +808,7 @@ export class LocationView extends ItemView {
             });
         }
 
-        const value = String((draft as unknown as Record<string, unknown>)[field.key] ?? '');
+        const value = coerceString((draft as unknown as Record<string, unknown>)[field.key]);
 
         if (field.key === 'locationType') {
             const select = row.createEl('select', { cls: 'location-field-input dropdown' });
