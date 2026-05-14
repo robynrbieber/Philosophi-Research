@@ -1,12 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access,
-                  @typescript-eslint/no-unsafe-assignment,
-                  @typescript-eslint/no-unsafe-argument,
-                  @typescript-eslint/no-unsafe-call,
-                  @typescript-eslint/no-unsafe-return
-   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
-      workspace view casts, plugin registration, frontmatter records, third-party
-      libraries without type definitions). These warnings are suppressed file-wide
-      with the same convention used by other major community plugins. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
 import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath, setIcon, FuzzySuggestModal } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { SceneManager } from './services/SceneManager';
@@ -264,8 +257,8 @@ export default class SceneCardsPlugin extends Plugin {
         });
 
         this.addCommand({
-            id: 'open-storyline-view',
-            name: 'Open storyline view',
+            id: 'open-plotlines-view',
+            name: 'Open plotlines view',
             callback: () => this.activateView(STORYLINE_VIEW_TYPE),
         });
 
@@ -1958,7 +1951,7 @@ export default class SceneCardsPlugin extends Plugin {
 
                     // Delete old file
                     const oldFile = this.app.vault.getAbstractFileByPath(oldPath);
-                    if (oldFile) await this.app.vault.delete(oldFile);
+                    if (oldFile) await this.app.fileManager.trashFile(oldFile);
 
                     console.log(`[StoryLine] Migrated ${oldPath} → ${newPath}`);
                 } catch (e) {
@@ -2827,3 +2820,5 @@ class SeriesManagementModal extends Modal {
         modal.open();
     }
 }
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents */
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty */

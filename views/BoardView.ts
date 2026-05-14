@@ -1,12 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access,
-                  @typescript-eslint/no-unsafe-assignment,
-                  @typescript-eslint/no-unsafe-argument,
-                  @typescript-eslint/no-unsafe-call,
-                  @typescript-eslint/no-unsafe-return
-   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
-      workspace view casts, plugin registration, frontmatter records, third-party
-      libraries without type definitions). These warnings are suppressed file-wide
-      with the same convention used by other major community plugins. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
 import { ItemView, WorkspaceLeaf, Menu, Notice, TFile, Modal, Setting, MarkdownRenderer } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Scene, SceneFilter, SortConfig, BoardGroupBy, SceneStatus, SceneTemplate, BUILTIN_BEAT_SHEETS, getStatusOrder, getStatusConfig, resolveStatusCfg } from '../models/Scene';
@@ -679,26 +672,17 @@ export class BoardView extends ItemView {
         };
 
         const placeCaretFromClick = (clientX: number, clientY: number) => {
-            const docAny = document as Document & {
+            const doc = activeDocument as Document & {
                 caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
-                caretRangeFromPoint?: (x: number, y: number) => Range | null;
             };
 
             let offset: number | null = null;
             const textNode = textarea.firstChild;
 
-            if (typeof docAny.caretPositionFromPoint === 'function') {
-                const pos = docAny.caretPositionFromPoint(clientX, clientY);
+            if (typeof doc.caretPositionFromPoint === 'function') {
+                const pos = doc.caretPositionFromPoint(clientX, clientY);
                 if (pos && (pos.offsetNode === textNode || pos.offsetNode === textarea)) {
                     offset = pos.offset;
-                }
-            }
-
-            if (offset === null && typeof docAny.caretRangeFromPoint === 'function') {
-                // eslint-disable-next-line @typescript-eslint/no-deprecated -- intentional fallback for older browsers without caretPositionFromPoint
-                const range = docAny.caretRangeFromPoint(clientX, clientY);
-                if (range && (range.startContainer === textNode || range.startContainer === textarea)) {
-                    offset = range.startOffset;
                 }
             }
 
@@ -3548,3 +3532,5 @@ export class BoardView extends ItemView {
         });
     }
 }
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents */
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty */

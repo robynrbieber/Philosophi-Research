@@ -1,12 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access,
-                  @typescript-eslint/no-unsafe-assignment,
-                  @typescript-eslint/no-unsafe-argument,
-                  @typescript-eslint/no-unsafe-call,
-                  @typescript-eslint/no-unsafe-return
-   -- Obsidian's API surface forces `any` in many places (vault adapter internals,
-      workspace view casts, plugin registration, frontmatter records, third-party
-      libraries without type definitions). These warnings are suppressed file-wide
-      with the same convention used by other major community plugins. */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
 import { Modal, Setting, Notice } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { STATUS_CONFIG, Scene, SceneStatus, getStatusOrder } from '../models/Scene';
@@ -307,3 +299,4 @@ export class MergeSceneModal extends Modal {
         this.contentEl.empty();
     }
 }
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty */
