@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch in many places; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force `any` and dynamic dispatch in many places; floating promises are intentional in DOM/event handlers. Re-enabled at end of file. */
 import * as obsidian from 'obsidian';
 import { MarkdownRenderer, Component, Modal, App } from 'obsidian';
@@ -334,7 +335,7 @@ export class SceneCardComponent {
         if (!tags || tags.length === 0) return 'var(--sl-emotion-default, #9E9E9E)';
         const tagColors = this.plugin.settings.tagColors || {};
         const scheme = this.plugin.settings.colorScheme;
-        const allTagsSorted = (this.plugin.sceneManager?.getAllTags() || []).sort();
+        const allTagsSorted = (this.plugin.sceneManager?.queryService.getAllTags() || []).sort();
         for (const tag of tags) {
             const color = resolveTagColor(tag, Math.max(0, allTagsSorted.indexOf(tag)), scheme, tagColors, getPlotlineHSL(this.plugin.settings));
             if (color && color !== '#888888') return color;
@@ -483,4 +484,4 @@ export class SceneCardComponent {
         modal.open();
     }
 }
-/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty */
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- end of file-wide suppression block opened at line 1 */
