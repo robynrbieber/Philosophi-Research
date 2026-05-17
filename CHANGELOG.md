@@ -6,10 +6,11 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
-## Version 1.10.9
+## Version 1.10.10
 
 ### Bug Fixes
 
+- **Small CSS fixes**
 - **Snapshots not appearing in the inspector** *([#95](https://github.com/PixeroJan/obsidian-storyline/issues/95))* — Snapshots were written to disk but never showed up in the list. Root cause: Obsidian's vault API ignores dot-prefixed folders, so the old `.snapshots/` directory was invisible to `vault.getAbstractFileByPath()`. The folder is now `_snapshots/` (still hidden visually in most file managers) and a one-shot migration moves any existing `.snapshots/` content over automatically the first time you open a scene after upgrading.
 - **Dropdown menu cut off at bottom of a Codex section** *([#91](https://github.com/PixeroJan/obsidian-storyline/issues/91))* — The multi-select tag dropdown opened *inside* the section's scroll container, so the last few options were clipped when the field sat near the bottom. The popup is now rendered in fixed-viewport coordinates and flips above the input when there isn't enough room below, so every option is always reachable.
 - **False-positive detected links cluttering the inspector** *([#89](https://github.com/PixeroJan/obsidian-storyline/issues/89))* — Plain text words that happen to match a character/location name (or appear inside wikilinks unrelated to the scene) were always shown under "Detected in text". Right-click any detected pill and choose **Ignore in this scene** to suppress it permanently for that scene. The ignored names are stored in the scene's frontmatter (`ignored_detections:`), so they round-trip via sync/git.
