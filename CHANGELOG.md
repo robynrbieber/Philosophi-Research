@@ -1,6 +1,22 @@
 # StoryLine — Changelog
 
+## Version 1.10.8
 
+### Bug Fixes
+
+- **Snapshots not appearing in the inspector** *([#95](https://github.com/PixeroJan/obsidian-storyline/issues/95))* — Snapshots were written to disk but never showed up in the list. Root cause: Obsidian's vault API ignores dot-prefixed folders, so the old `.snapshots/` directory was invisible to `vault.getAbstractFileByPath()`. The folder is now `_snapshots/` (still hidden visually in most file managers) and a one-shot migration moves any existing `.snapshots/` content over automatically the first time you open a scene after upgrading.
+- **Dropdown menu cut off at bottom of a Codex section** *([#91](https://github.com/PixeroJan/obsidian-storyline/issues/91))* — The multi-select tag dropdown opened *inside* the section's scroll container, so the last few options were clipped when the field sat near the bottom. The popup is now rendered in fixed-viewport coordinates and flips above the input when there isn't enough room below, so every option is always reachable.
+- **False-positive detected links cluttering the inspector** *([#89](https://github.com/PixeroJan/obsidian-storyline/issues/89))* — Plain text words that happen to match a character/location name (or appear inside wikilinks unrelated to the scene) were always shown under "Detected in text". Right-click any detected pill and choose **Ignore in this scene** to suppress it permanently for that scene. The ignored names are stored in the scene's frontmatter (`ignored_detections:`), so they round-trip via sync/git.
+- **Universal field reorder couldn't swap with built-in fields** *(follow-up to [#92](https://github.com/PixeroJan/obsidian-storyline/discussions/92))* — The up/down chevrons on a universal field would only move it past *other* universal fields; existing built-in fields acted as an invisible wall. Built-in and universal fields now share a single ordered list per section (persisted in `System/field-templates.json`), so chevrons can swap any two adjacent fields regardless of kind.
+
+### New Features
+
+- **Reorder universal fields without leaving the sheet** *([#92](https://github.com/PixeroJan/obsidian-storyline/discussions/92))* — Hover over any universal field (Character / Codex / Location) and two small chevron buttons appear next to the pencil: click to move the field up or down within its section. When you add a new universal field, the modal now offers a **Position** dropdown so you can insert it at the top, at the end (default), or directly after any existing sibling — no more being forced to the bottom.
+- **Reorder built-in fields too** *(follow-up to [#92](https://github.com/PixeroJan/obsidian-storyline/discussions/92))* — The hover chevrons are no longer exclusive to universal fields; every built-in field on the Character, Codex and Location sheets now has the same up/down arrows. Each section keeps its own custom order per project, and the order survives Obsidian restarts (stored in `System/field-templates.json`).
+- **View a snapshot before restoring it** — Each snapshot row in the inspector now has a **View** icon (between **Save** and **Restore**) that opens the snapshot markdown file in a new Obsidian tab, so you can compare it side-by-side with the current scene before deciding whether to roll back.
+- **Support StoryLine via PayPal** — The plugin manifest now exposes a `fundingUrl`, so Obsidian's community plugin page shows a sponsor heart. A matching donate button has been added to the README.
+
+---
 ## Version 1.10.6
 
 ### Why this release
