@@ -6,6 +6,15 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.11
+
+### Bug Fixes
+
+- **Plotlines view ignored chapter nesting when sorting** *([#96](https://github.com/PixeroJan/obsidian-storyline/issues/96))* — With three-part numbering (Act-Chapter-Sequence), the Plotlines **Subway Map** sorted scenes by Sequence only, so `01-02-01` (Ch 2 Seq 1) appeared *before* `01-01-02` (Ch 1 Seq 2). Sorting now uses **act → chapter → sequence**, matching the Board, Export and SceneQueryService.
+- **Plotlines list view groups were unsorted** *([#96](https://github.com/PixeroJan/obsidian-storyline/issues/96))* — Each plotline's scene list appeared in whatever order scenes happened to be processed. Each plotline group is now sorted by act → chapter → sequence so reading order is consistent everywhere.
+- **Timeline drag-and-drop corrupted Chapter numbers** *([#96](https://github.com/PixeroJan/obsidian-storyline/issues/96))* — Dropping a scene in reading-order mode overwrote `chapter` flatly 1..N across every scene, destroying chapter nesting and sometimes reassigning scenes to the wrong act. The reorder handler now adopts the act/chapter of the neighbour at the drop location for the moved scene and renumbers `sequence` *within* each (act, chapter) group. Chronological mode still updates `chronologicalOrder` as a single global counter (unchanged).
+
+---
 ## Version 1.10.10
 
 ### Bug Fixes
