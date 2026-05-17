@@ -1918,7 +1918,11 @@ body.theme-dark {
 }
 .inspector-snapshots-header .inspector-label { font-weight: 600; font-size: 0.85em; }
 .inspector-snapshot-save-btn {
-    all: unset;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
     margin-left: auto;
     cursor: pointer;
     display: inline-flex;
@@ -1975,7 +1979,11 @@ body.theme-dark {
     flex-shrink: 0;
 }
 .inspector-snapshot-btns button {
-    all: unset;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -3604,7 +3612,10 @@ body.theme-dark {
 }
 .character-universal-edit-btn,
 .character-universal-move-btn {
-    all: unset;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
     color: var(--text-muted);
     cursor: pointer;
     display: inline-flex;
@@ -8825,7 +8836,10 @@ body /* Clamp title on mobile too, in case it's very long */
 }
 .codex-universal-edit-btn,
 .codex-universal-move-btn {
-    all: unset;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
     color: var(--text-muted);
     cursor: pointer;
     display: inline-flex;
