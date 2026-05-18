@@ -13,6 +13,7 @@
  */
 
 import { App, TFile, TFolder, normalizePath, Notice } from 'obsidian';
+import { tokenizeWords, DEFAULT_STORYLINE_LOCALE, type StoryLineLocale } from '../utils/locale';
 
 export interface SceneSnapshot {
     /** Vault-relative path of the snapshot file */
@@ -29,9 +30,11 @@ export interface SceneSnapshot {
 
 export class SnapshotManager {
     private app: App;
+    private getLocale: () => StoryLineLocale;
 
-    constructor(app: App) {
+    constructor(app: App, getLocale: () => StoryLineLocale = () => DEFAULT_STORYLINE_LOCALE) {
         this.app = app;
+        this.getLocale = getLocale;
     }
 
     /**
@@ -254,9 +257,8 @@ export class SnapshotManager {
 
     private countWords(content: string): number {
         // Strip frontmatter
-        const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
-        const words = body.trim().split(/\s+/).filter(w => w.length > 0);
-        return words.length;
+        const body = content.replace(/^---[\s\S]*?---\n?/, '');
+        return tokenizeWords(body.trim(), this.getLocale()).length;
     }
 
     private parseSnapshotHeader(content: string): { label?: string; timestamp?: string; wordcount?: number } {

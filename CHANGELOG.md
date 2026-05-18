@@ -6,6 +6,20 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.12
+
+### New Features
+
+- **Multi-language support** — replaced the English-only word splitter with BCP-47-aware tokenisation (`Intl.Segmenter` where available, with regex fallbacks). Word counts, reading time, dialogue %, stop-word filtering and PDF line-wrap now behave correctly for English, Swedish, Dutch, Danish, Norwegian, Finnish, Polish, Spanish, French, German, Italian, Portuguese, Russian, Chinese, Japanese, Korean, Thai, Arabic, Hebrew and Hindi. Per-project language is set via the `language:` frontmatter key on the project file, a Settings → Default project language dropdown (with `auto` detection), and Flesch readability is automatically marked **N/A** for non-Latin scripts where it doesn't apply. Inspired by [PR #90](https://github.com/PixeroJan/obsidian-storyline/pull/90) by @Firefox2100 — generalised to a script-profile registry so adding new locales is a one-line change.
+
+### Bug Fixes
+
+- **Snapshots counted as scenes everywhere** *([#100](https://github.com/PixeroJan/obsidian-storyline/issues/100))* — Saved snapshot files live in a `_snapshots/` subfolder next to each scene. The scene scanner recursed into those folders and registered every snapshot as a separate scene, inflating Manuscript, Corkboard, Kanban, Navigator, Plot Grid, Timeline and the project word count. `SceneManager.scanFolderAdapter` now skips the `_snapshots/` directory (and `addFile` rejects any path under it), so snapshots remain pure history and are never indexed as scenes.
+- **PDF export ignored "Include scene titles" and "Number scenes"** *([#103](https://github.com/PixeroJan/obsidian-storyline/issues/103))* — The PDF (and HTML print) generator built its own manuscript HTML and always emitted `<h4>Scene title</h4>` headings regardless of the toggles on the Export dialog. `buildManuscriptHtml` now honours both `includeSceneTitles` and `numberScenesOnExport`, matching the existing Markdown and DOCX exports.
+- **Multi-select dropdown drifted away from the input** *([#102](https://github.com/PixeroJan/obsidian-storyline/issues/102))* — On Codex / Character / Location custom fields, the autocomplete popup was positioned with `position: fixed` but lived inside a DOM ancestor that established a containing block (via `transform`, `filter`, `contain`, etc.). That turned "viewport coordinates" into "ancestor coordinates" and the menu rendered far below/beside the input. The dropdown is now portaled to `document.body`, so its `position: fixed` is once again truly viewport-relative; portaled popups are tracked per view and cleaned up on every re-render and on `onClose`.
+- **Visible gap above the sticky toolbar on Codex pages** *([#98](https://github.com/PixeroJan/obsidian-storyline/issues/98))* — Scrolling the character editing page revealed a sliver of content showing through above the sticky toolbar. The toolbar now paints its background colour upward with a `::before` overlay (24px), covering any subpixel/padding gap between the toolbar and the top of the scroll container.
+
+---
 ## Version 1.10.11
 
 ### Bug Fixes

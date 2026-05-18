@@ -24,6 +24,12 @@ export interface StoryLineProject {
     created: string;
     /** Description / notes (body of the .md file) */
     description: string;
+    /**
+     * Optional BCP-47 language tag for this project (`'en'`, `'sv'`, `'zh'`, `'ja'`, …).
+     * Drives word counting, reading time, dialogue %, stop-word filtering, and PDF
+     * line wrapping. `'auto'` enables script auto-detection from manuscript text.
+     */
+    locale?: string;
     /** Derived scene folder path */
     sceneFolder: string;
     /** Derived character folder path */

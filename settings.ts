@@ -7,6 +7,7 @@ import type { UniversalFieldTemplate } from './services/FieldTemplateService';
 import { ColorCodingMode, CustomStatusDef, SceneStatus, SceneTemplate, ViewType, getStatusConfig, getStatusOrder, registerCustomStatuses } from './models/Scene';
 import { App, Modal, Notice, PluginSettingTab, Setting, TFolder, TextAreaComponent, AbstractInputSuggest } from 'obsidian';
 import * as obsidian from 'obsidian';
+import { SUPPORTED_STORYLINE_LOCALES } from './utils/locale';
 
 // ═══════════════════════════════════════════════════════
 //  COLOR PALETTES — Catppuccin + Mood-based
@@ -707,6 +708,15 @@ export interface SceneCardsSettings {
     excludeChecklistFromWordcount?: boolean;
 
     /**
+     * Default BCP-47 language tag applied to newly created projects (e.g. `'en'`,
+     * `'sv'`, `'zh'`, `'ja'`, `'th'`). Drives word tokenisation, reading time,
+     * stop-word filtering, dialogue % and PDF wrapping. Use `'auto'` to
+     * auto-detect from manuscript text. Existing projects keep whatever
+     * `language:` value is in their frontmatter.
+     */
+    defaultProjectLanguage?: string;
+
+    /**
      * Issue #77 — raw YAML snippet merged into the frontmatter of every
      * newly-created scene. Lets users default fields like
      * `cssclasses: [fountain]` for use with companion plugins. StoryLine's
@@ -810,6 +820,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     warnOnCrossBookMove: true,
     excludeCommentsFromWordcount: true,
     excludeChecklistFromWordcount: false,
+    defaultProjectLanguage: 'en',
     defaultSceneFrontmatter: '',
 };
 
@@ -1376,6 +1387,33 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.plugin.settings.excludeChecklistFromWordcount = value;
                     await this.plugin.saveSettings();
                 }));
+
+        // ── Multi-language support — default project language ──
+        new Setting(containerEl)
+            .setName('Default project language')
+            .setDesc('BCP-47 tag used for word counting, reading time, dialogue %, stop-word filtering and PDF line wrapping. Choose Auto-detect to infer the script from manuscript text. Existing projects keep whatever `language:` value is in their frontmatter; set per-project by editing that key.')
+            .addDropdown(dropdown => {
+                dropdown.addOption('auto', 'Auto-detect from text');
+                for (const { code, label } of SUPPORTED_STORYLINE_LOCALES) {
+                    dropdown.addOption(code, `${label} (${code})`);
+                }
+                dropdown.setValue(this.plugin.settings.defaultProjectLanguage ?? 'en');
+                dropdown.onChange(async (value) => {
+                    this.plugin.settings.defaultProjectLanguage = value;
+                    await this.plugin.saveSettings();
+                    // If no project is active yet, push the chosen locale to the
+                    // module-level word-count tokeniser so brand-new scenes count
+                    // correctly. When a project IS active, its own `language:`
+                    // wins — don't override it here.
+                    if (!this.plugin.sceneManager?.activeProject) {
+                        try {
+                            const { normalizeStoryLineLocale } = await import('./utils/locale');
+                            const { setWordcountLocale } = await import('./services/MetadataParser');
+                            setWordcountLocale(normalizeStoryLineLocale(value));
+                        } catch { /* non-fatal */ }
+                    }
+                });
+            });
 
         // ── Issue #77 — Default scene frontmatter ──
         new Setting(containerEl)

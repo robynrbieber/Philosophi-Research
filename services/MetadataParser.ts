@@ -3,6 +3,7 @@ import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } f
 import { App, TFile, parseYaml, stringifyYaml } from 'obsidian';
 import { Scene, SceneStatus, TIMELINE_MODES, TimelineMode } from '../models/Scene';
 import { coerceString } from '../utils/narrow';
+import { tokenizeWords, DEFAULT_STORYLINE_LOCALE, type StoryLineLocale } from '../utils/locale';
 
 /**
  * Issue #73 — frontmatter scene fields that point at other entities (scenes,
@@ -42,6 +43,20 @@ let _excludeChecklistFromWordcount = false;
 export function setWordcountExclusions(opts: { comments?: boolean; checklists?: boolean }): void {
     if (typeof opts.comments === 'boolean') _excludeCommentsFromWordcount = opts.comments;
     if (typeof opts.checklists === 'boolean') _excludeChecklistFromWordcount = opts.checklists;
+}
+
+/**
+ * Module-level active locale (BCP-47) used by `countWords`. Set from
+ * `SceneManager` whenever the active project changes so word counts respect
+ * the project's `language:` frontmatter (CJK, Thai, etc. tokenise differently
+ * from whitespace-delimited Latin scripts).
+ */
+let _wordcountLocale: StoryLineLocale = DEFAULT_STORYLINE_LOCALE;
+export function setWordcountLocale(locale: StoryLineLocale): void {
+    _wordcountLocale = locale || DEFAULT_STORYLINE_LOCALE;
+}
+export function getWordcountLocale(): StoryLineLocale {
+    return _wordcountLocale;
 }
 function wrapScalar(v: unknown): unknown {
     if (!_writeSceneFieldsAsWikilinks) return v;
@@ -436,7 +451,7 @@ export class MetadataParser {
             .replace(/[*_~`]/g, '')
             .trim();
         if (!cleaned) return 0;
-        return cleaned.split(/\s+/).filter(w => w.length > 0).length;
+        return tokenizeWords(cleaned, _wordcountLocale).length;
     }
 
     /**

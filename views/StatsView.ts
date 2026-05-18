@@ -10,6 +10,21 @@ import { applyMobileClass } from '../components/MobileAdapter';
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import { Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import { PlotWarning, Validator } from '../services/Validator';
+import {
+    tokenizeWords,
+    splitSentences,
+    countDialogueCharacters,
+    countReadingCharacters,
+    getReadingWordsPerMinute,
+    getReadingCharactersPerMinute,
+    getStopWords,
+    isSignificantWord,
+    normalizeAnalysisToken,
+    supportsSyllableMetrics,
+    isScriptioContinuaLocale,
+    DEFAULT_STORYLINE_LOCALE,
+    type StoryLineLocale,
+} from '../utils/locale';
 
 /**
  * Statistics Dashboard View
@@ -150,8 +165,21 @@ export class StatsView extends ItemView {
         this.createStatCard(row, 'file-text', 'Scenes', String(stats.totalScenes));
         this.createStatCard(row, 'pen-tool', 'Words', stats.totalWords.toLocaleString());
 
-        // Estimated reading time (~250 wpm)
-        const readMinutes = Math.round(stats.totalWords / 250);
+        // Estimated reading time — multi-language aware. Latin/Cyrillic
+        // scripts use words/min; CJK/Thai use characters/min for sanity.
+        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const wpm = getReadingWordsPerMinute(locale);
+        const cpm = getReadingCharactersPerMinute(locale);
+        let readMinutes: number;
+        if (cpm > 0 && isScriptioContinuaLocale(locale)) {
+            // Sum CJK chars across all scenes (cheaper than re-tokenising).
+            const scenes = this.plugin.sceneManager?.getAllScenes?.() ?? [];
+            let chars = 0;
+            for (const s of scenes) if (s.body) chars += countReadingCharacters(s.body);
+            readMinutes = chars > 0 ? Math.round(chars / cpm) : Math.round(stats.totalWords / wpm);
+        } else {
+            readMinutes = Math.round(stats.totalWords / wpm);
+        }
         const readH = Math.floor(readMinutes / 60);
         const readM = readMinutes % 60;
         this.createStatCard(row, 'book-open', 'Read Time',
@@ -1037,7 +1065,7 @@ export class StatsView extends ItemView {
         const withBody = allScenes.filter(s => s.body && s.body.trim().length > 0);
         if (withBody.length === 0) return;
 
-        const quoteRe = /[""\u201C](.*?)[""\u201D]/gs;
+        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
         let totalDlg = 0;
         let totalAll = 0;
         const actDlg: Record<string, { dialogue: number; total: number }> = {};
@@ -1045,10 +1073,7 @@ export class StatsView extends ItemView {
         for (const scene of withBody) {
             const body = scene.body!;
             const total = body.length;
-            let dlg = 0;
-            let m: RegExpExecArray | null;
-            quoteRe.lastIndex = 0;
-            while ((m = quoteRe.exec(body)) !== null) dlg += m[1].length;
+            const dlg = countDialogueCharacters(body, locale);
             totalDlg += dlg;
             totalAll += total;
             const k = scene.act !== undefined ? `Act ${scene.act}` : 'No Act';
@@ -1132,17 +1157,26 @@ export class StatsView extends ItemView {
         const rSec = parent.createDiv('stats-subsection');
         rSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Readability' });
         const row = rSec.createDiv('stats-sprint-row');
-        this.createStatCard(row, 'graduation-cap', 'FK Grade', String(readability.fleschKincaidGrade));
-        this.createStatCard(row, 'book', 'Reading Ease', String(readability.fleschReadingEase));
+        // Flesch metrics are English-specific. For non-Latin scripts the
+        // computeReadability path returns 0 — show "N/A" instead of a
+        // misleading numeric grade.
+        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const fkSupported = supportsSyllableMetrics(locale);
+        this.createStatCard(row, 'graduation-cap', 'FK Grade', fkSupported ? String(readability.fleschKincaidGrade) : 'N/A');
+        this.createStatCard(row, 'book', 'Reading Ease', fkSupported ? String(readability.fleschReadingEase) : 'N/A');
         this.createStatCard(row, 'align-left', 'Avg Sentence', `${readability.avgSentenceLength} words`);
         this.createStatCard(row, 'type', 'Avg Word', `${readability.avgWordLength} chars`);
 
-        const ease = readability.fleschReadingEase;
-        const interp = ease >= 80 ? 'Very easy to read — suitable for a wide audience.'
-            : ease >= 60 ? 'Standard fiction level — clear and accessible.'
-            : ease >= 40 ? 'Moderately difficult — literary fiction range.'
-            : 'Difficult — dense or academic prose.';
-        rSec.createEl('p', { cls: 'stats-hint', text: interp });
+        if (fkSupported) {
+            const ease = readability.fleschReadingEase;
+            const interp = ease >= 80 ? 'Very easy to read — suitable for a wide audience.'
+                : ease >= 60 ? 'Standard fiction level — clear and accessible.'
+                : ease >= 40 ? 'Moderately difficult — literary fiction range.'
+                : 'Difficult — dense or academic prose.';
+            rSec.createEl('p', { cls: 'stats-hint', text: interp });
+        } else {
+            rSec.createEl('p', { cls: 'stats-hint', text: 'Flesch readability scores are tuned for English prose; only sentence/word averages are shown for the current project language.' });
+        }
 
         // Word frequency — top 20
         const totalWc = wordFreq.reduce((s, [, c]) => s + c, 0);
@@ -1178,6 +1212,7 @@ export class StatsView extends ItemView {
     // ── Readability helpers ────────────────────────────
 
     private computeReadability(text: string): ReadabilityResult {
+        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
         const clean = text
             .replace(/^---[\s\S]*?---/gm, '')
             .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
@@ -1185,22 +1220,39 @@ export class StatsView extends ItemView {
             .replace(/\n+/g, ' ')
             .trim();
 
-        const sentences = clean.split(/[.!?]+/).filter(s => s.trim().length > 0);
-        const words = clean.split(/\s+/).filter(w => w.length > 0);
+        const sentences = splitSentences(clean, locale);
+        const words = tokenizeWords(clean, locale);
         const totalS = Math.max(sentences.length, 1);
         const totalW = Math.max(words.length, 1);
 
         let syllables = 0;
         let charLen = 0;
+        const supportsSyllables = supportsSyllableMetrics(locale);
+        const isContinua = isScriptioContinuaLocale(locale);
         for (const w of words) {
-            syllables += this.countSyllables(w);
-            charLen += w.replace(/[^a-zA-Z]/g, '').length;
+            if (supportsSyllables) syllables += this.countSyllables(w);
+            if (isContinua) {
+                charLen += w.length;
+            } else {
+                charLen += w.replace(/[^a-zA-Z\u00c0-\u017f\u0400-\u04FF]/g, '').length;
+            }
         }
 
         const avgSL = Math.round((totalW / totalS) * 10) / 10;
         const avgWL = Math.round((charLen / totalW) * 10) / 10;
-        const spw = syllables / totalW;
 
+        if (!supportsSyllables) {
+            // Flesch is English-specific. Report N/A (0) for other scripts but
+            // keep sentence/word averages, which are still meaningful.
+            return {
+                fleschKincaidGrade: 0,
+                fleschReadingEase: 0,
+                avgSentenceLength: avgSL,
+                avgWordLength: avgWL,
+            };
+        }
+
+        const spw = syllables / totalW;
         return {
             fleschKincaidGrade: Math.max(0, Math.round((0.39 * (totalW / totalS) + 11.8 * spw - 15.59) * 10) / 10),
             fleschReadingEase: Math.max(0, Math.min(100, Math.round(206.835 - 1.015 * (totalW / totalS) - 84.6 * spw))),
@@ -1217,29 +1269,20 @@ export class StatsView extends ItemView {
     }
 
     private computeWordFrequency(text: string): [string, number][] {
+        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
         const clean = text
             .replace(/^---[\s\S]*?---/gm, '')
             .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
             .replace(/[#*_~`>\[\]()!]/g, '')
             .toLowerCase();
 
-        const words = clean.split(/\s+/)
-            .map(w => w.replace(/^[^a-z]+|[^a-z]+$/g, ''))
-            .filter(w => w.length > 2);
-
-        const stop = new Set([
-            'the','and','was','for','that','with','his','her','had','not','but','you','are',
-            'from','they','she','been','have','him','has','this','were','said','each','its',
-            'who','which','their','will','would','could','than','them','then','into','more',
-            'some','when','what','there','about','just','like','all','out','did','one','over',
-            'how','back','down','only','very','after','before','even','also','other','our',
-            'own','still','being','your','too','here','those','both','does','where','most',
-            'much','through','while','now','way','may','any','well','between','another',
-            'because','such','never',
-        ]);
+        const stop = getStopWords(locale);
+        const tokens = tokenizeWords(clean, locale)
+            .map(w => normalizeAnalysisToken(w, locale))
+            .filter(w => isSignificantWord(w, locale, stop));
 
         const freq: Record<string, number> = {};
-        for (const w of words) if (!stop.has(w)) freq[w] = (freq[w] || 0) + 1;
+        for (const w of tokens) freq[w] = (freq[w] || 0) + 1;
         return Object.entries(freq).sort(([, a], [, b]) => b - a);
     }
 
@@ -1272,17 +1315,8 @@ export class StatsView extends ItemView {
     }
 
     private computeEchoes(scenes: Scene[]): { echoes: EchoCluster[]; perScene: SceneEchoReport[] } {
-        const stop = new Set([
-            'the','and','was','for','that','with','his','her','had','not','but','you','are',
-            'from','they','she','been','have','him','has','this','were','said','each','its',
-            'who','which','their','will','would','could','than','them','then','into','more',
-            'some','when','what','there','about','just','like','all','out','did','one','over',
-            'how','back','down','only','very','after','before','even','also','other','our',
-            'own','still','being','your','too','here','those','both','does','where','most',
-            'much','through','while','now','way','may','any','well','between','another',
-            'because','such','never','went','came','made','around','long','time','know',
-            'looked','thought','could','would','should','going','come','take','make',
-        ]);
+        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const stop = getStopWords(locale);
 
         const echoes: EchoCluster[] = [];
         const perScene: SceneEchoReport[] = [];
@@ -1293,7 +1327,7 @@ export class StatsView extends ItemView {
         for (const scene of scenes) {
             const words = this.extractWords(scene.body!);
             for (const w of words) {
-                if (!stop.has(w) && w.length > 2) {
+                if (isSignificantWord(w, locale, stop)) {
                     globalFreq[w] = (globalFreq[w] || 0) + 1;
                     globalTotal++;
                 }
@@ -1308,17 +1342,17 @@ export class StatsView extends ItemView {
             const sentences = body.replace(/([.!?])\s+/g, '$1\u0001').split('\u0001').filter(s => s.trim().length > 0);
             const sceneWordList = this.extractWords(body);
             const sceneFreq: Record<string, number> = {};
-            const sceneTotal = sceneWordList.filter(w => !stop.has(w) && w.length > 2).length;
+            const sceneTotal = sceneWordList.filter(w => isSignificantWord(w, locale, stop)).length;
 
             for (const w of sceneWordList) {
-                if (!stop.has(w) && w.length > 2) {
+                if (isSignificantWord(w, locale, stop)) {
                     sceneFreq[w] = (sceneFreq[w] || 0) + 1;
                 }
             }
 
             // Find proximity echoes: same word repeated within a window of 3 sentences
             const sentenceWords: string[][] = sentences.map(s =>
-                this.extractWords(s).filter(w => !stop.has(w) && w.length > 2)
+                this.extractWords(s).filter(w => isSignificantWord(w, locale, stop))
             );
 
             const proximityMap: Record<string, number> = {};
@@ -1374,13 +1408,14 @@ export class StatsView extends ItemView {
     }
 
     private extractWords(text: string): string[] {
-        return text
+        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const clean = text
             .replace(/^---[\s\S]*?---/gm, '')
             .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
             .replace(/[#*_~`>\[\]()!]/g, '')
-            .toLowerCase()
-            .split(/\s+/)
-            .map(w => w.replace(/^[^a-z]+|[^a-z]+$/g, ''))
+            .toLowerCase();
+        return tokenizeWords(clean, locale)
+            .map(w => normalizeAnalysisToken(w, locale))
             .filter(w => w.length > 0);
     }
 

@@ -145,6 +145,7 @@ export class CodexView extends ItemView {
     // ══════════════════════════════════════════════════
 
     private renderView(container: HTMLElement): void {
+        this.clearPortaledDropdowns(); // issue #102 — don't leak portaled popups across re-renders
         container.empty();
 
         // ── Toolbar ────────────────────────────────────
@@ -883,8 +884,13 @@ export class CodexView extends ItemView {
                 type: 'text',
                 attr: { placeholder: tpl.placeholder || 'Type to add\u2026' },
             });
-            const msDropdown = inputRow.createDiv('universal-multi-dropdown');
+            // Issue #102 — portal dropdown to <body> so position:fixed coords are
+            // relative to the viewport even when an ancestor uses `transform`,
+            // `filter`, `contain` or other properties that establish a
+            // containing block (which made the popup drift off the input).
+            const msDropdown = document.body.createDiv('universal-multi-dropdown');
             msDropdown.setCssStyles({ display: 'none' });
+            this._portaledDropdowns.push(msDropdown);
 
             const renderPills = () => {
                 pillsEl.empty();

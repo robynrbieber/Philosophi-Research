@@ -107,6 +107,37 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 
 ---
 
+## Language Support
+
+StoryLine analyses your prose for word counts, reading time, dialogue %, stop-words, readability and PDF line-wrapping. From v1.10.12 these all respect the **project language**.
+
+### Setting the language
+
+- **Per project** — open the project file and add a `language:` key to its frontmatter:
+  ```yaml
+  ---
+  type: storyline-project
+  title: My Swedish Novel
+  language: sv
+  ---
+  ```
+- **Default for new projects** — Settings → **StoryLine** → **Default project language**. Choose `auto` to detect from existing content.
+
+### Supported codes
+
+`en` English · `sv` Swedish · `nl` Dutch · `da` Danish · `no` Norwegian · `fi` Finnish · `pl` Polish · `es` Spanish · `fr` French · `de` German · `it` Italian · `pt` Portuguese · `ru` Russian · `zh` Chinese · `ja` Japanese · `ko` Korean · `th` Thai · `ar` Arabic · `he` Hebrew · `hi` Hindi. Use full BCP-47 tags (`pt-BR`, `zh-Hant`, …) and StoryLine will pick the closest script profile.
+
+### What changes per language
+
+- **Word counts** use `Intl.Segmenter` for Chinese / Japanese / Korean / Thai (where spaces aren't word boundaries) and locale-aware splitting elsewhere.
+- **Reading time** uses words-per-minute for Latin/Cyrillic scripts and characters-per-minute for CJK/Thai.
+- **Dialogue detection** recognises locale quote marks: `« »`, `„ "`, `「 」`, `『 』`, `《 》`.
+- **Stop-words & word-frequency** use language-appropriate lists.
+- **Flesch readability** is shown only for English (it's tuned for English syllable structure); other languages show **N/A** but still report sentence and word averages.
+- **PDF export** keeps CJK characters together without inserting spaces.
+
+---
+
 ## Views
 
 StoryLine provides seven interconnected views plus a sidebar navigator. Switch between them using the tab bar or keyboard shortcuts.

@@ -215,6 +215,21 @@ body.theme-dark {
     flex-wrap: wrap;
 }
 
+/* Issue #98 — when the toolbar is sticky inside a scroll container that has
+   any top padding (or Obsidian's view-content edge), a thin strip of scrolling
+   content could appear above the toolbar. This pseudo paints the same
+   background colour upward to cover that gap on the Codex/Character pages. */
+.story-line-toolbar::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 24px;
+    background: var(--background-primary);
+    pointer-events: none;
+}
+
 .story-line-view-title {
     margin: 0;
     font-size: 1.1em;

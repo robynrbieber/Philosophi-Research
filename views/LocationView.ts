@@ -60,6 +60,14 @@ export class LocationView extends ItemView {
      */
     private bookFilterActive: boolean = false;
 
+    /** Issue #102 — dropdowns portaled to <body> so position:fixed escapes
+     *  ancestors with transform/contain. Cleaned up on each re-render. */
+    private _portaledDropdowns: HTMLElement[] = [];
+    private clearPortaledDropdowns(): void {
+        for (const el of this._portaledDropdowns) { try { el.remove(); } catch { /* noop */ } }
+        this._portaledDropdowns = [];
+    }
+
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
         this.plugin = plugin;
@@ -94,11 +102,13 @@ export class LocationView extends ItemView {
         await this.flushPendingSave();
         // Remove any orphaned gallery lightbox windows
         activeDocument.querySelectorAll('.gallery-lightbox-window').forEach(el => el.remove());
+        this.clearPortaledDropdowns(); // issue #102 — clean up portaled popups
     }
 
     // ── Main render ────────────────────────────────────
 
     private renderView(container: HTMLElement): void {
+        this.clearPortaledDropdowns(); // issue #102 — don't leak portaled popups across re-renders
         container.empty();
 
         const toolbar = container.createDiv('story-line-toolbar');
@@ -1030,8 +1040,11 @@ export class LocationView extends ItemView {
                 type: 'text',
                 attr: { placeholder: tpl.placeholder || 'Type to add\u2026' },
             });
-            const msDropdown = inputRow.createDiv('universal-multi-dropdown');
+            // Issue #102 — portal dropdown to <body> so position:fixed coords are
+            // viewport-relative even when an ancestor uses transform/contain.
+            const msDropdown = document.body.createDiv('universal-multi-dropdown');
             msDropdown.setCssStyles({ display: 'none' });
+            this._portaledDropdowns.push(msDropdown);
 
             const renderPills = () => {
                 pillsEl.empty();

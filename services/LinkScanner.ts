@@ -287,11 +287,18 @@ export class LinkScanner {
 
         for (const nameLower of this.plainTextNames) {
             if (foundKeys.has(nameLower)) continue;
-            // Build a word-boundary regex for this name
-            // Escape regex special characters in the name
-            const escaped = nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const re = new RegExp(`\\b${escaped}\\b`, 'i');
-            if (re.test(stripped)) {
+            let matched = false;
+            // Multi-language support — \b word boundaries don't exist in CJK
+            // (no whitespace between tokens). Fall back to a case-insensitive
+            // substring search whenever the name itself contains CJK glyphs.
+            if (/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\u3040-\u30FF\uAC00-\uD7AF]/.test(nameLower)) {
+                matched = stripped.toLowerCase().includes(nameLower);
+            } else {
+                const escaped = nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const re = new RegExp(`\\b${escaped}\\b`, 'i');
+                matched = re.test(stripped);
+            }
+            if (matched) {
                 foundKeys.add(nameLower);
                 results.push(nameLower);
                 // If this is a canonical (full) name, also mark its parts as found
@@ -357,8 +364,9 @@ export class LinkScanner {
             if (!seen.has(canonKey)) seen.set(canonKey, canonical);
         }
 
-        // 3. #tags
-        const tagRe = /#([A-Za-z][\w/-]*)/g;
+        // 3. #tags — accept any non-punctuation/whitespace run after `#`, so
+        // tags like `#主角` (Chinese) or `#キャラ` (Japanese) work alongside ASCII.
+        const tagRe = /#([^\s#.,;:!?()\[\]{}'"“”‘’「」『』，。！？、]+)/g;
         const tags: string[] = [];
         const tagSeen = new Set<string>();
         let tm: RegExpExecArray | null;

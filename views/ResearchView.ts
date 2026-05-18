@@ -6,6 +6,7 @@ import { ResearchManager } from '../services/ResearchManager';
 import { ResearchPost, ResearchType, RESEARCH_TYPE_CONFIG } from '../models/Research';
 import { RESEARCH_VIEW_TYPE } from '../constants';
 import { attachTooltip } from '../components/Tooltip';
+import { tokenizeWords, isScriptioContinuaLocale, DEFAULT_STORYLINE_LOCALE, type StoryLineLocale } from '../utils/locale';
 
 /**
  * ResearchView — a right-sidebar panel for browsing, searching,
@@ -400,9 +401,12 @@ export class ResearchView extends ItemView {
         if (scene.location) keywords.push(scene.location);
         // Tags
         if (scene.tags) keywords.push(...scene.tags);
-        // Title words (3+ chars)
+        // Title words — locale-aware tokenisation. For scriptio-continua
+        // scripts (CJK, Thai) a 2-char minimum is more meaningful than 3.
         if (scene.title) {
-            scene.title.split(/\s+/).filter(w => w.length >= 3).forEach(w => keywords.push(w));
+            const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+            const minLen = isScriptioContinuaLocale(locale) ? 2 : 3;
+            tokenizeWords(scene.title, locale).filter(w => w.length >= minLen).forEach(w => keywords.push(w));
         }
 
         return [...new Set(keywords)];

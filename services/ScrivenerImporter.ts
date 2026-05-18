@@ -14,6 +14,7 @@
  */
 
 import type SceneCardsPlugin from '../main';
+import { tokenizeWords, DEFAULT_STORYLINE_LOCALE } from '../utils/locale';
 import type { SceneStatus } from '../models/Scene';
 import { makeCustomCodexCategory } from '../models/Codex';
 import type { SeriesMetadata } from '../models/StoryLineProject';
@@ -1465,7 +1466,8 @@ export class ScrivenerImporter {
             fm.compile = false;
         }
 
-        const wordcount = body ? body.split(/\s+/).filter(Boolean).length : 0;
+        const importLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const wordcount = body ? tokenizeWords(body, importLocale).length : 0;
         fm.wordcount = wordcount;
 
         fm.order = index;

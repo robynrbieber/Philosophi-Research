@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { Modal, Setting, Notice } from 'obsidian';
 import type SceneCardsPlugin from '../main';
+import { tokenizeWords, DEFAULT_STORYLINE_LOCALE } from '../utils/locale';
 import { BUILTIN_STATUS_CONFIG, Scene, SceneStatus, getStatusOrder } from '../models/Scene';
 
 // ────────────────────────────────────────────────────────
@@ -134,8 +135,9 @@ export class SplitSceneModal extends Modal {
 
         const partA = body.substring(0, this.splitOffset).trim();
         const partB = body.substring(this.splitOffset).trim();
-        const wordCountA = partA ? partA.split(/\s+/).length : 0;
-        const wordCountB = partB ? partB.split(/\s+/).length : 0;
+        const splitLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const wordCountA = partA ? tokenizeWords(partA, splitLocale).length : 0;
+        const wordCountB = partB ? tokenizeWords(partB, splitLocale).length : 0;
 
         this.previewEl.createEl('div', {
             text: `Scene A: ~${wordCountA} words  |  Scene B: ~${wordCountB} words`,

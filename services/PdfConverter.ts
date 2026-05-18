@@ -16,6 +16,7 @@ import {
     rgb,
     PageSizes,
 } from 'pdf-lib';
+import { splitWrapTokens, isCjkWrapToken } from '../utils/locale';
 
 // ── Settings interface ─────────────────────────────────────────
 
@@ -444,22 +445,28 @@ export class SLMarkdownToPdfConverter {
     /** Wrap plain text into lines that fit within maxWidth */
     private wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
         const safeInput = this.safeText(text);
-        const words = safeInput.split(/\s+/);
+        // Multi-language support — CJK has no inter-word spaces, so we split on
+        // codepoints and join with the empty string between CJK glyphs.
+        const tokens = splitWrapTokens(safeInput).filter(t => t !== '');
         const lines: string[] = [];
         let currentLine = '';
 
-        for (const word of words) {
-            if (!word) continue;
-            const testLine = currentLine ? `${currentLine} ${word}` : word;
+        for (const token of tokens) {
+            if (/^\s+$/.test(token)) {
+                if (currentLine) currentLine += ' ';
+                continue;
+            }
+            const joiner = currentLine && !isCjkWrapToken(token) && !isCjkWrapToken(currentLine.slice(-1)) && !currentLine.endsWith(' ') ? ' ' : '';
+            const testLine = currentLine + joiner + token;
             const width = font.widthOfTextAtSize(testLine, fontSize);
             if (width > maxWidth && currentLine) {
-                lines.push(currentLine);
-                currentLine = word;
+                lines.push(currentLine.trimEnd());
+                currentLine = token;
             } else {
                 currentLine = testLine;
             }
         }
-        if (currentLine) lines.push(currentLine);
+        if (currentLine) lines.push(currentLine.trimEnd());
         if (lines.length === 0) lines.push('');
         return lines;
     }
@@ -472,7 +479,9 @@ export class SLMarkdownToPdfConverter {
 
         for (const run of runs) {
             const font = this.pickFont(fonts, run.bold, run.italic);
-            const words = this.safeText(run.text).split(/( +)/); // keep spaces as separate tokens
+            // Multi-language support — split CJK by codepoints so lines can
+            // break inside scriptio-continua paragraphs.
+            const words = splitWrapTokens(this.safeText(run.text)); // keep spaces as separate tokens
 
             for (const word of words) {
                 if (!word) continue;

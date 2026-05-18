@@ -542,6 +542,12 @@ ${body}
         const parts: string[] = [];
         let currentAct: string | number | undefined;
         let currentChapter: string | number | undefined;
+        // Issue #103 — honour the same per-export options as the MD/DOCX paths
+        // (Include scene titles + Number scenes). Previously PDF/HTML export
+        // always emitted scene-title h4 headings regardless of these flags.
+        let sceneNumber = 0;
+        const includeTitles = this.exportOptions.includeSceneTitles !== false;
+        const numberScenes = this.exportOptions.numberScenesOnExport === true;
 
         for (const scene of scenes) {
             if (scene.act !== undefined && scene.act !== currentAct) {
@@ -555,8 +561,13 @@ ${body}
                 parts.push(`<h3>Chapter ${this.escHtml(String(currentChapter))}</h3>`);
             }
 
+            sceneNumber++;
             parts.push('<div class="scene-block">');
-            parts.push(`<h4>${this.escHtml(scene.title || 'Untitled Scene')}</h4>`);
+            if (numberScenes) {
+                parts.push(`<h4>${sceneNumber}</h4>`);
+            } else if (includeTitles) {
+                parts.push(`<h4>${this.escHtml(scene.title || 'Untitled Scene')}</h4>`);
+            }
 
             if (scene.body && scene.body.trim()) {
                 // Convert basic markdown paragraphs to HTML (strip wikilinks + tags, convert formatting)

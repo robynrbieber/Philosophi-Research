@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { StoryLineProject, deriveProjectFolders, deriveProjectFoldersFromFilePath } from '../models/StoryLineProject';
-import { MetadataParser } from './MetadataParser';
+import { MetadataParser, setWordcountLocale } from './MetadataParser';
+import { normalizeStoryLineLocale, resolveLocale, DEFAULT_STORYLINE_LOCALE, AUTO_DETECT_LOCALE } from '../utils/locale';
 import { UndoManager } from './UndoManager';
 import { SceneQueryService, ISceneStore } from './SceneQueryService';
 import { formatActChapterPrefix, sanitizeActChapterForPath } from '../utils/actChapter';
@@ -292,7 +293,29 @@ export class SceneManager implements ISceneStore {
             }
         }
 
+        // Propagate the active project's language to wordcount tokenisation.
+        this.applyActiveProjectLocale();
+
         return this.getProjects();
+    }
+
+    /**
+     * Push the active project's `locale` to module-level word-count state so
+     * `MetadataParser.countWords` tokenises with the right script profile.
+     * Falls back to the global default-language setting, then English.
+     */
+    private applyActiveProjectLocale(): void {
+        const projectLocale = this._activeProject?.locale;
+        const settingsDefault = (this.plugin.settings as { defaultProjectLanguage?: string }).defaultProjectLanguage;
+        const stored = projectLocale ?? settingsDefault ?? DEFAULT_STORYLINE_LOCALE;
+        if (stored === AUTO_DETECT_LOCALE) {
+            // Sample a chunk of the project description; deeper scene-text
+            // sampling happens lazily once scenes are indexed.
+            const sample = this._activeProject?.description ?? '';
+            setWordcountLocale(resolveLocale(stored, sample, DEFAULT_STORYLINE_LOCALE));
+        } else {
+            setWordcountLocale(normalizeStoryLineLocale(stored));
+        }
     }
 
     /**
@@ -309,10 +332,14 @@ export class SceneManager implements ISceneStore {
         const folders = deriveProjectFolders(rootPath, safeName);
         const now = new Date().toISOString().split('T')[0];
 
+        const defaultLang = (this.plugin.settings as { defaultProjectLanguage?: string }).defaultProjectLanguage ?? DEFAULT_STORYLINE_LOCALE;
+        const projectLocale = normalizeStoryLineLocale(defaultLang);
+
         const frontmatter: Record<string, unknown> = {
             type: 'storyline',
             title,
             created: now,
+            language: projectLocale,
         };
         const content = `---\n${stringifyYaml(frontmatter)}---\n${description}\n`;
 
@@ -362,6 +389,7 @@ export class SceneManager implements ISceneStore {
                 title,
                 created: now,
                 description,
+                locale: projectLocale,
                 ...folders,
                 definedActs: [],
                 definedChapters: [],
@@ -391,6 +419,7 @@ export class SceneManager implements ISceneStore {
 
         this._activeProject = project;
         this.plugin.settings.activeProjectFile = project.filePath;
+        this.applyActiveProjectLocale();
 
         // Load per-project data from the new project's System/ folder BEFORE
         // saveSettings (which also calls saveProjectSystemData — with the new
@@ -555,6 +584,9 @@ export class SceneManager implements ISceneStore {
                 title,
                 created: fm.created || '',
                 description: content.slice(fmMatch[0].length).trim(),
+                // Issue: multi-language support — accept both `language:` (preferred)
+                // and `storyline-locale:` (community PR #90 spelling) for forward/back compat.
+                locale: normalizeStoryLineLocale(fm.language ?? fm['storyline-locale'] ?? ''),
                 ...folders,
                 definedActs: Array.isArray(fm.acts) ? fm.acts.map(Number).filter((n: number) => !isNaN(n)) : [],
                 definedChapters: Array.isArray(fm.chapters) ? fm.chapters.map(Number).filter((n: number) => !isNaN(n)) : [],
@@ -617,6 +649,7 @@ export class SceneManager implements ISceneStore {
      */
     addFile(content: string, filePath: string): boolean {
         if (this.scenes.has(filePath)) return false;
+        if (filePath.includes('/_snapshots/')) return false; // issue #100 — snapshots aren't scenes
         const scene = MetadataParser.parseContent(content, filePath);
         if (scene) {
             this.scenes.set(filePath, scene);
@@ -627,7 +660,12 @@ export class SceneManager implements ISceneStore {
     }
 
     /**
-     * Recursively scan a folder for scene files using the adapter API
+     * Recursively scan a folder for scene files using the adapter API.
+     *
+     * Issue #100 — Files under any `_snapshots/` folder are version history
+     * artifacts of scenes (see SnapshotManager); they must not be counted as
+     * scenes themselves. Skip both the snapshot files directly and any
+     * recursion into a `_snapshots` subfolder.
      */
     private async scanFolderAdapter(folderPath: string): Promise<void> {
         const adapter = this.app.vault.adapter;
@@ -635,17 +673,19 @@ export class SceneManager implements ISceneStore {
 
         const listing = await adapter.list(folderPath);
         for (const f of listing.files) {
-            if (f.endsWith('.md')) {
-                try {
-                    const content = await adapter.read(f);
-                    const scene = MetadataParser.parseContent(content, f);
-                    if (scene) {
-                        this.scenes.set(f, scene);
-                    }
-                } catch { /* file unreadable — skip */ }
-            }
+            if (!f.endsWith('.md')) continue;
+            if (f.includes('/_snapshots/')) continue; // issue #100 — skip snapshot files
+            try {
+                const content = await adapter.read(f);
+                const scene = MetadataParser.parseContent(content, f);
+                if (scene) {
+                    this.scenes.set(f, scene);
+                }
+            } catch { /* file unreadable — skip */ }
         }
         for (const sub of listing.folders) {
+            const segment = sub.split('/').pop() ?? '';
+            if (segment === '_snapshots') continue; // issue #100 — don't recurse into snapshots
             await this.scanFolderAdapter(sub);
         }
     }
@@ -1540,6 +1580,19 @@ export class SceneManager implements ISceneStore {
         existingFm.type = 'storyline';
         existingFm.title = project.title;
         existingFm.created = project.created;
+
+        // Multi-language support — persist BCP-47 locale.
+        if (project.locale) {
+            existingFm.language = normalizeStoryLineLocale(project.locale);
+            // Drop the legacy/community-PR key if both were present.
+            if ('storyline-locale' in existingFm) delete existingFm['storyline-locale'];
+        }
+
+        // If we're rewriting the *active* project's frontmatter, also bring the
+        // module-level word-count tokeniser in sync immediately.
+        if (this._activeProject?.filePath === project.filePath) {
+            this.applyActiveProjectLocale();
+        }
 
         // Acts & chapters — only write if non-empty, remove if empty
         if (project.definedActs.length > 0) {
