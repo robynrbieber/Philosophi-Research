@@ -21,7 +21,7 @@ export interface InlineSuggestOptions {
     allowNew?: boolean;
     /** Label for the "create new" entry (default: 'Add "{query}"') */
     newLabel?: (query: string) => string;
-    /** Maximum visible suggestions (default: 8) */
+    /** Maximum visible suggestions (default: 200 — the dropdown scrolls within its max-height) */
     maxVisible?: number;
     /** Optional mapping from value to display label (e.g., "Hallway" → "Bank > Hallway") */
     getDisplayLabel?: (value: string) => string;
@@ -74,7 +74,7 @@ export class InlineSuggest {
         this.onDismiss = opts.onDismiss;
         this.allowNew = opts.allowNew ?? true;
         this.newLabel = opts.newLabel ?? ((q) => `Add "${q}"`);
-        this.maxVisible = opts.maxVisible ?? 8;
+        this.maxVisible = opts.maxVisible ?? 200;
         this.minChars = opts.minChars ?? 0;
         this.getDisplayLabel = opts.getDisplayLabel;
 

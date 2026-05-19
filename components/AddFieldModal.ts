@@ -127,6 +127,7 @@ export class AddFieldModal extends Modal {
                 dd.addOption('textarea', 'Text block (multi-line)');
                 dd.addOption('dropdown', 'Dropdown menu');
                 dd.addOption('multi-select', 'Multi-select (tags)');
+                dd.addOption('checkbox', 'Checkbox (yes/no)');
                 dd.setValue(this.type);
                 dd.onChange(v => {
                     this.type = v as UniversalFieldType;

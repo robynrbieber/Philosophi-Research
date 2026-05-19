@@ -1005,6 +1005,18 @@ export class CodexView extends ItemView {
                 this.scheduleSave(draft);
                 autoGrow();
             });
+        } else if (tpl.type === 'checkbox') {
+            const checked = value === true || value === 'true' || value === 'yes';
+            const wrap = row.createDiv('codex-field-checkbox-wrap');
+            const cb = wrap.createEl('input', {
+                cls: 'codex-field-checkbox',
+                type: 'checkbox',
+            });
+            cb.checked = !!checked;
+            cb.addEventListener('change', () => {
+                draft.universalFields![tpl.id] = cb.checked;
+                this.scheduleSave(draft);
+            });
         } else {
             const input = row.createEl('input', {
                 cls: 'codex-field-input',

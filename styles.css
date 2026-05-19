@@ -9230,13 +9230,21 @@ body.theme-dark .location-field-input.dropdown {
 /* Act divider */
 .sl-manuscript-act-divider {
     text-align: center;
-    margin: 48px 0 24px;
+    margin: 24px 0 16px;
     padding-bottom: 8px;
     border-bottom: 2px solid var(--background-modifier-border);
 }
 
 .sl-manuscript-act-divider:first-child {
     margin-top: 8px;
+}
+
+/* Issue #105 — when a scene block is immediately followed by an act or chapter
+   divider, drop its bottom padding/margin so we don't compound spacing. */
+.sl-manuscript-scene-block:has(+ .sl-manuscript-act-divider),
+.sl-manuscript-scene-block:has(+ .sl-manuscript-chapter-divider) {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
 }
 
 .sl-manuscript-act-label {
@@ -9401,6 +9409,13 @@ body.theme-dark .location-field-input.dropdown {
     display: none;
 }
 
+/* Issue #104 — Scoped hide-frontmatter (only when "Hide frontmatter" is on AND
+   the markdown leaf is showing a file inside the StoryLine root). This avoids
+   touching Obsidian's global "Properties in document" editor setting. */
+.view-content.sl-hide-frontmatter .metadata-container {
+    display: none;
+}
+
 /* Remove background from inner containers */
 .sl-manuscript-embedded-split.sl-manuscript-embedded-split .workspace-tabs,
 .sl-manuscript-embedded-split.sl-manuscript-embedded-split .workspace-tab-container,
@@ -9419,18 +9434,21 @@ body.theme-dark .location-field-input.dropdown {
     border: none;
 }
 
-/* Remove inner scrollbar — all scrolling via manuscript scroll area */
+/* Strip CM6 scrollPastEnd padding from .cm-content and remove the
+   inner scroller so .cm-scroller.scrollHeight equals real document
+   content (without ~70vh of trailing padding).
+   !important is required: CM6 injects a per-editor-instance theme rule
+   targeting .cm-content with equal specificity that loads after our
+   styles.css. Scoped tightly to .sl-manuscript-embedded-split so no
+   other editor in Obsidian is affected. */
 .sl-manuscript-embedded-split.sl-manuscript-embedded-split .cm-scroller {
-    overflow: visible;
+    overflow: visible !important;
 }
-
-/* Remove CM6 scroll-past-end / bottom padding that creates extra space */
 .sl-manuscript-embedded-split.sl-manuscript-embedded-split .cm-content {
-    padding-bottom: 0;
+    padding-bottom: 0 !important;
 }
 .sl-manuscript-embedded-split.sl-manuscript-embedded-split .cm-sizer {
-    min-height: 0;
-    padding-bottom: 0;
+    padding-bottom: 0 !important;
 }
 
 /* Remove view-content padding */

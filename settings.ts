@@ -872,14 +872,14 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Hide frontmatter')
-            .setDesc('Hide the properties/frontmatter block in live preview and reading mode. Since all fields are editable from the Inspector, frontmatter can safely be hidden.')
+            .setDesc('Hide the properties/frontmatter block on StoryLine notes only (live preview and reading mode). Since all fields are editable from the Inspector, frontmatter can safely be hidden. Your global Obsidian "Properties in document" setting is left untouched.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.hideFrontmatter)
                 .onChange(async (value) => {
                     this.plugin.settings.hideFrontmatter = value;
                     await this.plugin.saveSettings();
-                    // Apply Obsidian\'s built-in "Properties in document" setting
-                    (this.app.vault as unknown as { setConfig?: (k: string, v: string) => void }).setConfig?.('propertiesInDocument', value ? 'hidden' : 'visible');
+                    // Re-apply scoped hiding to currently open markdown leaves (issue #104)
+                    this.plugin.updateFrontmatterVisibility();
                 }));
 
         // ═══════════════════════════════════════════

@@ -853,6 +853,18 @@ export class InspectorComponent {
                     msInput.value = '';
                 }
             });
+        } else if (tpl.type === 'checkbox') {
+            const checked = value === true || value === 'true' || value === 'yes';
+            const wrap = row.createDiv('inspector-universal-checkbox-wrap');
+            const cb = wrap.createEl('input', {
+                cls: 'inspector-universal-checkbox',
+                type: 'checkbox',
+            });
+            cb.checked = !!checked;
+            cb.addEventListener('change', async () => {
+                scene.universalFields![tpl.id] = cb.checked;
+                await this.sceneManager.updateScene(scene.filePath, { universalFields: { ...scene.universalFields } });
+            });
         } else {
             // Default: text input
             const input = row.createEl('input', {

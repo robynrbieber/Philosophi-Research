@@ -6,6 +6,19 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.13
+
+### New Features
+
+- **Checkbox custom field type** *([#107](https://github.com/PixeroJan/obsidian-storyline/issues/107))* — Universal fields on Scene, Character, Codex and Location sheets now support a new **Checkbox (yes/no)** input type alongside Text, Text block, Dropdown and Multi-select. Values are stored as proper booleans (`true` / `false`) in the note's frontmatter, so they round-trip cleanly via sync, git and Dataview queries.
+
+### Bug Fixes
+
+- **"Hide frontmatter" silently overrode Obsidian's global Properties setting** *([#104](https://github.com/PixeroJan/obsidian-storyline/issues/104))* — When the StoryLine setting was enabled, the plugin called Obsidian's internal `setConfig('propertiesInDocument', 'hidden')` on every load, which flipped the user's **Editor → Properties in document** preference to *Hidden* for the entire vault — affecting non-StoryLine notes too. The setting now hides the properties block only on markdown files inside the StoryLine root folder, via a scoped CSS class on the markdown leaf. Your global Obsidian preference is left untouched.
+- **Excessive vertical gap between acts in the Manuscript view** *([#105](https://github.com/PixeroJan/obsidian-storyline/issues/105))* — The last scene of an act contributed `32px + 32px` of bottom margin/padding, and the act divider then added another `48px + 24px` on top — compounding to ~140px of empty space between acts. The act divider margin has been reduced to `24px / 16px`, and scene blocks immediately preceding an act or chapter divider now drop their trailing space to `8px + 8px`, giving a much tighter rhythm without visually merging acts.
+- **POV / Characters / Location autocomplete capped at 8 suggestions** *([#109](https://github.com/PixeroJan/obsidian-storyline/issues/109))* — With more than eight matching characters or locations, the suggestion dropdown silently hid the rest. The default visible-suggestions cap on the shared `InlineSuggest` component has been raised from 8 to 200. The dropdown already has a fixed `max-height` with internal scrolling, so longer lists are now fully reachable without overflowing the screen.
+
+---
 ## Version 1.10.12
 
 ### New Features

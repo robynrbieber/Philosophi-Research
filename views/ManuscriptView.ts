@@ -442,8 +442,8 @@ export class ManuscriptView extends ItemView {
             container.appendChild(splitEl);
             splitEl.classList.add('sl-manuscript-embedded-split');
 
-            // Give the split an initial height so the absolute-positioned
-            // workspace-leaf chain has a viewport for CM6 to render into.
+            // Initial height seed so the absolute-positioned workspace-leaf
+            // chain has a viewport for CM6 to render into.
             splitEl.setCssStyles({ height: '300px' });
 
             const leaf = this.app.workspace.createLeafInParent(split, 0);
@@ -458,32 +458,48 @@ export class ManuscriptView extends ItemView {
             // Inject the atomic-links extension into the CM6 editor
             this.injectAtomicExtension(leaf);
 
-            // Obsidian's workspace-leaf uses position:absolute + inset:0,
-            // which collapses to 0 in a detached split because splitEl has
-            // no explicit height. Fix: measure the actual content height
-            // and set splitEl to that pixel height.
+            // Measurement strategy:
+            //   Read cm-content's actual rendered DOM height. Because we set
+            //   `.cm-scroller { overflow: visible }` in CSS, CM6 lays out
+            //   every line into the DOM at its true (wrapped) height, so
+            //   `cm-content.getBoundingClientRect().height` is the ground
+            //   truth — no need to expand splitEl to 8000px to force render.
+            //
+            //   We deliberately avoid `EditorView.contentHeight` here:
+            //   CM6's internal height map adds the scrollPastEnd extension's
+            //   ~70vh of padding, which we strip visually via CSS but cannot
+            //   remove from the height map. Using it would make every scene
+            //   block ~70vh too tall (the empty gap users reported).
             let rafPending = false;
+            let syncing = false;
             const syncHeight = () => {
-                // Measure the inner content height.
-                // cm-sizer holds the actual content; cm-scroller's scrollHeight
-                // captures full content even when clipped by overflow:hidden.
-                const sizer = splitEl.querySelector('.cm-sizer') as HTMLElement | null;
-                const scroller = splitEl.querySelector('.cm-scroller') as HTMLElement | null;
-                const cmEl = splitEl.querySelector('.cm-editor') as HTMLElement | null;
-                const el = sizer || cmEl;
-                if (!el) return;
-                const rect = el.getBoundingClientRect().height;
-                const offset = el.offsetHeight;
-                const scroll = scroller ? scroller.scrollHeight : 0;
-                const h = Math.max(rect, offset, scroll);
-                if (h > 0) {
-                    const px = Math.ceil(h) + 'px';
-                    splitEl.setCssStyles({ height: px });
-                    container.setCssStyles({ height: px });
-                }
+                if (syncing) return;
+                const cm = this.getCmView(leaf);
+                if (!cm) return;
+                syncing = true;
+                cm.requestMeasure({
+                    read: () => {
+                        const content = splitEl.querySelector('.cm-content') as HTMLElement | null;
+                        if (!content) return 0;
+                        const contentRect = content.getBoundingClientRect();
+                        const splitTop = splitEl.getBoundingClientRect().top;
+                        // Offset of cm-content from splitEl's top (chrome /
+                        // padding above the editor body — normally ~0 after
+                        // our chrome strip, but kept as a safety term).
+                        const offset = Math.max(0, contentRect.top - splitTop);
+                        return contentRect.height + offset;
+                    },
+                    write: (h) => {
+                        if (h > 0) {
+                            const px = Math.ceil(h) + 'px';
+                            splitEl.setCssStyles({ height: px });
+                            container.setCssStyles({ height: px });
+                        }
+                        syncing = false;
+                    },
+                });
             };
 
-            // Debounced version for ResizeObserver
             const debouncedSync = () => {
                 if (rafPending) return;
                 rafPending = true;
@@ -502,15 +518,17 @@ export class ManuscriptView extends ItemView {
                 });
             });
 
-            // On tablet, poll until height stabilises (CM6 can take
-            // a long time to lay out content on mobile browsers).
+            // On mobile/tablet, poll until height stabilises (CM6 can
+            // take a long time to lay out content on mobile browsers).
             if (isMobile) {
                 let lastH = 0;
                 let stableCount = 0;
                 const poll = window.setInterval(() => {
                     syncHeight();
                     const sizer = splitEl.querySelector('.cm-sizer') as HTMLElement | null;
-                    const h = sizer ? Math.max(sizer.getBoundingClientRect().height, sizer.offsetHeight) : 0;
+                    const h = sizer
+                        ? Math.max(sizer.getBoundingClientRect().height, sizer.offsetHeight)
+                        : 0;
                     if (h > 0 && Math.abs(h - lastH) < 2) {
                         stableCount++;
                         if (stableCount >= 3) window.clearInterval(poll);
@@ -523,8 +541,8 @@ export class ManuscriptView extends ItemView {
             }
 
             // Keep height synced as user edits (content grows/shrinks).
-            // Observe both .cm-editor and .cm-content — on mobile the
-            // inner content node may resize independently.
+            // Observe both .cm-editor and .cm-content — the inner content
+            // node may resize independently.
             const cmEl = splitEl.querySelector('.cm-editor') as HTMLElement | null;
             const cmContent = splitEl.querySelector('.cm-content') as HTMLElement | null;
             if (cmEl) {

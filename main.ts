@@ -196,10 +196,8 @@ export default class SceneCardsPlugin extends Plugin {
         // Wait for the workspace layout to be ready, then bootstrap projects
         this.app.workspace.onLayoutReady(async () => {
             try {
-            // Apply frontmatter visibility setting
-            if (this.settings.hideFrontmatter) {
-                (this.app.vault as unknown as { setConfig?: (k: string, v: string) => void }).setConfig?.('propertiesInDocument', 'hidden');
-            }
+            // Apply frontmatter visibility (scoped to StoryLine files only — issue #104)
+            this.updateFrontmatterVisibility();
 
             await this.bootstrapProjects();
             // Re-initialize scene index now that the active project is set.
@@ -580,8 +578,46 @@ export default class SceneCardsPlugin extends Plugin {
         this.registerEvent(
             this.app.workspace.on('active-leaf-change', (leaf) => {
                 this.injectFormattingToolbar(leaf);
+                this.updateFrontmatterVisibility();
             })
         );
+
+        // Re-apply scoped frontmatter hiding when layout changes or files open
+        this.registerEvent(
+            this.app.workspace.on('layout-change', () => {
+                this.updateFrontmatterVisibility();
+            })
+        );
+        this.registerEvent(
+            this.app.workspace.on('file-open', () => {
+                this.updateFrontmatterVisibility();
+            })
+        );
+    }
+
+    /**
+     * Issue #104 — Apply the "Hide frontmatter" preference by toggling a CSS
+     * class on individual markdown leaves whose file lives inside the StoryLine
+     * root folder, instead of overriding Obsidian's global
+     * "Properties in document" editor setting. This keeps the user's global
+     * Obsidian preference intact across vaults.
+     */
+    public updateFrontmatterVisibility(): void {
+        const hide = !!this.settings.hideFrontmatter;
+        const root = this.settings.storyLineRoot.replace(/\\/g, '/').replace(/\/$/, '') + '/';
+        const leaves = this.app.workspace.getLeavesOfType('markdown');
+        for (const leaf of leaves) {
+            const view = leaf.view as unknown as { getViewType?: () => string; file?: TFile | null; contentEl?: HTMLElement };
+            const filePath = view?.file?.path;
+            const inStoryLine = !!filePath && (filePath === root.slice(0, -1) || filePath.startsWith(root));
+            const target = (leaf as unknown as { containerEl?: HTMLElement }).containerEl?.querySelector('.view-content') as HTMLElement | null;
+            if (!target) continue;
+            if (hide && inStoryLine) {
+                target.classList.add('sl-hide-frontmatter');
+            } else {
+                target.classList.remove('sl-hide-frontmatter');
+            }
+        }
     }
 
     onunload(): void {

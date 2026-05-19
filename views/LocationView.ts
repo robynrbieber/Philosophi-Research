@@ -1139,6 +1139,18 @@ export class LocationView extends ItemView {
                 draft.universalFields![tpl.id] = textarea.value;
                 this.scheduleSave(draft);
             });
+        } else if (tpl.type === 'checkbox') {
+            const checked = value === true || value === 'true' || value === 'yes';
+            const wrap = row.createDiv('location-field-checkbox-wrap');
+            const cb = wrap.createEl('input', {
+                cls: 'location-field-checkbox',
+                type: 'checkbox',
+            });
+            cb.checked = !!checked;
+            cb.addEventListener('change', () => {
+                draft.universalFields![tpl.id] = cb.checked;
+                this.scheduleSave(draft);
+            });
         } else {
             const input = row.createEl('input', {
                 cls: 'location-field-input',
