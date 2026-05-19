@@ -47,6 +47,14 @@ export class CodexView extends ItemView {
     private static SAVE_DEBOUNCE_MS = 600;
     private static SAVE_REFRESH_GRACE_MS = 1500;
 
+    /** Issue #102 — dropdowns portaled to <body> so position:fixed escapes
+     *  ancestors with transform/contain. Cleaned up on each re-render. */
+    private _portaledDropdowns: HTMLElement[] = [];
+    private clearPortaledDropdowns(): void {
+        for (const el of this._portaledDropdowns) { try { el.remove(); } catch { /* noop */ } }
+        this._portaledDropdowns = [];
+    }
+
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
         this.plugin = plugin;
@@ -89,6 +97,7 @@ export class CodexView extends ItemView {
     async onClose(): Promise<void> {
         await this.flushPendingSave();
         activeDocument.querySelectorAll('.gallery-lightbox-window').forEach(w => w.remove());
+        this.clearPortaledDropdowns();
     }
 
     /**
