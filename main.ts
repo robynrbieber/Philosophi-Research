@@ -605,12 +605,21 @@ export default class SceneCardsPlugin extends Plugin {
     public updateFrontmatterVisibility(): void {
         const hide = !!this.settings.hideFrontmatter;
         const root = this.settings.storyLineRoot.replace(/\\/g, '/').replace(/\/$/, '') + '/';
-        const leaves = this.app.workspace.getLeavesOfType('markdown');
+
+        const body = activeDocument.body;
+        if (body) {
+            if (hide) body.classList.add('sl-hide-frontmatter-global');
+            else body.classList.remove('sl-hide-frontmatter-global');
+        }
+
+        const leaves: WorkspaceLeaf[] = [];
+        this.app.workspace.iterateAllLeaves(l => { leaves.push(l); });
         for (const leaf of leaves) {
-            const view = leaf.view as unknown as { getViewType?: () => string; file?: TFile | null; contentEl?: HTMLElement };
+            const view = leaf.view as unknown as { getViewType?: () => string; file?: TFile | null };
             const filePath = view?.file?.path;
             const inStoryLine = !!filePath && (filePath === root.slice(0, -1) || filePath.startsWith(root));
-            const target = (leaf as unknown as { containerEl?: HTMLElement }).containerEl?.querySelector('.view-content') as HTMLElement | null;
+            const container = (leaf as unknown as { containerEl?: HTMLElement }).containerEl;
+            const target = container?.querySelector('.view-content') as HTMLElement | null;
             if (!target) continue;
             if (hide && inStoryLine) {
                 target.classList.add('sl-hide-frontmatter');

@@ -138,6 +138,8 @@ export interface Scene {
     body?: string;
     /** Editorial notes / revision comments (not part of manuscript) */
     notes?: string;
+    /** Brief scene synopsis (planning sketch — shown in the Info side panel) */
+    synopsis?: string;
     /** True when this item is a corkboard note card (not a regular scene card) */
     corkboardNote?: boolean;
     /** Optional custom corkboard note color (hex, e.g. #F7E27A) */

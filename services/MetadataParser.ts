@@ -125,6 +125,7 @@ export class MetadataParser {
             modified: frontmatter.modified,
             body,
             notes: frontmatter.notes,
+            synopsis: frontmatter.synopsis,
             corkboardNote: this.parseBooleanFlag(frontmatter.corkboardNote ?? (frontmatter.corkboard_note as boolean | undefined)),
             corkboardNoteColor: frontmatter.corkboardNoteColor ?? (frontmatter.corkboard_note_color as string | undefined),
             corkboardNoteImage: frontmatter.corkboardNoteImage,
@@ -183,6 +184,7 @@ export class MetadataParser {
             if (key === 'filePath' || key === 'body') continue;
             // Remove empty notes rather than storing blank string
             if (key === 'notes' && !value) { delete frontmatter[key]; continue; }
+            if (key === 'synopsis' && !value) { delete frontmatter[key]; continue; }
             if (key === 'corkboardNote' && !value) { delete frontmatter[key]; continue; }
             if (key === 'corkboardNoteColor' && !value) { delete frontmatter[key]; continue; }
             if (key === 'corkboardNoteImage' && !value) { delete frontmatter[key]; continue; }
@@ -277,6 +279,7 @@ export class MetadataParser {
         if (scene.setup_scenes?.length) fm.setup_scenes = wrapArray(scene.setup_scenes);
         if (scene.payoff_scenes?.length) fm.payoff_scenes = wrapArray(scene.payoff_scenes);
         if (scene.notes) fm.notes = scene.notes;
+        if (scene.synopsis) fm.synopsis = scene.synopsis;
         if (scene.corkboardNote) fm.corkboardNote = true;
         if (scene.corkboardNoteColor) fm.corkboardNoteColor = scene.corkboardNoteColor;
         if (scene.corkboardNoteImage) fm.corkboardNoteImage = scene.corkboardNoteImage;

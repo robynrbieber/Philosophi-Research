@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import * as obsidian from 'obsidian';
-import { MarkdownRenderer, Component, Modal, App } from 'obsidian';
+import { Modal, App } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
 import type { SceneManager } from '../services/SceneManager';
@@ -84,6 +84,24 @@ export class SceneCardComponent {
             });
         }
 
+        // Optional preview text (synopsis or first lines of draft) — issue #112
+        if (!options?.compact && !scene.corkboardNote) {
+            const previewMode = this.plugin.settings.cardPreviewSource || 'none';
+            let previewText = '';
+            if (previewMode === 'synopsis') {
+                previewText = (scene.synopsis || '').trim();
+            } else if (previewMode === 'body') {
+                previewText = this.extractBodyPreview(scene.body || '');
+            } else if (previewMode === 'conflict') {
+                previewText = (scene.conflict || '').trim();
+            }
+            if (previewText) {
+                const max = 220;
+                const clipped = previewText.length > max ? previewText.slice(0, max).trimEnd() + '…' : previewText;
+                card.createDiv({ cls: 'scene-card-preview', text: clipped });
+            }
+        }
+
         // Timeline mode badge (for non-linear scenes)
         const cardTlMode = scene.timeline_mode || 'linear';
         if (!options?.compact && cardTlMode !== 'linear') {
@@ -101,21 +119,6 @@ export class SceneCardComponent {
             meta.createSpan({
                 cls: 'scene-card-pov',
                 text: `POV: ${scene.pov}`
-            });
-        }
-        if (!options?.compact && scene.conflict) {
-            const conflictEl = card.createDiv({ cls: 'scene-card-conflict markdown-rendered' });
-            const conflictSource = scene.conflict.length > 80
-                ? scene.conflict.substring(0, 80) + '...'
-                : scene.conflict;
-            const renderComp = new Component();
-            renderComp.load();
-            void MarkdownRenderer.render(
-                this.plugin.app, conflictSource, conflictEl, scene.filePath, renderComp
-            ).then(() => {
-                // Strip wrapping <p> to keep it inline-styled
-                const p = conflictEl.querySelector(':scope > p:only-child');
-                if (p) { while (p.firstChild) conflictEl.insertBefore(p.firstChild, p); p.remove(); }
             });
         }
         if (!options?.compact) {
@@ -275,6 +278,24 @@ export class SceneCardComponent {
                 text: filled ? '●' : '○'
             });
         }
+    }
+
+    /** Strip basic markdown from a scene body and return a single condensed line. */
+    private extractBodyPreview(body: string): string {
+        const text = body
+            .split(/\r?\n/)
+            .map(l => l.trim())
+            .filter(l => l.length > 0 && !/^#{1,6}\s/.test(l) && !/^>\s/.test(l))
+            .map(l => l.replace(/^[-*+]\s+/, ''))
+            .join(' ')
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/\*(.*?)\*/g, '$1')
+            .replace(/`([^`]+)`/g, '$1')
+            .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+            .replace(/\[\[([^|\]]+)(?:\|([^\]]+))?\]\]/g, (_m, a, b) => b || a)
+            .replace(/\s+/g, ' ')
+            .trim();
+        return text;
     }
 
     private getDisplayTitle(scene: Scene): string {

@@ -391,7 +391,7 @@ A compact sidebar panel for quick scene navigation without leaving your current 
 
 #### Toolbar
 - **Search** — type to filter scenes by title.
-- **Sort** — five modes: Sequence (default), Status, Recently Modified, Word Count, and Title (A–Z).
+- **Sort** — multiple modes: Reading order (by act, default), **By chapter** *(since 1.10.14, groups scenes under collapsible chapter headers, acts hidden)*, Chronological, Status, Recently Modified, Word Count, and Title (A–Z).
 - **Scene Details** — a button that opens the Scene Details Sidebar in the right panel (see below).
 
 #### Plotline Filter
@@ -426,6 +426,7 @@ A standalone sidebar panel that shows the full Inspector for the currently activ
 
 #### Features
 
+- **Info tab** *(since 1.10.14)* — a lightweight planning panel showing synopsis, status, POV, location, word count and notes at a glance. Use it when you want a quick overview without scrolling through the full Inspector.
 - **Auto-update** — follows the active editor file. Switch between scene files and the sidebar updates instantly.
 - **Full Inspector** — all the same fields and editing capabilities as the main Inspector panel.
 - **Refresh on save** — when you modify a scene file in the editor, the sidebar refreshes to reflect changes (with a short delay to avoid conflicts).
@@ -504,6 +505,10 @@ Each scene is a Markdown file with YAML frontmatter. StoryLine manages these fie
 These settings flow through scene cards, the inspector, the Writing Tracker, and exports.
 
 **Default scene frontmatter** *(since 1.9.6)* — Universal Field Templates have an optional **Default value** that is auto-applied to newly created scenes (multi-select fields accept comma-separated defaults). In addition, **Settings → Default scene frontmatter** accepts a free-form YAML block whose keys are merged into every newly created scene's frontmatter. StoryLine-owned keys (`type`, `title`, `act`, `chapter`, `sequence`, `status`, `wordcount`, …) always win on conflict, so the default snippet can never overwrite the engine's own metadata.
+
+**Scene card preview text** *(since 1.10.14)* — Beneath each scene card title you can show a short preview line. Choose what to display at **Settings → Scene Cards → Scene card preview text**: **None**, **Synopsis**, **First lines of draft**, or **Conflict**. The card stays compact and the preview is clipped to ~4 lines.
+
+**Hide frontmatter on StoryLine notes** *(since 1.10.14)* — Toggle **Settings → Editor → Hide frontmatter** to hide the properties block on notes inside your StoryLine root folder. Other vault notes are unaffected. All scene metadata remains editable from the Inspector.
 
 Write your scene content below the frontmatter as normal Markdown.
 

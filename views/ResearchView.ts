@@ -44,15 +44,24 @@ export class ResearchView extends ItemView {
     getIcon(): string { return 'library-big'; }
 
     async onOpen(): Promise<void> {
-        await this.manager.scan();
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('sl-research-panel');
-        this.rootEl = container;
-        this.render();
+        await this.mountInto(container);
     }
 
     async onClose(): Promise<void> {}
+
+    /**
+     * Render the Research panel into an arbitrary host element.
+     * Used both by `onOpen` (full-view mount) and by the Scene Inspector
+     * sidebar's Research tab (embedded mount).
+     */
+    async mountInto(host: HTMLElement): Promise<void> {
+        await this.manager.scan();
+        host.addClass('sl-research-panel');
+        this.rootEl = host;
+        this.render();
+    }
 
     refresh(): void {
         this.manager.scan().then(() => {

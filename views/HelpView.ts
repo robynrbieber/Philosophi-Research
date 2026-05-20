@@ -31,16 +31,24 @@ export class HelpView extends ItemView {
     }
 
     async onOpen(): Promise<void> {
-        this.renderComponent.load();
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('storyline-help-container');
-
-        await this.renderHelp(container);
+        await this.mountInto(container);
     }
 
     async onClose(): Promise<void> {
         this.renderComponent.unload();
+    }
+
+    /**
+     * Render the Help panel into an arbitrary host element.
+     * Used both by `onOpen` (full-view mount) and by the Scene Inspector
+     * sidebar's Help tab (embedded mount).
+     */
+    async mountInto(host: HTMLElement): Promise<void> {
+        this.renderComponent.load();
+        host.addClass('storyline-help-container');
+        await this.renderHelp(host);
     }
 
     /**

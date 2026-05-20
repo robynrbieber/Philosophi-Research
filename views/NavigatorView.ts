@@ -13,10 +13,11 @@ import { Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 /**
  * Sort modes available in the navigator.
  */
-type NavSortMode = 'reading' | 'chronological' | 'status' | 'recent' | 'words' | 'title';
+type NavSortMode = 'reading' | 'chapter' | 'chronological' | 'status' | 'recent' | 'words' | 'title';
 
 const SORT_LABELS: Record<NavSortMode, string> = {
-    reading: 'Reading order',
+    reading: 'Reading order (by act)',
+    chapter: 'By chapter',
     chronological: 'Chronological order',
     status: 'Status',
     recent: 'Recently edited',
@@ -26,6 +27,7 @@ const SORT_LABELS: Record<NavSortMode, string> = {
 
 const SORT_ICONS: Record<NavSortMode, string> = {
     reading: 'book-open',
+    chapter: 'book-marked',
     chronological: 'list-ordered',
     status: 'circle-dot',
     recent: 'clock',
@@ -49,6 +51,7 @@ export class NavigatorView extends ItemView {
     private plotlineFilter: string | null = null;
     private pinnedScenes: Set<string> = new Set();
     private collapsedActs: Set<string> = new Set();
+    private collapsedChapters: Set<string> = new Set();
 
     // DOM refs
     private searchInput: HTMLInputElement | null = null;
@@ -86,13 +89,6 @@ export class NavigatorView extends ItemView {
 
         // ── Scene Details button (right-aligned above sort) ──
         const detailsRow = container.createDiv('sl-nav-details-row');
-
-        const researchBtn = detailsRow.createDiv('sl-nav-details-btn');
-        setIcon(researchBtn, 'library-big');
-        attachTooltip(researchBtn, 'Research');
-        researchBtn.addEventListener('click', () => {
-            this.plugin.openResearch();
-        });
 
         const detailsBtn = detailsRow.createDiv('sl-nav-details-btn');
         setIcon(detailsBtn, 'panel-right');
@@ -288,6 +284,8 @@ export class NavigatorView extends ItemView {
         // Group by act only for reading order
         if (this.sortMode === 'reading') {
             this.renderGroupedByAct(scenes);
+        } else if (this.sortMode === 'chapter') {
+            this.renderGroupedByChapter(scenes);
         } else {
             for (const scene of scenes) {
                 this.renderSceneRow(this.listEl!, scene);
@@ -335,6 +333,62 @@ export class NavigatorView extends ItemView {
             if (!isCollapsed) {
                 for (const scene of actScenes) {
                     this.renderSceneRow(this.listEl!, scene);
+                }
+            }
+        }
+    }
+
+    /**
+     * Issue #113 — "By chapter" grouping. Scenes are grouped under chapter
+     * headers only; the Act level is hidden entirely (the user picked this
+     * mode precisely to flatten Acts away). Scenes are visually nested
+     * inside their chapter's container so they read as children, not peers.
+     */
+    private renderGroupedByChapter(scenes: Scene[]): void {
+        if (!this.listEl) return;
+
+        const groups = new Map<string, Scene[]>();
+        for (const scene of scenes) {
+            const ch = scene.chapter !== undefined && scene.chapter !== null && String(scene.chapter).trim() !== ''
+                ? `Chapter ${scene.chapter}`
+                : 'Unassigned';
+            if (!groups.has(ch)) groups.set(ch, []);
+            groups.get(ch)!.push(scene);
+        }
+
+        // If every scene is unassigned, just render bare scenes (no header).
+        if (groups.size === 1 && groups.has('Unassigned')) {
+            for (const scene of scenes) {
+                this.renderSceneRow(this.listEl!, scene);
+            }
+            return;
+        }
+
+        for (const [chKey, chScenes] of groups) {
+            const isCollapsed = this.collapsedChapters.has(chKey);
+
+            const header = this.listEl!.createDiv('sl-nav-chapter-header');
+            const toggle = header.createSpan('sl-nav-chapter-toggle');
+            toggle.textContent = isCollapsed ? '▸' : '▾';
+            header.createSpan({ text: chKey, cls: 'sl-nav-chapter-label' });
+            const count = header.createSpan({ cls: 'sl-nav-chapter-count' });
+            count.textContent = `${chScenes.length}`;
+
+            header.addEventListener('click', () => {
+                if (this.collapsedChapters.has(chKey)) {
+                    this.collapsedChapters.delete(chKey);
+                } else {
+                    this.collapsedChapters.add(chKey);
+                }
+                this.renderList();
+            });
+
+            if (!isCollapsed) {
+                // Wrap scenes in their own container so CSS can indent them
+                // visually under the chapter header.
+                const body = this.listEl!.createDiv('sl-nav-chapter-body');
+                for (const scene of chScenes) {
+                    this.renderSceneRow(body, scene);
                 }
             }
         }

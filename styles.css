@@ -1912,10 +1912,10 @@ body.theme-dark {
     resize: vertical;
     font-size: 0.85em;
     padding: 6px 8px;
-    border: 1px solid var(--sc-card-border);
-    border-radius: var(--sc-radius);
-    background: var(--sc-card-bg);
-    color: var(--sc-text);
+    border: 1px solid var(--sc-card-border, var(--background-modifier-border));
+    border-radius: var(--sc-radius, 4px);
+    background: var(--sc-card-bg, var(--background-primary));
+    color: var(--sc-text, var(--text-normal));
     font-family: inherit;
 }
 .inspector-notes-textarea:focus {
@@ -8160,6 +8160,52 @@ body /* Clamp title on mobile too, in case it's very long */
     font-weight: 400;
 }
 
+/* Issue #113 — Chapter sub-group header. Same uppercase, weighted style as
+   act headers so the navigator looks consistent when grouping by chapter. */
+.sl-nav-chapter-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    user-select: none;
+}
+.sl-nav-chapter-header:hover {
+    color: var(--text-normal);
+}
+.sl-nav-chapter-toggle {
+    font-size: 10px;
+    width: 12px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.sl-nav-chapter-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.sl-nav-chapter-count {
+    font-size: 10px;
+    color: var(--text-faint);
+    font-weight: 400;
+}
+/* Scenes wrapper — visually nests rows under their chapter header. */
+.sl-nav-chapter-body {
+    padding-left: 14px;
+    border-left: 1px solid var(--background-modifier-border);
+    margin: 0 6px 4px 14px;
+}
+.sl-nav-chapter-body .sl-nav-row {
+    margin: 0;
+}
+
 /* Scene row */
 .sl-nav-row {
     display: flex;
@@ -8737,6 +8783,20 @@ body /* Clamp title on mobile too, in case it's very long */
     line-height: 1.3;
 }
 
+/* Issue #112 — optional preview text shown under the card title (synopsis or
+   first lines of draft). User chooses via Settings → Scene card preview text. */
+.scene-card-preview {
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 2px 8px 6px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
+
 /* ============================================
    Manuscript Scene Subtitle
    ============================================ */
@@ -9240,9 +9300,9 @@ body.theme-dark .location-field-input.dropdown {
 }
 
 /* Issue #105 — when a scene block is immediately followed by an act or chapter
-   divider, drop its bottom padding/margin so we don't compound spacing. */
-.sl-manuscript-scene-block:has(+ .sl-manuscript-act-divider),
-.sl-manuscript-scene-block:has(+ .sl-manuscript-chapter-divider) {
+   divider, drop its bottom padding/margin so we don't compound spacing.
+   Class is applied by ManuscriptView at render time (cheaper than :has()). */
+.sl-manuscript-scene-block.is-before-divider {
     margin-bottom: 8px;
     padding-bottom: 8px;
 }
@@ -9404,16 +9464,47 @@ body.theme-dark .location-field-input.dropdown {
     display: none;
 }
 
-/* Hide frontmatter / properties */
-.sl-manuscript-embedded-split.sl-manuscript-embedded-split .metadata-container {
-    display: none;
+/* Hide frontmatter / properties — gated on the Hide-Frontmatter setting via
+   the body-level class so toggling the setting OFF restores frontmatter
+   inside Manuscript-embedded scenes too. */
+body.sl-hide-frontmatter-global .sl-manuscript-embedded-split.sl-manuscript-embedded-split .metadata-container,
+body.sl-hide-frontmatter-global .sl-manuscript-embedded-split.sl-manuscript-embedded-split .metadata-properties-container,
+body.sl-hide-frontmatter-global .sl-manuscript-embedded-split.sl-manuscript-embedded-split .metadata-properties-heading {
+    display: none !important;
 }
 
-/* Issue #104 — Scoped hide-frontmatter (only when "Hide frontmatter" is on AND
-   the markdown leaf is showing a file inside the StoryLine root). This avoids
-   touching Obsidian's global "Properties in document" editor setting. */
-.view-content.sl-hide-frontmatter .metadata-container {
-    display: none;
+/* Issue #104 / #110 — Scoped hide-frontmatter (only when "Hide frontmatter"
+   is on AND the markdown leaf is showing a file inside the StoryLine root).
+   This avoids touching Obsidian's global "Properties in document" editor
+   setting. Targets both the Properties UI (.metadata-container) and the raw
+   YAML lines shown in Source mode (.HyperMD-frontmatter in CM6). All rules
+   are also gated on body.sl-hide-frontmatter-global so toggling the setting
+   OFF reliably restores frontmatter even if the per-leaf class lingers. */
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .metadata-container,
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .metadata-properties-container,
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .metadata-properties-heading,
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .cm-line.HyperMD-frontmatter,
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .markdown-source-view .cm-line.HyperMD-frontmatter {
+    display: none !important;
+}
+
+/* Frontmatter inside any StoryLine custom view (Board, Manuscript, Scene
+   Inspector sidebar, Research, etc.) — those views have no `view.file`, so
+   we can't tag them per-leaf. Use the body-class + view data-type instead. */
+body.sl-hide-frontmatter-global .workspace-leaf-content[data-type^="story-line-"] .metadata-container,
+body.sl-hide-frontmatter-global .workspace-leaf-content[data-type^="story-line-"] .metadata-properties-container,
+body.sl-hide-frontmatter-global .workspace-leaf-content[data-type^="story-line-"] .metadata-properties-heading,
+body.sl-hide-frontmatter-global .workspace-leaf-content[data-type^="story-line-"] .cm-line.HyperMD-frontmatter {
+    display: none !important;
+}
+
+/* Issue #110 — Manuscript view embeds scene editors via detached splits, so
+   the JS toggle in updateFrontmatterVisibility() can't reach them. Gate on the
+   body-level `sl-hide-frontmatter-global` class so the setting still
+   round-trips: turning Hide Frontmatter OFF removes the class and restores
+   frontmatter inside Manuscript-embedded scenes too. */
+body.sl-hide-frontmatter-global .sl-manuscript-embedded-split .cm-line.HyperMD-frontmatter {
+    display: none !important;
 }
 
 /* Remove background from inner containers */
@@ -10012,6 +10103,7 @@ body /* ── Plain-text mode: hide link/tag decorations ───────�
 .sl-research-type-row {
     display: flex;
     justify-content: space-evenly;
+    padding: 8px 0 10px;
 }
 
 .sl-research-type-btn {
@@ -10648,4 +10740,270 @@ body.sl-focus-active-global .mod-root > .workspace-tabs > .workspace-tab-header-
 body.sl-focus-active-global .titlebar {
     filter: var(--sl-focus-filter, none);
     transition: filter 0.25s ease;
+}
+
+
+
+/* --- Scene Inspector tabs + Info panel (right sidebar) --- */
+/* Anchor off the host class we add to `.view-content` and use `:has()` to
+   force the workspace-leaf-content ancestor to also claim full height —
+   in the right sidedock Obsidian does NOT give it `flex:1` by default. */
+.workspace-leaf:has(> .workspace-leaf-content > .view-content.sl-scene-inspector-host) > .workspace-leaf-content {
+    flex: 9999 1 auto;
+    min-height: 0;
+    height: 100%;
+}
+/* Orphan leaf-content siblings (stale DOM from previous sessions for the
+   embedded views) steal vertical space. Workspace API confirms they aren't
+   real leaves, so it's safe to hide them when they appear alongside us. */
+.workspace-leaf:has(> .workspace-leaf-content > .view-content.sl-scene-inspector-host) > .workspace-leaf-content[data-type="story-line-research"],
+.workspace-leaf:has(> .workspace-leaf-content > .view-content.sl-scene-inspector-host) > .workspace-leaf-content[data-type="story-line-help"] {
+    display: none;
+}
+.view-content.sl-scene-inspector-host {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.sl-scene-inspector-sidebar {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.sl-inspector-tabbar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 8px 6px 6px 6px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    flex: 0 0 auto;
+}
+.sl-inspector-tab.sl-inspector-tab {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0 10px;
+    margin: 0;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    outline: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    min-width: 0;
+    line-height: 1;
+}
+.sl-inspector-tab.sl-inspector-tab:hover {
+    background: none;
+    color: var(--text-normal);
+}
+.sl-inspector-tab.sl-inspector-tab:focus,
+.sl-inspector-tab.sl-inspector-tab:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+.sl-inspector-tab.sl-inspector-tab.active {
+    background: none;
+    color: var(--interactive-accent);
+    border-bottom-color: var(--interactive-accent);
+    cursor: default;
+}
+.sl-inspector-tab-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.sl-inspector-tab-icon svg,
+.sl-inspector-tab-icon .svg-icon {
+    width: 16px;
+    height: 16px;
+}
+.sl-inspector-panels {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+.sl-inspector-panel {
+    display: none;
+}
+.sl-inspector-panel.is-active {
+    display: block;
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+.sl-inspector-panel.is-active:not(.sl-inspector-embed) {
+    padding: 8px 10px 32px;
+}
+/* Embedded full-views: no panel-level padding — the inner view classes
+   (e.g. `.sl-research-panel`, `.storyline-help-container`) own their own
+   padding, identical to when they're mounted as standalone views. */
+.sl-inspector-panel.is-active.sl-inspector-embed {
+    overflow-y: auto;
+}
+/* Bottom breathing room for the embedded scroll containers so the last
+   item is fully visible when scrolled to the end. */
+.sl-inspector-panel.is-active.sl-inspector-embed > .sl-research-panel,
+.sl-inspector-panel.is-active.sl-inspector-embed > .storyline-help-container {
+    padding-bottom: 40px;
+}
+.sl-inspector-shortcut {
+    padding: 12px 4px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+}
+.sl-inspector-shortcut p {
+    margin: 0;
+}
+
+/* Info panel layout */
+.sl-info-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px;
+}
+.sl-info-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 700;
+    color: var(--text-normal);
+    margin-bottom: 4px;
+}
+.sl-info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+}
+.sl-info-label {
+    flex: 0 0 70px;
+    font-size: var(--font-ui-smaller);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+.sl-info-field {
+    flex: 1;
+    min-width: 0;
+}
+.sl-info-value {
+    color: var(--text-normal);
+}
+.sl-info-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+.sl-info-section-label {
+    font-size: var(--font-ui-smaller);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+.sl-info-synopsis-textarea {
+    width: 100%;
+    min-height: 320px;
+    resize: vertical;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    line-height: 1.4;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    box-sizing: border-box;
+}
+.sl-info-notes-textarea {
+    width: 100%;
+    min-height: 260px;
+    resize: vertical;
+    font-family: var(--font-text);
+    font-size: var(--font-ui-small);
+    line-height: 1.4;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    box-sizing: border-box;
+}
+
+/* Status dropdown � info panel variant */
+.sl-info-status-dropdown {
+    position: relative;
+    flex: 1;
+}
+.sl-info-status-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    width: 100%;
+    justify-content: space-between;
+}
+.sl-info-status-button:hover {
+    background: var(--background-modifier-hover);
+}
+.sl-info-status-icon {
+    display: inline-flex;
+    align-items: center;
+}
+.sl-info-status-label {
+    flex: 1;
+    text-align: left;
+}
+.sl-info-status-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 2px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    box-shadow: var(--shadow-s);
+    z-index: 100;
+    overflow: hidden;
+}
+.sl-info-status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: var(--font-ui-small);
+}
+.sl-info-status-item:hover {
+    background: var(--background-modifier-hover);
+}
+.sl-info-status-item.active {
+    background: var(--background-secondary);
+    font-weight: 600;
 }

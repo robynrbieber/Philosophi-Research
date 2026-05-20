@@ -561,6 +561,8 @@ export interface SceneCardsSettings {
     colorCoding: ColorCodingMode;
     showWordCounts: boolean;
     compactCardView: boolean;
+    /** What text to show beneath a scene card title: nothing, the synopsis field, or the first lines of the draft body. */
+    cardPreviewSource: 'none' | 'synopsis' | 'body' | 'conflict';
     characterCardPortraitSize: number;
     characterDetailPortraitSize: number;
     locationTreeThumbSize: number;
@@ -749,6 +751,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     colorCoding: 'status',
     showWordCounts: true,
     compactCardView: false,
+    cardPreviewSource: 'none',
     characterCardPortraitSize: 64,
     characterDetailPortraitSize: 96,
     locationTreeThumbSize: 20,
@@ -838,16 +841,6 @@ export class SceneCardsSettingTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-
-        new Setting(containerEl)
-            .setName('Documentation')
-            .setDesc('Open the full StoryLine help guide in a side pane')
-            .addButton(btn => btn
-                .setButtonText('Open Help')
-                .setCta()
-                .onClick(() => {
-                    this.plugin.openHelp();
-                }));
 
         new Setting(containerEl)
             .setName('Root folder')
@@ -1108,6 +1101,21 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.compactCardView = value;
                     await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Scene card preview text')
+            .setDesc('Show a short preview beneath each scene card title')
+            .addDropdown(dd => dd
+                .addOption('none', 'None')
+                .addOption('synopsis', 'Synopsis')
+                .addOption('body', 'First lines of draft')
+                .addOption('conflict', 'Conflict')
+                .setValue(this.plugin.settings.cardPreviewSource || 'none')
+                .onChange(async (value) => {
+                    this.plugin.settings.cardPreviewSource = value as 'none' | 'synopsis' | 'body' | 'conflict';
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
                 }));
 
         new Setting(containerEl)

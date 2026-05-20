@@ -6,6 +6,19 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.14
+
+### New Features
+
+- **Scene Inspector "Info" panel** — A new lightweight planning tab in the Scene Details sidebar showing synopsis, status, POV, location, word count and notes at a glance — handy when you just want to skim or jot a quick note without scrolling through the full Inspector. Open the Scene Details sidebar and click the **Info** tab.
+- **Scene card preview text** — Show a short preview beneath each scene card title. Pick what to display: **None**, **Synopsis**, **First lines of draft**, or **Conflict**. Set it under **Settings → Scene Cards → Scene card preview text**.
+- **Navigator: Group by chapter** — A new "By chapter" option in the Navigator's sort dropdown groups scenes under collapsible chapter headers (acts hidden). Use it for chapter-driven outlines. Chapter headers now match the styling of act headers (uppercase).
+
+### Bug Fixes
+
+- **Hide frontmatter toggle was unreliable** — A leftover CSS rule kept the properties block hidden even when the toggle was turned off. The toggle now correctly shows and hides frontmatter on StoryLine notes only, and re-applies whenever you switch files. *Note:* If your vault has Obsidian's legacy "Properties in document" setting saved as `hidden` in `.obsidian/app.json`, properties stay hidden globally. That setting was removed from Obsidian's UI in 1.4 — flipping it requires editing the JSON directly.
+
+---
 ## Version 1.10.13
 
 ### New Features

@@ -1,23 +1,53 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { EventRef, ItemView, WorkspaceLeaf, TFile, MarkdownView } from 'obsidian';
+import { EventRef, ItemView, WorkspaceLeaf, TFile, MarkdownView, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { InspectorComponent } from '../components/Inspector';
-import { SCENE_INSPECTOR_VIEW_TYPE } from '../constants';
+import { InfoPanelComponent } from '../components/InfoPanel';
+import { ResearchView } from './ResearchView';
+import { HelpView } from './HelpView';
+import { ManuscriptView } from './ManuscriptView';
+import { attachTooltip } from '../components/Tooltip';
+import { SCENE_INSPECTOR_VIEW_TYPE, MANUSCRIPT_VIEW_TYPE, RESEARCH_VIEW_TYPE, HELP_VIEW_TYPE } from '../constants';
+
+type InspectorTab = 'info' | 'details' | 'research' | 'help';
+
+const TAB_DEFS: { id: InspectorTab; label: string; icon: string }[] = [
+    { id: 'info',     label: 'Info',     icon: 'info' },
+    { id: 'details',  label: 'Details',  icon: 'list' },
+    { id: 'research', label: 'Research', icon: 'library-big' },
+    { id: 'help',     label: 'Help',     icon: 'help-circle' },
+];
 
 /**
  * Standalone Scene Inspector sidebar view.
  *
- * Automatically shows scene details for the active editor file,
- * allowing users to view and edit metadata while writing in the editor.
+ * Hosts four tabs:
+ *  - Info     — lightweight planning panel (synopsis, POV, status, location, notes)
+ *  - Details  — the full Inspector (all scene metadata)
+ *  - Research — shortcut to open the Research view
+ *  - Help     — shortcut to open the Help view
  */
 export class SceneInspectorView extends ItemView {
     private plugin: SceneCardsPlugin;
     private sceneManager: SceneManager;
+
+    private infoPanel: InfoPanelComponent | null = null;
     private inspectorComponent: InspectorComponent | null = null;
+    private researchView: ResearchView | null = null;
+    private helpView: HelpView | null = null;
+
+    private tabBarEl: HTMLElement | null = null;
+    private tabPanels: Record<InspectorTab, HTMLElement | null> = {
+        info: null,
+        details: null,
+        research: null,
+        help: null,
+    };
     private emptyEl: HTMLElement | null = null;
-    /** Timestamp (ms) of last user-initiated edit inside the inspector.
-     *  Used to suppress competing refresh triggers for a short window. */
+    private activeTab: InspectorTab = 'info';
+
+    /** Timestamp (ms) of last user-initiated edit inside the inspector. */
     private lastEditTime = 0;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
@@ -39,20 +69,61 @@ export class SceneInspectorView extends ItemView {
     }
 
     async onOpen(): Promise<void> {
-        const container = this.containerEl.children[1] as HTMLElement;
-        container.empty();
-        container.addClass('sl-scene-inspector-sidebar');
+        const viewContent = this.containerEl.children[1] as HTMLElement;
+        viewContent.empty();
+        viewContent.addClass('sl-scene-inspector-host');
 
-        // Inspector component container
-        const inspectorEl = container.createDiv('story-line-inspector-panel sl-sidebar-inspector');
-        inspectorEl.setCssStyles({ display: 'none' });
+        // Research and Help are embedded as tabs here, so any standalone
+        // leaves of those types in the same sidebar root are redundant and
+        // steal vertical space. Detach them now (and again on workspace
+        // layout changes) so the inspector can claim the full sidebar.
+        this.detachRedundantSidebarLeaves();
+        this.registerEvent(
+            this.app.workspace.on('layout-change', () => this.detachRedundantSidebarLeaves())
+        );
 
-        // Empty state
-        this.emptyEl = container.createDiv('sl-scene-inspector-empty');
+        // Use a wrapper inside .view-content so we don't fight Obsidian's
+        // default flex layout on the leaf container.
+        const container = viewContent.createDiv('sl-scene-inspector-sidebar');
+
+        // ── Tab bar ──
+        this.tabBarEl = container.createDiv('sl-inspector-tabbar');
+        for (const def of TAB_DEFS) {
+            this.createTabButton(def.id, def.label, def.icon);
+        }
+
+        // ── Tab panels host ──
+        const panelsHost = container.createDiv('sl-inspector-panels');
+
+        // Info tab
+        const infoPanelEl = panelsHost.createDiv('sl-inspector-panel sl-info-panel-host');
+        this.tabPanels.info = infoPanelEl;
+        this.infoPanel = new InfoPanelComponent(infoPanelEl, this.plugin, this.sceneManager);
+
+        // Details tab — wraps the existing InspectorComponent
+        const detailsPanelEl = panelsHost.createDiv('sl-inspector-panel');
+        this.tabPanels.details = detailsPanelEl;
+        const inspectorHost = detailsPanelEl.createDiv('story-line-inspector-panel sl-sidebar-inspector');
+        inspectorHost.setCssStyles({ display: 'none' });
+
+        // Empty state (shared across Info + Details)
+        this.emptyEl = panelsHost.createDiv('sl-scene-inspector-empty');
         this.emptyEl.createEl('p', { text: 'Open a scene file to see its details here.' });
 
+        // Research tab — embed the full Research view
+        const researchPanelEl = panelsHost.createDiv('sl-inspector-panel sl-inspector-embed');
+        this.tabPanels.research = researchPanelEl;
+        this.researchView = new ResearchView(this.leaf, this.plugin, this.plugin.researchManager);
+        void this.researchView.mountInto(researchPanelEl);
+
+        // Help tab — embed the full Help view
+        const helpPanelEl = panelsHost.createDiv('sl-inspector-panel sl-inspector-embed');
+        this.tabPanels.help = helpPanelEl;
+        this.helpView = new HelpView(this.leaf, this.plugin);
+        void this.helpView.mountInto(helpPanelEl);
+
         this.inspectorComponent = new InspectorComponent(
-            inspectorEl,
+            inspectorHost,
             this.plugin,
             this.sceneManager,
             {
@@ -65,7 +136,8 @@ export class SceneInspectorView extends ItemView {
                 onDelete: async (scene) => {
                     await this.sceneManager.deleteScene(scene.filePath);
                     this.inspectorComponent?.hide();
-                    if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'block' });
+                    this.infoPanel?.hide();
+                    this.refreshEmptyState();
                 },
                 onRefresh: () => {
                     this.lastEditTime = Date.now();
@@ -79,93 +151,202 @@ export class SceneInspectorView extends ItemView {
             }
         );
 
+        this.setActiveTab(this.activeTab);
+
         // Listen for active file changes — only switch/hide when user
         // navigates to a real editor showing a different file.
         this.registerEvent(
             this.app.workspace.on('active-leaf-change', (leaf) => {
                 if (!leaf) return;
-                // Ignore if the new active leaf is this inspector itself
                 if (leaf === this.leaf) return;
-                // Only react when the user activates a MarkdownView (an actual file editor).
-                // StoryLine views (Manuscript, Board, etc.) don't own files, so
-                // switching to them should NOT hide the inspector — the Manuscript
-                // focus observer handles scene changes via events instead.
-                if (!(leaf.view instanceof MarkdownView)) return;
-                this.updateForActiveFile();
+                // Markdown editor — follow it
+                if (leaf.view instanceof MarkdownView) {
+                    this.updateForActiveFile();
+                    return;
+                }
+                // Manuscript view — follow its currently-focused scene
+                if (leaf.view instanceof ManuscriptView) {
+                    this.updateForActiveFile();
+                    return;
+                }
             })
         );
 
-        // Refresh scene data when files are modified (e.g. frontmatter
-        // updated by inspector itself). Never hide — just re-show the
-        // current scene with fresh data.  Skip if we just edited
-        // (the callback already refreshed synchronously).
+        // Refresh scene data when files are modified.
         this.registerEvent(
             this.app.vault.on('modify', () => {
-                if (!this.inspectorComponent?.isVisible()) return;
+                if (!this.hasSceneShown()) return;
                 if (Date.now() - this.lastEditTime < 2000) return;
                 window.setTimeout(() => this.refreshCurrentScene(), 600);
             })
         );
 
-        // Listen for Manuscript view focused-scene changes.
-        // Suppress during the cooldown window after an edit so the
-        // Manuscript rebuild doesn't clobber the inspector mid-interaction.
+        // Listen for Manuscript focused-scene changes.
         this.registerEvent(
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on('storyline:manuscript-focus', (filePath: string) => {
                 if (Date.now() - this.lastEditTime < 2000) return;
-                const scene = this.sceneManager.getScene(filePath);
-                if (scene) {
-                    if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'none' });
-                    this.inspectorComponent?.show(scene);
-                }
+                this.showScene(filePath);
             })
         );
 
-        // Listen for scene-focus from any StoryLine view (Board, Timeline, Plotgrid, etc.)
+        // Listen for scene-focus from any StoryLine view.
         this.registerEvent(
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on('storyline:scene-focus', (filePath: string) => {
                 if (Date.now() - this.lastEditTime < 2000) return;
-                const scene = this.sceneManager.getScene(filePath);
-                if (scene) {
-                    if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'none' });
-                    this.inspectorComponent?.show(scene);
-                }
+                this.showScene(filePath);
             })
         );
 
-        // Initial update
         this.updateForActiveFile();
     }
 
     async onClose(): Promise<void> {
+        try { await this.researchView?.onClose(); } catch { /* ignore */ }
+        try { await this.helpView?.onClose(); } catch { /* ignore */ }
+        this.researchView = null;
+        this.helpView = null;
         this.inspectorComponent = null;
+        this.infoPanel = null;
+    }
+
+    /**
+     * Detach any standalone Research/Help leaves that live in the same
+     * sidebar root as this inspector — they're now embedded as tabs and
+     * compete with us for vertical space.
+     */
+    private detachRedundantSidebarLeaves(): void {
+        try {
+            const ourRoot = this.leaf.getRoot();
+            const redundant = [
+                ...this.app.workspace.getLeavesOfType(RESEARCH_VIEW_TYPE),
+                ...this.app.workspace.getLeavesOfType(HELP_VIEW_TYPE),
+            ];
+            for (const leaf of redundant) {
+                if (leaf === this.leaf) continue;
+                try {
+                    if (leaf.getRoot() === ourRoot) {
+                        leaf.detach();
+                    }
+                } catch { /* ignore */ }
+            }
+        } catch { /* ignore */ }
+    }
+
+    // ── Tabs ─────────────────────────────────────────────
+
+    private createTabButton(id: InspectorTab, label: string, icon: string): void {
+        if (!this.tabBarEl) return;
+        const btn = this.tabBarEl.createEl('button', {
+            cls: `sl-inspector-tab ${id === this.activeTab ? 'active' : ''}`,
+            attr: { 'data-tab': id },
+        });
+        const iconEl = btn.createSpan({ cls: 'sl-inspector-tab-icon' });
+        setIcon(iconEl, icon);
+        attachTooltip(btn, label);
+        btn.addEventListener('click', () => this.setActiveTab(id));
+    }
+
+    private setActiveTab(id: InspectorTab): void {
+        this.activeTab = id;
+        if (this.tabBarEl) {
+            for (const el of Array.from(this.tabBarEl.querySelectorAll('.sl-inspector-tab'))) {
+                const tab = (el as HTMLElement).dataset.tab as InspectorTab;
+                el.toggleClass('active', tab === id);
+            }
+        }
+        for (const key of Object.keys(this.tabPanels) as InspectorTab[]) {
+            const panel = this.tabPanels[key];
+            if (!panel) continue;
+            const isActive = key === id;
+            panel.setCssStyles({ display: isActive ? 'block' : 'none' });
+            panel.toggleClass('is-active', isActive);
+        }
+        // Toggle padding-collapse on the panels host when an embedded
+        // full-view is active (Research / Help fill edge-to-edge).
+        const panelsHost = this.tabPanels[id]?.parentElement as HTMLElement | null;
+        if (panelsHost) {
+            const isEmbed = id === 'research' || id === 'help';
+            panelsHost.toggleClass('is-embed-active', isEmbed);
+        }
+        this.refreshEmptyState();
+    }
+
+    private renderShortcutPanel(
+        host: HTMLElement,
+        opts: { text: string; buttonText: string; action: () => unknown },
+    ): void {
+        // kept for potential future use
+        host.addClass('sl-inspector-shortcut');
+        host.createEl('p', { text: opts.text });
+        const btn = host.createEl('button', { cls: 'mod-cta', text: opts.buttonText });
+        btn.addEventListener('click', () => {
+            try { opts.action(); } catch { /* swallow */ }
+        });
+    }
+
+    // ── Scene wiring ──────────────────────────────────────────────
+
+    private showScene(filePath: string): void {
+        const scene = this.sceneManager.getScene(filePath);
+        if (!scene) return;
+        this.infoPanel?.show(scene);
+        this.inspectorComponent?.show(scene);
+        this.refreshEmptyState();
+    }
+
+    private hasSceneShown(): boolean {
+        return !!(this.infoPanel?.getCurrentScene() || this.inspectorComponent?.getCurrentScene?.());
+    }
+
+    private refreshEmptyState(): void {
+        if (!this.emptyEl) return;
+        const sceneTabs: InspectorTab[] = ['info', 'details'];
+        const showEmpty = sceneTabs.includes(this.activeTab) && !this.hasSceneShown();
+        this.emptyEl.setCssStyles({ display: showEmpty ? 'block' : 'none' });
     }
 
     private updateForActiveFile(): void {
+        // 1. Prefer an active MarkdownView's file (the user's open scene).
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile.extension === 'md') {
             const scene = this.sceneManager.getScene(activeFile.path);
             if (scene) {
-                if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'none' });
+                this.infoPanel?.show(scene);
                 this.inspectorComponent?.show(scene);
+                this.refreshEmptyState();
                 return;
             }
         }
-        // Active file is not a scene — show empty state
+
+        // 2. Otherwise, if a Manuscript view is open, mirror its focused scene.
+        const manuscriptLeaves = this.app.workspace.getLeavesOfType(MANUSCRIPT_VIEW_TYPE);
+        for (const leaf of manuscriptLeaves) {
+            const view = leaf.view;
+            if (view instanceof ManuscriptView && view.focusedScenePath) {
+                const scene = this.sceneManager.getScene(view.focusedScenePath);
+                if (scene) {
+                    this.infoPanel?.show(scene);
+                    this.inspectorComponent?.show(scene);
+                    this.refreshEmptyState();
+                    return;
+                }
+            }
+        }
+
         this.inspectorComponent?.hide();
-        if (this.emptyEl) this.emptyEl.setCssStyles({ display: 'block' });
+        this.infoPanel?.hide();
+        this.refreshEmptyState();
     }
 
-    /**
-     * Re-show the currently displayed scene with refreshed data.
-     * Used after file modifications to pick up frontmatter changes
-     * without risking hiding the panel.
-     */
     private refreshCurrentScene(): void {
-        const currentScene = this.inspectorComponent?.getCurrentScene?.();
-        if (!currentScene) return;
-        const fresh = this.sceneManager.getScene(currentScene.filePath);
+        const current =
+            this.infoPanel?.getCurrentScene() ||
+            this.inspectorComponent?.getCurrentScene?.() ||
+            null;
+        if (!current) return;
+        const fresh = this.sceneManager.getScene(current.filePath);
         if (fresh) {
+            this.infoPanel?.show(fresh);
             this.inspectorComponent?.show(fresh);
         }
     }

@@ -336,6 +336,10 @@ export class ManuscriptView extends ItemView {
         let totalWords = 0;
         let lastAct: string | number | undefined;
         let lastChapter: string | number | undefined;
+        // Issue #105 — track the previous scene block so we can mark it
+        // when followed by an act/chapter divider (replaces a former
+        // :has() rule, which is expensive due to broad invalidation).
+        let prevBlock: HTMLElement | null = null;
 
         const editorContainers: { el: HTMLElement; path: string }[] = [];
 
@@ -344,6 +348,7 @@ export class ManuscriptView extends ItemView {
             if (scene.act !== undefined && scene.act !== lastAct) {
                 lastAct = scene.act;
                 lastChapter = undefined;
+                if (prevBlock) prevBlock.classList.add('is-before-divider');
                 const actDiv = this.scrollArea.createDiv('sl-manuscript-act-divider');
                 actDiv.createEl('span', {
                     cls: 'sl-manuscript-act-label',
@@ -354,6 +359,7 @@ export class ManuscriptView extends ItemView {
             // Chapter divider
             if (scene.chapter !== undefined && scene.chapter !== lastChapter) {
                 lastChapter = scene.chapter;
+                if (prevBlock) prevBlock.classList.add('is-before-divider');
                 const chapDiv = this.scrollArea.createDiv('sl-manuscript-chapter-divider');
                 chapDiv.createEl('span', {
                     cls: 'sl-manuscript-chapter-label',
@@ -363,6 +369,7 @@ export class ManuscriptView extends ItemView {
 
             // Scene block
             const block = this.scrollArea.createDiv('sl-manuscript-scene-block');
+            prevBlock = block;
             block.dataset.scenePath = scene.filePath;
             if (this.focusObserver) this.focusObserver.observe(block);
 
