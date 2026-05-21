@@ -4,7 +4,7 @@ import { MetadataParser, setWordcountLocale } from './MetadataParser';
 import { normalizeStoryLineLocale, resolveLocale, DEFAULT_STORYLINE_LOCALE, AUTO_DETECT_LOCALE } from '../utils/locale';
 import { UndoManager } from './UndoManager';
 import { SceneQueryService, ISceneStore } from './SceneQueryService';
-import { formatActChapterPrefix, sanitizeActChapterForPath } from '../utils/actChapter';
+import { formatActChapterPrefix, sanitizeActChapterForPath, compareActChapter } from '../utils/actChapter';
 import type SceneCardsPlugin from '../main';
 import { App, Notice, TFile, TFolder, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
 import { BeatSheetTemplate, FilterPreset, Scene, SceneFilter, SceneStatus, SortConfig, getStatusOrder } from '../models/Scene';
@@ -1163,11 +1163,45 @@ export class SceneManager implements ISceneStore {
     }
 
     /**
-     * Resequence scenes after drag-and-drop (also syncs chapter field)
+     * Resequence scenes after drag-and-drop.
+     *
+     * Writes a flat, globally unique `sequence` value 1..N in the supplied
+     * order. Does NOT touch `chapter` (that destroys user-meaningful chapter
+     * assignments). For #118: `sequence` is the single global authoritative
+     * counter; `act` / `chapter` are independent organizational fields.
      */
     async resequenceScenes(orderedPaths: string[]): Promise<void> {
         for (let i = 0; i < orderedPaths.length; i++) {
-            await this.updateScene(orderedPaths[i], { sequence: i + 1, chapter: i + 1 });
+            await this.updateScene(orderedPaths[i], { sequence: i + 1 });
+        }
+    }
+
+    /**
+     * Renumber every scene in the project with a flat, globally unique
+     * `sequence` 1..N. Ordering is act → chapter → current `sequence`, so
+     * a scene's relative position is preserved while the counter becomes
+     * unique across the whole project. Does NOT modify `act` / `chapter`.
+     *
+     * Spec for #118: there is exactly ONE authoritative scene order —
+     * the global `sequence` value. Per-chapter "sequence within chapter"
+     * is a display concern only.
+     *
+     * @param ordered Optional explicit ordering; otherwise computed from
+     * the current act/chapter/sequence of all scenes.
+     */
+    async globalResequence(ordered?: Scene[]): Promise<void> {
+        const list = ordered ?? [...this.getAllScenes()].sort((a, b) => {
+            const ac = compareActChapter(a.act, b.act);
+            if (ac !== 0) return ac;
+            const cc = compareActChapter(a.chapter, b.chapter);
+            if (cc !== 0) return cc;
+            return (a.sequence ?? 0) - (b.sequence ?? 0);
+        });
+        for (let i = 0; i < list.length; i++) {
+            const want = i + 1;
+            if (list[i].sequence !== want) {
+                await this.updateScene(list[i].filePath, { sequence: want });
+            }
         }
     }
 

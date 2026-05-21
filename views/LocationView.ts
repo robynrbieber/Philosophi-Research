@@ -14,6 +14,12 @@ import { LocationManager } from '../services/LocationManager';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { pickImage as pickImageModal, resolveImagePath } from '../components/ImagePicker';
 import { AddFieldModal } from '../components/AddFieldModal';
+import {
+    isCustomSectionKey,
+    renderCustomSectionsAtSlot,
+    renderAddCustomSectionButton,
+    type CustomSectionsHost,
+} from '../components/CustomSectionsRenderer';
 import type { UniversalFieldTemplate } from '../services/FieldTemplateService';
 import { formatActChapterPrefix } from '../utils/actChapter';
 
@@ -664,10 +670,15 @@ export class LocationView extends ItemView {
         const formPanel = layout.createDiv('location-detail-form');
         const sidePanel = layout.createDiv('location-detail-side');
 
-        // Categories
+        // Categories interleaved with user-defined custom sections (#120)
         const categories = isWorld ? WORLD_CATEGORIES : LOCATION_CATEGORIES;
-        for (const cat of categories) {
-            this.renderCategory(formPanel, cat, draft);
+        const customHost = this.buildCustomSectionsHost(draft, categories.length);
+        // Slot 0: any custom sections positioned above the first built-in.
+        renderCustomSectionsAtSlot(formPanel, customHost, 0);
+        for (let i = 0; i < categories.length; i++) {
+            this.renderCategory(formPanel, categories[i], draft);
+            // Slot i+1: any custom sections after the i-th built-in.
+            renderCustomSectionsAtSlot(formPanel, customHost, i + 1);
         }
 
         // For locations: world & parent dropdowns
@@ -677,6 +688,9 @@ export class LocationView extends ItemView {
 
         // Custom fields
         this.renderCustomFields(formPanel, draft);
+
+        // "+ Add custom section" button at the bottom
+        renderAddCustomSectionButton(formPanel, customHost);
 
         // Gallery (before side panel stats)
         this.renderGallery(sidePanel, draft);
@@ -1239,6 +1253,8 @@ export class LocationView extends ItemView {
             const custom = draft.custom || {};
 
             for (const [key, val] of Object.entries(custom)) {
+                // Skip composite keys belonging to user-defined custom sections (#120)
+                if (isCustomSectionKey(key)) continue;
                 const row = sectionBody.createDiv('location-field-row location-custom-row');
                 const keyIn = row.createEl('input', {
                     cls: 'location-field-input location-custom-key',
@@ -1287,6 +1303,38 @@ export class LocationView extends ItemView {
         };
 
         renderAll();
+    }
+
+    // ── User-defined custom sections (#120) ────────────
+
+    /**
+     * Build the {@link CustomSectionsHost} used to interleave user-defined
+     * custom sections with the built-in WORLD_CATEGORIES / LOCATION_CATEGORIES
+     * in the detail form. Rebuilt per-render so it always reflects the latest
+     * settings array reference.
+     */
+    private buildCustomSectionsHost(
+        draft: WorldOrLocation,
+        builtinSectionCount: number,
+    ): CustomSectionsHost<WorldOrLocation> {
+        if (!this.plugin.settings.locationCustomSections) {
+            this.plugin.settings.locationCustomSections = [];
+        }
+        const sections = this.plugin.settings.locationCustomSections;
+        return {
+            app: this.app,
+            draft,
+            sections,
+            builtinSectionCount,
+            collapsedSections: this.collapsedSections,
+            collapseKeyPrefix: 'location',
+            cssPrefix: 'location',
+            scheduleSave: (d) => this.scheduleSave(d),
+            persistSections: () => { void this.plugin.saveSettings(); },
+            requestRerender: () => {
+                if (this.rootContainer) this.renderView(this.rootContainer);
+            },
+        };
     }
 
     // ── Side panels ────────────────────────────────────

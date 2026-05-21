@@ -11,6 +11,12 @@ import { applyMobileClass } from '../components/MobileAdapter';
 import { pickImage as pickImageModal, resolveImagePath } from '../components/ImagePicker';
 import { AddFieldModal } from '../components/AddFieldModal';
 import { attachTooltip } from '../components/Tooltip';
+import {
+    CUSTOM_SECTION_KEY_SEP,
+    renderCustomSectionsAtSlot,
+    renderAddCustomSectionButton,
+    type CustomSectionsHost,
+} from '../components/CustomSectionsRenderer';
 import type { UniversalFieldTemplate } from '../services/FieldTemplateService';
 
 /**
@@ -511,13 +517,19 @@ export class CodexView extends ItemView {
         const formPanel = layout.createDiv('codex-detail-form');
         const sidePanel = layout.createDiv('codex-detail-side');
 
-        // Render field categories
-        for (const cat of catDef.categories) {
-            this.renderFieldCategory(formPanel, cat, draft, catDef);
+        // Render field categories interleaved with user-defined custom sections (#114)
+        const customHost = this.buildCustomSectionsHost(draft, catDef.categories.length);
+        renderCustomSectionsAtSlot(formPanel, customHost, 0);
+        for (let i = 0; i < catDef.categories.length; i++) {
+            this.renderFieldCategory(formPanel, catDef.categories[i], draft, catDef);
+            renderCustomSectionsAtSlot(formPanel, customHost, i + 1);
         }
 
         // Custom fields section
         this.renderCustomFields(formPanel, draft);
+
+        // "+ Add custom section" button at the bottom
+        renderAddCustomSectionButton(formPanel, customHost);
 
         // Books (series-ready)
         this.renderBooksField(formPanel, draft);
@@ -1042,7 +1054,22 @@ export class CodexView extends ItemView {
 
     // ── Custom fields ──────────────────────────────────
 
+    /** Composite-key separator used to namespace fields inside user-defined
+     *  custom sections (#114). Re-exported from the shared helper so existing
+     *  call-sites within this file keep working. */
+    private static readonly CUSTOM_SECTION_KEY_SEP = CUSTOM_SECTION_KEY_SEP;
+
     private renderCustomFields(container: HTMLElement, draft: CodexEntry): void {
+        // Merge per-category template fields into draft.custom so they appear
+        // automatically for new entries (#115)
+        const template = this.plugin.settings.codexCategoryFieldTemplates?.[draft.type] || [];
+        if (template.length > 0) {
+            if (!draft.custom) draft.custom = {};
+            for (const name of template) {
+                if (!(name in draft.custom)) draft.custom[name] = '';
+            }
+        }
+
         const section = container.createDiv('codex-section');
         const header = section.createDiv('codex-section-header');
         const chevron = header.createSpan({ cls: 'codex-section-chevron' });
@@ -1070,6 +1097,8 @@ export class CodexView extends ItemView {
         const custom = draft.custom || {};
 
         for (const [fieldName, fieldValue] of Object.entries(custom)) {
+            // Skip composite keys belonging to user-defined custom sections (#114)
+            if (fieldName.includes(CodexView.CUSTOM_SECTION_KEY_SEP)) continue;
             const row = body.createDiv('codex-field-row codex-custom-field-row');
             row.createEl('label', { cls: 'codex-field-label', text: fieldName });
 
@@ -1090,12 +1119,32 @@ export class CodexView extends ItemView {
             });
             obsidian.setIcon(removeBtn, 'x');
             removeBtn.addEventListener('click', () => {
-                if (draft.custom) {
-                    delete draft.custom[fieldName];
-                    if (Object.keys(draft.custom).length === 0) draft.custom = undefined;
+                const tplMap = this.plugin.settings.codexCategoryFieldTemplates;
+                const inTemplate = !!(tplMap && tplMap[draft.type] && tplMap[draft.type].includes(fieldName));
+                const doRemove = (alsoFromTemplate: boolean) => {
+                    if (draft.custom) {
+                        delete draft.custom[fieldName];
+                        if (Object.keys(draft.custom).length === 0) draft.custom = undefined;
+                    }
+                    if (alsoFromTemplate && tplMap && tplMap[draft.type]) {
+                        tplMap[draft.type] = tplMap[draft.type].filter(n => n !== fieldName);
+                        if (tplMap[draft.type].length === 0) delete tplMap[draft.type];
+                        void this.plugin.saveSettings();
+                    }
+                    this.scheduleSave(draft);
+                    if (this.rootContainer) this.renderView(this.rootContainer);
+                };
+                if (inTemplate) {
+                    // Confirm whether to remove from template (all entries) or just this entry
+                    const choice = window.confirm(
+                        `"${fieldName}" is a template field for this category.\n\n` +
+                        `OK = remove from ALL entries in this category (remove template).\n` +
+                        `Cancel = remove from this entry only (will reappear on reload).`
+                    );
+                    doRemove(choice);
+                } else {
+                    doRemove(false);
                 }
-                this.scheduleSave(draft);
-                if (this.rootContainer) this.renderView(this.rootContainer);
             });
         }
 
@@ -1103,14 +1152,63 @@ export class CodexView extends ItemView {
         const addRow = body.createDiv('codex-add-custom-field-row');
         const addBtn = addRow.createEl('button', { cls: 'codex-add-custom-btn', text: '+ Add custom field' });
         addBtn.addEventListener('click', () => {
-            const modal = new AddCustomFieldModal(this.app, (name) => {
+            const modal = new AddCustomFieldModal(this.app, (name, applyToAll) => {
                 if (!draft.custom) draft.custom = {};
-                draft.custom[name] = '';
+                if (!(name in draft.custom)) draft.custom[name] = '';
+                if (applyToAll) {
+                    if (!this.plugin.settings.codexCategoryFieldTemplates) {
+                        this.plugin.settings.codexCategoryFieldTemplates = {};
+                    }
+                    const tpl = this.plugin.settings.codexCategoryFieldTemplates[draft.type] || [];
+                    if (!tpl.includes(name)) {
+                        tpl.push(name);
+                        this.plugin.settings.codexCategoryFieldTemplates[draft.type] = tpl;
+                        void this.plugin.saveSettings();
+                    }
+                }
                 this.scheduleSave(draft);
                 if (this.rootContainer) this.renderView(this.rootContainer);
             });
             modal.open();
         });
+    }
+
+    // ── User-defined custom sections (#114) ────────────
+
+    /**
+     * Build the {@link CustomSectionsHost} used to interleave user-defined
+     * custom sections with the category-defined built-in sections. The host
+     * is rebuilt per-render so it always reflects the latest settings list
+     * for the current Codex category.
+     */
+    private buildCustomSectionsHost(
+        draft: CodexEntry,
+        builtinSectionCount: number,
+    ): CustomSectionsHost<CodexEntry> {
+        if (!this.plugin.settings.codexCategoryCustomSections) {
+            this.plugin.settings.codexCategoryCustomSections = {};
+        }
+        const allSections = this.plugin.settings.codexCategoryCustomSections;
+        if (!allSections[draft.type]) allSections[draft.type] = [];
+        const sections = allSections[draft.type];
+        return {
+            app: this.app,
+            draft,
+            sections,
+            builtinSectionCount,
+            collapsedSections: this.collapsedSections,
+            collapseKeyPrefix: `codex::${draft.type}`,
+            cssPrefix: 'codex',
+            scheduleSave: (d) => this.scheduleSave(d),
+            persistSections: () => {
+                allSections[draft.type] = sections;
+                if (sections.length === 0) delete allSections[draft.type];
+                void this.plugin.saveSettings();
+            },
+            requestRerender: () => {
+                if (this.rootContainer) this.renderView(this.rootContainer);
+            },
+        };
     }
 
     // ── Books (series-ready) ───────────────────────────
@@ -1608,12 +1706,14 @@ export class CodexView extends ItemView {
         el.createEl('h4', { text: 'Add Custom Category' });
         let newLabel = '';
         let newIcon = 'file-text';
+        let newLabelInput: HTMLInputElement | null = null;
 
         new Setting(el)
             .setName('Label')
             .addText(text => {
                 text.setPlaceholder('e.g. Factions, Artifacts, Magic…');
                 text.onChange(v => { newLabel = v; });
+                newLabelInput = text.inputEl;
             });
 
         new Setting(el)
@@ -1631,6 +1731,13 @@ export class CodexView extends ItemView {
                 .setButtonText('Add Category')
                 .setCta()
                 .onClick(() => {
+                    // Read value directly from input as a fallback in case the change
+                    // event hasn't fired yet (issue #115)
+                    if (newLabelInput && newLabelInput.value && !newLabel) {
+                        newLabel = newLabelInput.value;
+                    } else if (newLabelInput) {
+                        newLabel = newLabelInput.value || newLabel;
+                    }
                     if (!newLabel.trim()) {
                         new Notice('Please enter a label');
                         return;
@@ -1938,9 +2045,9 @@ export class CodexView extends ItemView {
 // ═══════════════════════════════════════════════════
 
 class AddCustomFieldModal extends Modal {
-    private callback: (name: string) => void;
+    private callback: (name: string, applyToAll: boolean) => void;
 
-    constructor(app: App, callback: (name: string) => void) {
+    constructor(app: App, callback: (name: string, applyToAll: boolean) => void) {
         super(app);
         this.callback = callback;
     }
@@ -1948,31 +2055,44 @@ class AddCustomFieldModal extends Modal {
     onOpen(): void {
         this.titleEl.setText('Add Custom Field');
         let fieldName = '';
+        let applyToAll = true;
+        let nameInput: HTMLInputElement | null = null;
         new Setting(this.contentEl)
             .setName('Field name')
             .addText(text => {
                 text.setPlaceholder('e.g. Rarity, Alignment…');
                 text.onChange(v => { fieldName = v; });
+                nameInput = text.inputEl;
                 text.inputEl.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && fieldName.trim()) {
-                        e.preventDefault();
-                        this.close();
-                        this.callback(fieldName.trim());
+                    if (e.key === 'Enter') {
+                        const v = (nameInput?.value || fieldName).trim();
+                        if (v) {
+                            e.preventDefault();
+                            this.close();
+                            this.callback(v, applyToAll);
+                        }
                     }
                 });
                 window.setTimeout(() => text.inputEl.focus(), 50);
             });
 
         new Setting(this.contentEl)
+            .setName('Add to all entries in this category')
+            .setDesc('When enabled, this field becomes a template for the category and appears on every existing and future entry of this type.')
+            .addToggle(t => t.setValue(applyToAll).onChange(v => { applyToAll = v; }));
+
+        new Setting(this.contentEl)
             .addButton(btn => btn
                 .setButtonText('Add')
                 .setCta()
                 .onClick(() => {
-                    if (fieldName.trim()) {
+                    const v = (nameInput?.value || fieldName).trim();
+                    if (v) {
                         this.close();
-                        this.callback(fieldName.trim());
+                        this.callback(v, applyToAll);
                     }
                 }));
     }
 }
+
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- end of file-wide suppression block opened at line 1 */

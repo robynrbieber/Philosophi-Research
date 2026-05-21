@@ -343,35 +343,11 @@ export class BoardView extends ItemView {
             }
             attachTooltip(reseqBtn, 'Resequence all scenes');
             reseqBtn.addEventListener('click', async () => {
-                const scenes = this.sceneManager.queryService.getFilteredScenes(
-                    undefined,
-                    { field: 'sequence', direction: 'asc' }
-                );
-                // Sort by act → chapter → current sequence for stable ordering.
-                // compareActChapter handles non-numeric acts ("1.1", "Prologue")
-                // by falling back to a numeric-aware locale compare.
-                const sorted = [...scenes].sort((a, b) => {
-                    const actCmp = compareActChapter(a.act, b.act);
-                    if (actCmp !== 0) return actCmp;
-                    const chCmp = compareActChapter(a.chapter, b.chapter);
-                    if (chCmp !== 0) return chCmp;
-                    return (a.sequence ?? 0) - (b.sequence ?? 0);
-                });
-                // Renumber sequence within each (act, chapter) group.
-                // Never overwrite chapter — preserve existing chapter assignments.
-                // Group key uses String() so non-numeric acts/chapters
-                // (e.g. "1.1", "Prologue") group cleanly instead of all
-                // collapsing onto the same numeric fallback.
-                let prevKey = '\0';
-                let seqInGroup = 0;
-                for (const scene of sorted) {
-                    const key = `${String(scene.act ?? '')}\u0001${String(scene.chapter ?? '')}`;
-                    if (key !== prevKey) {
-                        seqInGroup = 0; prevKey = key;
-                    }
-                    seqInGroup++;
-                    await this.sceneManager.updateScene(scene.filePath, { sequence: seqInGroup });
-                }
+                // #118: sequence is a single, globally unique counter.
+                // SceneManager.globalResequence() sorts by act → chapter →
+                // current sequence and writes flat 1..N. `chapter` is left
+                // untouched so existing chapter assignments are preserved.
+                await this.sceneManager.globalResequence();
                 await this.sceneManager.initialize();
                 this.refreshBoard();
             });
@@ -1759,23 +1735,16 @@ export class BoardView extends ItemView {
             }
         }
 
-        // Renumber sequences within each (act, chapter) group.
-        // Group key uses String() so non-numeric values ("1.1", "Prologue")
-        // still group cleanly and don't all collapse onto NaN.
-        let prevKey = '\0';
-        let seqInGroup = 0;
-        for (const scene of ordered) {
-            const key = `${String(scene.act ?? '')}\u0001${String(scene.chapter ?? '')}`;
-            if (key !== prevKey) {
-                seqInGroup = 0; prevKey = key;
-            }
-            seqInGroup++;
-            const sceneUpdates: Partial<Scene> = { sequence: seqInGroup };
-            if (scene.filePath === draggedPath) {
-                Object.assign(sceneUpdates, updates);
-            }
-            await this.sceneManager.updateScene(scene.filePath, sceneUpdates);
-        }
+        // #118: apply the moved scene's column updates plus a temporary
+        // fractional sequence that positions it next to the target within
+        // its (act, chapter) bucket, then globally flatten 1..N so the
+        // sequence stays unique across the whole project. We do NOT
+        // renumber other scenes locally — the global pass owns that.
+        const sceneUpdates: Partial<Scene> = { ...updates };
+        const targetSeq = targetScene.sequence ?? 0;
+        sceneUpdates.sequence = insertBefore ? targetSeq - 0.5 : targetSeq + 0.5;
+        await this.sceneManager.updateScene(draggedPath, sceneUpdates);
+        await this.sceneManager.globalResequence();
 
         this.plugin.viewSnapshotService.scheduleAutoSave();
         this.refreshBoard();
@@ -1827,14 +1796,16 @@ export class BoardView extends ItemView {
             if (last.chapter !== undefined) updates.chapter = last.chapter;
         }
 
-        // Compute sequence at end of the last (act, chapter) group
-        const maxSeq = columnScenes.reduce(
-            (max, s) => Math.max(max, s.sequence ?? 0),
-            0
-        );
-        updates.sequence = maxSeq + 1;
+        // #118: position the moved scene after the last scene in its new
+        // column with a fractional sequence, then globally renumber 1..N
+        // so the project keeps a single unique sequence counter.
+        const lastSeq = ordered.length > 0
+            ? (ordered[ordered.length - 1].sequence ?? 0)
+            : 0;
+        updates.sequence = lastSeq + 0.5;
 
         await this.sceneManager.updateScene(filePath, updates);
+        await this.sceneManager.globalResequence();
         this.plugin.viewSnapshotService.scheduleAutoSave();
         this.refreshBoard();
     }

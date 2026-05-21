@@ -1864,14 +1864,17 @@ body.theme-dark {
 
 .inspector-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-top: 16px;
 }
 
 .inspector-actions button {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
     padding: 6px 12px;
     font-size: 0.85em;
+    white-space: normal;
 }
 
 /* Custom (universal) scene fields in Inspector */
@@ -1963,6 +1966,9 @@ body.theme-dark {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    /* Reserve space so the layout doesn't jump while the async
+       `listSnapshots()` call resolves (placeholder swap to rows). */
+    min-height: 32px;
     max-height: 180px;
     overflow-y: auto;
 }
@@ -8971,8 +8977,19 @@ body.theme-dark .location-field-input.dropdown {
     color: var(--text-muted);
     cursor: pointer;
     padding: 4px;
+    display: inline-flex;
+    align-items: center;
 }
 .codex-custom-field-remove:hover { color: var(--text-error); }
+.codex-custom-field-remove[data-disabled="true"] {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+}
+.codex-custom-field-remove .svg-icon {
+    width: 14px;
+    height: 14px;
+}
 
 .codex-add-custom-field-row { margin-top: 6px; }
 .codex-add-custom-btn {
@@ -8987,6 +9004,56 @@ body.theme-dark .location-field-input.dropdown {
 .codex-add-custom-btn:hover {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
+}
+
+/* User-defined custom sections (#114) */
+.codex-section-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+}
+.codex-section-action-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    user-select: none;
+}
+.codex-section-action-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+.codex-section-action-btn[data-disabled="true"] {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+}
+.codex-section-action-btn .svg-icon {
+    width: 14px;
+    height: 14px;
+}
+.codex-add-custom-section-row {
+    margin-top: 10px;
+    margin-bottom: 6px;
+}
+.codex-add-custom-section-btn {
+    background: none;
+    border: 1px dashed var(--interactive-accent);
+    border-radius: 4px;
+    padding: 6px 12px;
+    color: var(--interactive-accent);
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+}
+.codex-add-custom-section-btn:hover {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
 }
 
 /* ── Side panel sections ────────────────────────────── */
@@ -10780,8 +10847,8 @@ body.sl-focus-active-global .titlebar {
 .sl-inspector-tabbar {
     display: flex;
     align-items: center;
-    gap: 0;
-    padding: 8px 6px 6px 6px;
+    gap: 8px;
+    padding: 8px 10px 6px 10px;
     border-bottom: 1px solid var(--background-modifier-border);
     background: var(--background-secondary);
     flex: 0 0 auto;
@@ -10948,6 +11015,124 @@ body.sl-focus-active-global .titlebar {
     color: var(--text-normal);
     box-sizing: border-box;
 }
+
+/* Dedicated Synopsis / Notes inspector tabs: full-width, full-height,
+   no resize handle on the textarea — the textarea grows to fill the
+   available tab pane and scrolls internally. The active inspector panel
+   is `position: absolute; inset: 0` so `height: 100%` here resolves
+   against the panels host, giving the inner flex chain a real height. */
+.sl-inspector-panel.is-active.sl-inspector-panel-synopsis,
+.sl-inspector-panel.is-active.sl-inspector-panel-notes {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    box-sizing: border-box;
+}
+.sl-inspector-panel-synopsis .sl-info-panel,
+.sl-inspector-panel-notes .sl-info-panel,
+.sl-notes-view .sl-inspector-panel-notes.sl-info-panel,
+.sl-notes-view .sl-inspector-panel-notes {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.sl-inspector-panel-synopsis .sl-info-title,
+.sl-inspector-panel-notes .sl-info-title {
+    flex: 0 0 auto;
+}
+.sl-inspector-panel-synopsis .sl-info-section,
+.sl-inspector-panel-notes .sl-info-section {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.sl-inspector-panel-synopsis .sl-info-synopsis-textarea,
+.sl-inspector-panel-notes .sl-info-notes-textarea,
+.sl-notes-view .sl-info-notes-textarea {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    resize: none;
+    overflow: auto;
+    box-sizing: border-box;
+}
+
+/* Standalone Notes sidebar view — give the host a real height so the
+   inner flex chain on `.sl-inspector-panel-notes` has something to fill. */
+.view-content.sl-notes-view-host {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.sl-notes-view {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px 12px;
+    box-sizing: border-box;
+}
+
+/* Standalone Synopsis sidebar view — same flex chain as Notes. */
+.view-content.sl-synopsis-view-host {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.sl-synopsis-view {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px 12px;
+    box-sizing: border-box;
+}
+
+/* Standalone Scene Details view — hosts the full InspectorComponent. */
+.view-content.sl-details-view-host {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.sl-details-view {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 10px 12px;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+/* Tab bar layout updated: tabs are direct children of `.sl-inspector-tabbar`
+   with a generous gap. Pop-out is exposed via right-click context menu, not
+   a per-tab button, so no wrapper/popout styling is needed. */
 
 /* Status dropdown � info panel variant */
 .sl-info-status-dropdown {

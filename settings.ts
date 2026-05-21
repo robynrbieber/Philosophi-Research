@@ -560,6 +560,7 @@ export interface SceneCardsSettings {
     plotgridAutoNote: boolean;
     colorCoding: ColorCodingMode;
     showWordCounts: boolean;
+    showSceneNumberOnCards: boolean;
     compactCardView: boolean;
     /** What text to show beneath a scene card title: nothing, the synopsis field, or the first lines of the draft body. */
     cardPreviewSource: 'none' | 'synopsis' | 'body' | 'conflict';
@@ -637,6 +638,19 @@ export interface SceneCardsSettings {
     codexEnabledCategories: string[];
     /** User-created custom codex category definitions */
     codexCustomCategories: Array<{ id: string; label: string; icon: string; showInSidebar?: boolean }>;
+
+    // Per-category default custom field templates (#115). When a new entry is created
+    // in this category, the listed field names are pre-populated with empty values.
+    // Keyed by category id (e.g. 'items', 'creatures', or a custom id).
+    codexCategoryFieldTemplates?: Record<string, string[]>;
+    // Per-category user-defined custom sections (#114). Each section has a title
+    // and a list of field names. Field values live in CodexEntry.custom keyed by
+    // a composite `${sectionTitle} :: ${fieldName}` to keep them grouped.
+    codexCategoryCustomSections?: Record<string, Array<{ title: string; fields: string[] }>>;
+    /** User-defined custom sections shared across all characters (#120). */
+    characterCustomSections?: Array<{ title: string; fields: string[] }>;
+    /** User-defined custom sections shared across all locations / worlds (#120). */
+    locationCustomSections?: Array<{ title: string; fields: string[] }>;
     /** Which codex category IDs should appear in the Scene Inspector sidebar */
     codexSidebarCategories: string[];
     /** Series name — groups projects that share a common universe / codex */
@@ -750,6 +764,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     plotgridAutoNote: true,
     colorCoding: 'status',
     showWordCounts: true,
+    showSceneNumberOnCards: true,
     compactCardView: false,
     cardPreviewSource: 'none',
     characterCardPortraitSize: 64,
@@ -801,6 +816,10 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     codexEnabledCategories: ['items'],
     codexCustomCategories: [],
+    codexCategoryFieldTemplates: {},
+    codexCategoryCustomSections: {},
+    characterCustomSections: [],
+    locationCustomSections: [],
     /** Which codex category IDs should appear in the Scene Inspector sidebar */
     codexSidebarCategories: [] as string[],
     series: '',
@@ -1091,6 +1110,17 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.showWordCounts = value;
                     await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Show scene number on cards')
+            .setDesc('Display the sequence number badge in the card header')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showSceneNumberOnCards ?? true)
+                .onChange(async (value) => {
+                    this.plugin.settings.showSceneNumberOnCards = value;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
                 }));
 
         new Setting(containerEl)

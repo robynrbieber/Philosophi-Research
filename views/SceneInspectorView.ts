@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { EventRef, ItemView, WorkspaceLeaf, TFile, MarkdownView, setIcon } from 'obsidian';
+import { EventRef, ItemView, WorkspaceLeaf, TFile, MarkdownView, Menu, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { InspectorComponent } from '../components/Inspector';
@@ -8,15 +8,24 @@ import { ResearchView } from './ResearchView';
 import { HelpView } from './HelpView';
 import { ManuscriptView } from './ManuscriptView';
 import { attachTooltip } from '../components/Tooltip';
-import { SCENE_INSPECTOR_VIEW_TYPE, MANUSCRIPT_VIEW_TYPE, RESEARCH_VIEW_TYPE, HELP_VIEW_TYPE } from '../constants';
+import {
+    SCENE_INSPECTOR_VIEW_TYPE,
+    MANUSCRIPT_VIEW_TYPE,
+    RESEARCH_VIEW_TYPE,
+    HELP_VIEW_TYPE,
+    SYNOPSIS_VIEW_TYPE,
+    DETAILS_VIEW_TYPE,
+    NOTES_VIEW_TYPE,
+} from '../constants';
 
-type InspectorTab = 'info' | 'details' | 'research' | 'help';
+type InspectorTab = 'synopsis' | 'notes' | 'details' | 'research' | 'help';
 
-const TAB_DEFS: { id: InspectorTab; label: string; icon: string }[] = [
-    { id: 'info',     label: 'Info',     icon: 'info' },
-    { id: 'details',  label: 'Details',  icon: 'list' },
-    { id: 'research', label: 'Research', icon: 'library-big' },
-    { id: 'help',     label: 'Help',     icon: 'help-circle' },
+const TAB_DEFS: { id: InspectorTab; label: string; icon: string; popOutType?: string }[] = [
+    { id: 'details',  label: 'Details',  icon: 'list',         popOutType: DETAILS_VIEW_TYPE },
+    { id: 'synopsis', label: 'Synopsis', icon: 'scroll-text',  popOutType: SYNOPSIS_VIEW_TYPE },
+    { id: 'notes',    label: 'Notes',    icon: 'sticky-note',  popOutType: NOTES_VIEW_TYPE },
+    { id: 'research', label: 'Research', icon: 'library-big',  popOutType: RESEARCH_VIEW_TYPE },
+    { id: 'help',     label: 'Help',     icon: 'help-circle',  popOutType: HELP_VIEW_TYPE },
 ];
 
 /**
@@ -32,20 +41,22 @@ export class SceneInspectorView extends ItemView {
     private plugin: SceneCardsPlugin;
     private sceneManager: SceneManager;
 
-    private infoPanel: InfoPanelComponent | null = null;
+    private synopsisPanel: InfoPanelComponent | null = null;
+    private notesPanel: InfoPanelComponent | null = null;
     private inspectorComponent: InspectorComponent | null = null;
     private researchView: ResearchView | null = null;
     private helpView: HelpView | null = null;
 
     private tabBarEl: HTMLElement | null = null;
     private tabPanels: Record<InspectorTab, HTMLElement | null> = {
-        info: null,
+        synopsis: null,
+        notes: null,
         details: null,
         research: null,
         help: null,
     };
     private emptyEl: HTMLElement | null = null;
-    private activeTab: InspectorTab = 'info';
+    private activeTab: InspectorTab = 'details';
 
     /** Timestamp (ms) of last user-initiated edit inside the inspector. */
     private lastEditTime = 0;
@@ -95,10 +106,15 @@ export class SceneInspectorView extends ItemView {
         // ── Tab panels host ──
         const panelsHost = container.createDiv('sl-inspector-panels');
 
-        // Info tab
-        const infoPanelEl = panelsHost.createDiv('sl-inspector-panel sl-info-panel-host');
-        this.tabPanels.info = infoPanelEl;
-        this.infoPanel = new InfoPanelComponent(infoPanelEl, this.plugin, this.sceneManager);
+        // Synopsis tab
+        const synopsisPanelEl = panelsHost.createDiv('sl-inspector-panel sl-info-panel-host sl-inspector-panel-synopsis');
+        this.tabPanels.synopsis = synopsisPanelEl;
+        this.synopsisPanel = new InfoPanelComponent(synopsisPanelEl, this.plugin, this.sceneManager, 'synopsis');
+
+        // Notes tab
+        const notesPanelEl = panelsHost.createDiv('sl-inspector-panel sl-info-panel-host sl-inspector-panel-notes');
+        this.tabPanels.notes = notesPanelEl;
+        this.notesPanel = new InfoPanelComponent(notesPanelEl, this.plugin, this.sceneManager, 'notes');
 
         // Details tab — wraps the existing InspectorComponent
         const detailsPanelEl = panelsHost.createDiv('sl-inspector-panel');
@@ -136,7 +152,6 @@ export class SceneInspectorView extends ItemView {
                 onDelete: async (scene) => {
                     await this.sceneManager.deleteScene(scene.filePath);
                     this.inspectorComponent?.hide();
-                    this.infoPanel?.hide();
                     this.refreshEmptyState();
                 },
                 onRefresh: () => {
@@ -206,7 +221,8 @@ export class SceneInspectorView extends ItemView {
         this.researchView = null;
         this.helpView = null;
         this.inspectorComponent = null;
-        this.infoPanel = null;
+        this.synopsisPanel = null;
+        this.notesPanel = null;
     }
 
     /**
@@ -242,8 +258,40 @@ export class SceneInspectorView extends ItemView {
         });
         const iconEl = btn.createSpan({ cls: 'sl-inspector-tab-icon' });
         setIcon(iconEl, icon);
-        attachTooltip(btn, label);
+        attachTooltip(btn, `${label}  —  right-click to open in own pane`);
         btn.addEventListener('click', () => this.setActiveTab(id));
+
+        // Right-click → "Open in own pane" (uses Obsidian's native Menu).
+        const def = TAB_DEFS.find(d => d.id === id);
+        if (def?.popOutType) {
+            btn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const menu = new Menu();
+                menu.addItem((item) => {
+                    item.setTitle(`Open ${label} in own pane`)
+                        .setIcon('panel-right-open')
+                        .onClick(() => this.popOutTab(def.popOutType as string));
+                });
+                menu.showAtMouseEvent(e);
+            });
+        }
+    }
+
+    private async popOutTab(viewType: string): Promise<void> {
+        try {
+            const { workspace } = this.app;
+            const existing = workspace.getLeavesOfType(viewType);
+            if (existing.length > 0) {
+                workspace.revealLeaf(existing[0]);
+                return;
+            }
+            const leaf = workspace.getLeaf('tab');
+            await leaf.setViewState({ type: viewType, active: true });
+            workspace.revealLeaf(leaf);
+        } catch (err) {
+            console.error('[StoryLine] popOutTab failed:', err);
+        }
     }
 
     private setActiveTab(id: InspectorTab): void {
@@ -258,7 +306,11 @@ export class SceneInspectorView extends ItemView {
             const panel = this.tabPanels[key];
             if (!panel) continue;
             const isActive = key === id;
-            panel.setCssStyles({ display: isActive ? 'block' : 'none' });
+            // Clear any inline `display` so the stylesheet owns visibility
+            // (the `.is-active` class handles the active panel's display
+            // mode — `flex` for synopsis/notes so the textarea fills the
+            // pane, `block` for everyone else).
+            panel.style.display = isActive ? '' : 'none';
             panel.toggleClass('is-active', isActive);
         }
         // Toggle padding-collapse on the panels host when an embedded
@@ -289,18 +341,19 @@ export class SceneInspectorView extends ItemView {
     private showScene(filePath: string): void {
         const scene = this.sceneManager.getScene(filePath);
         if (!scene) return;
-        this.infoPanel?.show(scene);
+        this.synopsisPanel?.show(scene);
+        this.notesPanel?.show(scene);
         this.inspectorComponent?.show(scene);
         this.refreshEmptyState();
     }
 
     private hasSceneShown(): boolean {
-        return !!(this.infoPanel?.getCurrentScene() || this.inspectorComponent?.getCurrentScene?.());
+        return !!(this.synopsisPanel?.getCurrentScene() || this.notesPanel?.getCurrentScene() || this.inspectorComponent?.getCurrentScene?.());
     }
 
     private refreshEmptyState(): void {
         if (!this.emptyEl) return;
-        const sceneTabs: InspectorTab[] = ['info', 'details'];
+        const sceneTabs: InspectorTab[] = ['synopsis', 'notes', 'details'];
         const showEmpty = sceneTabs.includes(this.activeTab) && !this.hasSceneShown();
         this.emptyEl.setCssStyles({ display: showEmpty ? 'block' : 'none' });
     }
@@ -311,7 +364,8 @@ export class SceneInspectorView extends ItemView {
         if (activeFile && activeFile.extension === 'md') {
             const scene = this.sceneManager.getScene(activeFile.path);
             if (scene) {
-                this.infoPanel?.show(scene);
+                this.synopsisPanel?.show(scene);
+                this.notesPanel?.show(scene);
                 this.inspectorComponent?.show(scene);
                 this.refreshEmptyState();
                 return;
@@ -325,7 +379,8 @@ export class SceneInspectorView extends ItemView {
             if (view instanceof ManuscriptView && view.focusedScenePath) {
                 const scene = this.sceneManager.getScene(view.focusedScenePath);
                 if (scene) {
-                    this.infoPanel?.show(scene);
+                    this.synopsisPanel?.show(scene);
+                    this.notesPanel?.show(scene);
                     this.inspectorComponent?.show(scene);
                     this.refreshEmptyState();
                     return;
@@ -334,19 +389,22 @@ export class SceneInspectorView extends ItemView {
         }
 
         this.inspectorComponent?.hide();
-        this.infoPanel?.hide();
+        this.synopsisPanel?.hide();
+        this.notesPanel?.hide();
         this.refreshEmptyState();
     }
 
     private refreshCurrentScene(): void {
         const current =
-            this.infoPanel?.getCurrentScene() ||
+            this.synopsisPanel?.getCurrentScene() ||
+            this.notesPanel?.getCurrentScene() ||
             this.inspectorComponent?.getCurrentScene?.() ||
             null;
         if (!current) return;
         const fresh = this.sceneManager.getScene(current.filePath);
         if (fresh) {
-            this.infoPanel?.show(fresh);
+            this.synopsisPanel?.show(fresh);
+            this.notesPanel?.show(fresh);
             this.inspectorComponent?.show(fresh);
         }
     }

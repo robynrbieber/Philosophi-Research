@@ -9,6 +9,12 @@ import { pickImage as pickImageModal, resolveImagePath } from '../components/Ima
 import { isMobile, DESKTOP_ONLY_CHARACTER_MODES, applyMobileClass } from '../components/MobileAdapter';
 import { RenameConfirmModal } from '../components/RenameConfirmModal';
 import { AddFieldModal } from '../components/AddFieldModal';
+import {
+    isCustomSectionKey,
+    renderCustomSectionsAtSlot,
+    renderAddCustomSectionButton,
+    type CustomSectionsHost,
+} from '../components/CustomSectionsRenderer';
 import type { UniversalFieldTemplate } from '../services/FieldTemplateService';
 import { formatActChapterPrefix } from '../utils/actChapter';
 
@@ -863,13 +869,21 @@ export class CharacterView extends ItemView {
         const formPanel = layout.createDiv('character-detail-form');
         const sidePanel = layout.createDiv('character-detail-side');
 
-        // ── Form sections ──
-        for (const category of CHARACTER_CATEGORIES) {
-            this.renderCategory(formPanel, category, draft);
+        // ── Form sections + interleaved user-defined custom sections (#120) ──
+        const customHost = this.buildCustomSectionsHost(draft);
+        // Slot 0: any custom sections positioned above the first built-in.
+        renderCustomSectionsAtSlot(formPanel, customHost, 0);
+        for (let i = 0; i < CHARACTER_CATEGORIES.length; i++) {
+            this.renderCategory(formPanel, CHARACTER_CATEGORIES[i], draft);
+            // Slot i+1: any custom sections after the i-th built-in.
+            renderCustomSectionsAtSlot(formPanel, customHost, i + 1);
         }
 
         // ── Custom fields section ──
         this.renderCustomFields(formPanel, draft);
+
+        // ── "+ Add custom section" button at the bottom ──
+        renderAddCustomSectionButton(formPanel, customHost);
 
         // ── Side panel: gallery + scene info + references ──
         this.renderGallery(sidePanel, draft);
@@ -1814,6 +1828,8 @@ export class CharacterView extends ItemView {
             const custom = draft.custom || {};
 
             for (const [key, val] of Object.entries(custom)) {
+                // Skip composite keys belonging to user-defined custom sections (#120)
+                if (isCustomSectionKey(key)) continue;
                 const row = sectionBody.createDiv('character-field-row character-custom-row');
                 const keyInput = row.createEl('input', {
                     cls: 'character-field-input character-custom-key',
@@ -1870,6 +1886,35 @@ export class CharacterView extends ItemView {
         };
 
         renderAllCustomFields();
+    }
+
+    // ── User-defined custom sections (#120) ────────────
+
+    /**
+     * Build the {@link CustomSectionsHost} used to interleave user-defined
+     * custom sections with the built-in `CHARACTER_CATEGORIES` in the detail
+     * form. The host is rebuilt per-render so it always reflects the latest
+     * settings array reference.
+     */
+    private buildCustomSectionsHost(draft: Character): CustomSectionsHost<Character> {
+        if (!this.plugin.settings.characterCustomSections) {
+            this.plugin.settings.characterCustomSections = [];
+        }
+        const sections = this.plugin.settings.characterCustomSections;
+        return {
+            app: this.app,
+            draft,
+            sections,
+            builtinSectionCount: CHARACTER_CATEGORIES.length,
+            collapsedSections: this.collapsedSections,
+            collapseKeyPrefix: 'character',
+            cssPrefix: 'character',
+            scheduleSave: (d) => this.scheduleSave(d),
+            persistSections: () => { void this.plugin.saveSettings(); },
+            requestRerender: () => {
+                if (this.rootContainer) this.renderView(this.rootContainer);
+            },
+        };
     }
 
     // ── Image gallery carousel ─────────────────────────

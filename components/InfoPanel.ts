@@ -12,16 +12,20 @@ import { renderAutocompleteInput } from './InlineSuggest';
  * All fields are bound to the same Scene model the main Inspector edits,
  * so changes round-trip through the normal frontmatter pipeline.
  */
+export type InfoPanelMode = 'full' | 'synopsis' | 'notes';
+
 export class InfoPanelComponent {
     private plugin: SceneCardsPlugin;
     private sceneManager: SceneManager;
     private container: HTMLElement;
     private currentScene: Scene | null = null;
+    private mode: InfoPanelMode;
 
-    constructor(container: HTMLElement, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
+    constructor(container: HTMLElement, plugin: SceneCardsPlugin, sceneManager: SceneManager, mode: InfoPanelMode = 'full') {
         this.container = container;
         this.plugin = plugin;
         this.sceneManager = sceneManager;
+        this.mode = mode;
     }
 
     show(scene: Scene): void {
@@ -54,6 +58,23 @@ export class InfoPanelComponent {
 
         this.container.addClass('sl-info-panel');
 
+        if (this.mode === 'synopsis') {
+            this.container.addClass('sl-info-panel-mode-synopsis');
+            // Title kept small for context
+            const titleEl = this.container.createDiv('sl-info-title');
+            titleEl.setText(scene.title || 'Untitled');
+            this.renderSynopsis(scene);
+            return;
+        }
+
+        if (this.mode === 'notes') {
+            this.container.addClass('sl-info-panel-mode-notes');
+            const titleEl = this.container.createDiv('sl-info-title');
+            titleEl.setText(scene.title || 'Untitled');
+            this.renderNotes(scene);
+            return;
+        }
+
         // Title
         const titleEl = this.container.createDiv('sl-info-title');
         titleEl.setText(scene.title || 'Untitled');
@@ -69,12 +90,6 @@ export class InfoPanelComponent {
 
         // ── Word count (read-only) ──
         this.renderWordCountRow(scene);
-
-        // ── Synopsis ──
-        this.renderSynopsis(scene);
-
-        // ── Notes (linked to scene.notes) ──
-        this.renderNotes(scene);
     }
 
     private renderStatusRow(scene: Scene): void {
@@ -173,7 +188,7 @@ export class InfoPanelComponent {
 
         const textarea = section.createEl('textarea', {
             cls: 'sl-info-synopsis-textarea',
-            attr: { placeholder: 'Brief scene synopsis…', rows: '6' },
+            attr: { placeholder: 'Brief scene synopsis…' },
         });
         textarea.value = scene.synopsis || '';
         textarea.addEventListener('change', async () => {
@@ -189,7 +204,7 @@ export class InfoPanelComponent {
 
         const textarea = section.createEl('textarea', {
             cls: 'sl-info-notes-textarea',
-            attr: { placeholder: 'Notes & comments…', rows: '6' },
+            attr: { placeholder: 'Notes & comments…' },
         });
         textarea.value = scene.notes || '';
         textarea.addEventListener('change', async () => {

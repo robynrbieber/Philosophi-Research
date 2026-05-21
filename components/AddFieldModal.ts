@@ -23,6 +23,7 @@ export class AddFieldModal extends Modal {
 
     // Working state
     private label = '';
+    private labelInput: HTMLInputElement | null = null;
     private type: UniversalFieldType = 'text';
     private section = '';
     private placeholder = '';
@@ -101,6 +102,7 @@ export class AddFieldModal extends Modal {
                             topLevelKeyInput.value = this.topLevelKey;
                         }
                     });
+                this.labelInput = text.inputEl;
                 text.inputEl.focus();
             });
 
@@ -281,6 +283,11 @@ export class AddFieldModal extends Modal {
             text: this.existing ? 'Save' : 'Add field',
         });
         confirmBtn.addEventListener('click', () => {
+            // Read input value directly in case onChange hasn't fired yet (issue #115)
+            if (this.labelInput) {
+                const raw = this.labelInput.value.trim();
+                if (raw) this.label = raw;
+            }
             if (!this.label) {
                 // Highlight label field
                 const labelInput = contentEl.querySelector('.setting-item:first-child input') as HTMLInputElement;

@@ -56,7 +56,8 @@ export class SceneCardComponent {
 
         // Header
         const header = card.createDiv('scene-card-header');
-        if (scene.sequence !== undefined) {
+        const showSeq = this.plugin.settings.showSceneNumberOnCards ?? true;
+        if (showSeq) {
             header.createSpan({
                 cls: 'scene-card-seq',
                 text: this.formatSequence(scene)

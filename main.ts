@@ -21,6 +21,9 @@ import {
     SCENE_INSPECTOR_VIEW_TYPE,
     MANUSCRIPT_VIEW_TYPE,
     RESEARCH_VIEW_TYPE,
+    NOTES_VIEW_TYPE,
+    SYNOPSIS_VIEW_TYPE,
+    DETAILS_VIEW_TYPE,
 } from './constants';
 import { PlotgridView } from './views/PlotgridView';
 import type { PlotGridData } from './models/PlotGridData';
@@ -35,6 +38,9 @@ import { HelpView } from './views/HelpView';
 import { NavigatorView } from './views/NavigatorView';
 import { CodexView } from './views/CodexView';
 import { SceneInspectorView } from './views/SceneInspectorView';
+import { NotesView } from './views/NotesView';
+import { SynopsisView } from './views/SynopsisView';
+import { DetailsView } from './views/DetailsView';
 import { ManuscriptView } from './views/ManuscriptView';
 import { ResearchView } from './views/ResearchView';
 import { ResearchManager } from './services/ResearchManager';
@@ -184,6 +190,15 @@ export default class SceneCardsPlugin extends Plugin {
         );
         this.registerView(SCENE_INSPECTOR_VIEW_TYPE, (leaf) =>
             new SceneInspectorView(leaf, this, this.sceneManager)
+        );
+        this.registerView(NOTES_VIEW_TYPE, (leaf) =>
+            new NotesView(leaf, this, this.sceneManager)
+        );
+        this.registerView(SYNOPSIS_VIEW_TYPE, (leaf) =>
+            new SynopsisView(leaf, this, this.sceneManager)
+        );
+        this.registerView(DETAILS_VIEW_TYPE, (leaf) =>
+            new DetailsView(leaf, this, this.sceneManager)
         );
         this.registerView(MANUSCRIPT_VIEW_TYPE, (leaf) =>
             new ManuscriptView(leaf, this, this.sceneManager)
@@ -363,6 +378,24 @@ export default class SceneCardsPlugin extends Plugin {
             id: 'open-scene-inspector',
             name: 'Open scene details sidebar',
             callback: () => this.openSceneInspector(),
+        });
+
+        this.addCommand({
+            id: 'open-scene-notes',
+            name: 'Open scene notes sidebar',
+            callback: () => this.openNotesView(),
+        });
+
+        this.addCommand({
+            id: 'open-scene-synopsis',
+            name: 'Open scene synopsis sidebar',
+            callback: () => this.openSynopsisView(),
+        });
+
+        this.addCommand({
+            id: 'open-scene-details-view',
+            name: 'Open scene details in own pane',
+            callback: () => this.openSceneDetailsLeaf(),
         });
 
         this.addCommand({
@@ -1449,6 +1482,59 @@ export default class SceneCardsPlugin extends Plugin {
         const leaf = workspace.getRightLeaf(false);
         if (leaf) {
             await leaf.setViewState({ type: SCENE_INSPECTOR_VIEW_TYPE, active: true });
+            workspace.revealLeaf(leaf);
+        }
+    }
+
+    /**
+     * Open (or reveal) the standalone Notes sidebar view.
+     */
+    async openNotesView(): Promise<void> {
+        const { workspace } = this.app;
+        const existing = workspace.getLeavesOfType(NOTES_VIEW_TYPE);
+        if (existing.length > 0) {
+            workspace.revealLeaf(existing[0]);
+            return;
+        }
+        const leaf = workspace.getRightLeaf(false);
+        if (leaf) {
+            await leaf.setViewState({ type: NOTES_VIEW_TYPE, active: true });
+            workspace.revealLeaf(leaf);
+        }
+    }
+
+    /**
+     * Open (or reveal) the standalone Synopsis sidebar view. The leaf can be
+     * dragged to dock above/below/beside any other pane.
+     */
+    async openSynopsisView(): Promise<void> {
+        const { workspace } = this.app;
+        const existing = workspace.getLeavesOfType(SYNOPSIS_VIEW_TYPE);
+        if (existing.length > 0) {
+            workspace.revealLeaf(existing[0]);
+            return;
+        }
+        const leaf = workspace.getRightLeaf(false);
+        if (leaf) {
+            await leaf.setViewState({ type: SYNOPSIS_VIEW_TYPE, active: true });
+            workspace.revealLeaf(leaf);
+        }
+    }
+
+    /**
+     * Open (or reveal) the standalone Scene Details view (the full inspector
+     * inside its own dockable leaf).
+     */
+    async openSceneDetailsLeaf(): Promise<void> {
+        const { workspace } = this.app;
+        const existing = workspace.getLeavesOfType(DETAILS_VIEW_TYPE);
+        if (existing.length > 0) {
+            workspace.revealLeaf(existing[0]);
+            return;
+        }
+        const leaf = workspace.getRightLeaf(false);
+        if (leaf) {
+            await leaf.setViewState({ type: DETAILS_VIEW_TYPE, active: true });
             workspace.revealLeaf(leaf);
         }
     }
