@@ -6,6 +6,18 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.16
+
+### Changes
+
+- **Cleaner POV display on scene cards** — The separate *POV: Name* line above the footer is gone. The POV character now appears as the **first pill** in the character row of each scene card, with the label *POV: <name>*. One row, less clutter.
+- **Plot Grid: POV pill instead of cell markers** — Plot Grid cells no longer show a `✓` or `★ POV` at the top. Instead, the existing pill row inside each cell now lists characters first, then locations, and the POV character is hoisted to the very first slot with the label *POV: <name>* on an amber background. The cell background itself stays untouched. Existing grids are cleaned up automatically on next load — no manual sync needed.
+
+### Bug Fixes
+
+- **Plot Grid: section action buttons are now plain icons** — The Move-up / Move-down / Rename / Delete buttons on user-defined custom section headers, and the per-field reorder/remove buttons inside them, are now icon-only spans matching the rest of the app instead of native `<button>` elements with default browser chrome. Applies to Codex, Character, and World/Location custom sections.
+
+---
 ## Version 1.10.15
 
 ### New Features

@@ -115,13 +115,6 @@ export class SceneCardComponent {
             }
         }
 
-        if (!options?.compact && scene.pov) {
-            const meta = card.createDiv('scene-card-meta');
-            meta.createSpan({
-                cls: 'scene-card-pov',
-                text: `POV: ${scene.pov}`
-            });
-        }
         if (!options?.compact) {
             const footer = card.createDiv('scene-card-footer');
             if (this.plugin.settings.showWordCounts) {
@@ -135,18 +128,42 @@ export class SceneCardComponent {
             }
             const progress = footer.createSpan('scene-card-progress');
             this.renderProgressDots(progress, scene.status || 'idea');
-            if (scene.characters?.length) {
+
+            // Character pill row. POV character is rendered first as a plain
+            // pill but with the text "POV: <name>" so the reader can identify
+            // whose head we're in without needing a separate metadata line.
+            const povName = scene.pov ? scene.pov.trim() : '';
+            const allChars = scene.characters || [];
+            const otherChars = allChars.filter(
+                c => c && c.toLowerCase() !== povName.toLowerCase()
+            );
+            const havePovInList = !!povName && allChars.some(
+                c => c && c.toLowerCase() === povName.toLowerCase()
+            );
+            if (havePovInList || otherChars.length || (povName && !havePovInList)) {
                 const charList = card.createDiv('scene-card-characters');
-                scene.characters.slice(0, 3).forEach(c => {
+                let renderedCount = 0;
+                const maxPills = 3;
+                if (povName) {
                     charList.createSpan({
                         cls: 'scene-card-char-tag',
-                        text: c
+                        text: `POV: ${povName}`,
                     });
-                });
-                if (scene.characters.length > 3) {
+                    renderedCount += 1;
+                }
+                for (const c of otherChars) {
+                    if (renderedCount >= maxPills) break;
+                    charList.createSpan({
+                        cls: 'scene-card-char-tag',
+                        text: c,
+                    });
+                    renderedCount += 1;
+                }
+                const totalChars = (povName ? 1 : 0) + otherChars.length;
+                if (totalChars > renderedCount) {
                     charList.createSpan({
                         cls: 'scene-card-char-more',
-                        text: `+${scene.characters.length - 3}`
+                        text: `+${totalChars - renderedCount}`,
                     });
                 }
             }

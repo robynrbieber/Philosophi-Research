@@ -134,9 +134,35 @@ export class PlotgridView extends ItemView {
             }
             // Auto-repair broken linkedSceneId paths (e.g. after project migration)
             this.repairLinkedScenePaths();
+            // Strip legacy auto-sync markers ("✓", "★ POV", "POV: …") that
+            // older builds wrote into cell.content. The pill row inside each
+            // cell now carries that information instead, so the marker text
+            // would just show up twice and clutter the top of the cell.
+            this.stripLegacyAutoMarkers();
         } catch (e) {
             this.data = { rows: [], columns: [], cells: {}, zoom: 1 };
         }
+    }
+
+    /**
+     * Remove auto-generated presence/POV marker text left over in
+     * `cell.content` by earlier sync runs. Only touches cells whose content
+     * is exactly one of the known marker strings AND that aren't flagged as
+     * `manualContent`, so user-typed text is never destroyed.
+     */
+    private stripLegacyAutoMarkers(): void {
+        const markerRe = /^(✓|★\s*POV|POV:\s.+)$/;
+        let dirty = false;
+        for (const key of Object.keys(this.data.cells)) {
+            const cell = this.data.cells[key];
+            if (!cell || cell.manualContent) continue;
+            const text = (cell.content || '').trim();
+            if (text && markerRe.test(text)) {
+                cell.content = '';
+                dirty = true;
+            }
+        }
+        if (dirty) this.scheduleSave();
     }
 
     /**
@@ -1251,21 +1277,60 @@ export class PlotgridView extends ItemView {
                         }
                     };
 
+                    // Resolve linked scene up-front so we can inject the
+                    // POV character as a dedicated first pill below.
+                    const scMgr2 = this.plugin.sceneManager as SceneManager | undefined;
+                    const linkedScene = cell.linkedSceneId ? scMgr2?.getScene(cell.linkedSceneId) : undefined;
+
                     // Scan linked scene body (uses cache)
-                    if (cell.linkedSceneId) {
-                        const scMgr2 = this.plugin.sceneManager as SceneManager | undefined;
-                        const linkedScene = scMgr2?.getScene(cell.linkedSceneId);
-                        if (linkedScene) addMentions(this.plugin.linkScanner.scan(linkedScene));
-                    }
+                    if (linkedScene) addMentions(this.plugin.linkScanner.scan(linkedScene));
 
                     // Scan cell text
                     if (cell.content?.trim()) {
                         addMentions(this.plugin.linkScanner.scanText(cell.content));
                     }
 
-                    if (mentions.length > 0) {
+                    const povName = (linkedScene?.pov || '').trim();
+
+                    // Sort: characters first, then locations, then everything
+                    // else, preserving discovery order within each group.
+                    const typeRank = (t: string): number => {
+                        if (t === 'character') return 0;
+                        if (t === 'location') return 1;
+                        return 2;
+                    };
+                    const sortedMentions = mentions
+                        .map((m, idx) => ({ m, idx }))
+                        .sort((a, b) => {
+                            const r = typeRank(a.m.type) - typeRank(b.m.type);
+                            return r !== 0 ? r : a.idx - b.idx;
+                        })
+                        .map(x => x.m);
+
+                    // Pull the POV character (if present) out of the list so we
+                    // can render it as the very first pill, with an amber
+                    // accent. If the POV isn't in the mention list at all we
+                    // still inject it explicitly.
+                    let povHandled = false;
+                    if (povName) {
+                        const povIdx = sortedMentions.findIndex(
+                            m => m.type === 'character' && m.name.toLowerCase() === povName.toLowerCase()
+                        );
+                        if (povIdx >= 0) {
+                            sortedMentions.splice(povIdx, 1);
+                        }
+                        povHandled = true;
+                    }
+
+                    if (povHandled || sortedMentions.length > 0) {
                         const tagsEl = cellEl.createDiv('pg-codex-tags');
-                        for (const m of mentions) {
+                        if (povHandled) {
+                            const povPill = tagsEl.createSpan({
+                                cls: 'pg-codex-tag pg-codex-tag-character pg-codex-tag-pov',
+                            });
+                            povPill.textContent = `POV: ${povName}`;
+                        }
+                        for (const m of sortedMentions) {
                             const pill = tagsEl.createSpan({ cls: `pg-codex-tag pg-codex-tag-${m.type}` });
                             pill.textContent = m.name;
                         }
@@ -2743,20 +2808,16 @@ export class PlotgridView extends ItemView {
         return parts.join(' · ');
     }
 
-    /** Build cell content: a short summary for the intersection */
+    /** Build cell content: a short summary for the intersection.
+     *  Presence cells are left empty (the linked-scene preview already
+     *  carries the visual weight). The POV character gets a small textual
+     *  marker so authors can tell at a glance whose head we're in. */
     private buildCellContent(scene: Scene, colSource: string, colValue: string, resolve?: (n: string) => string): string {
         if (colSource === 'characters') {
-            // If this character is the POV, mark it
             const resolvedPov = scene.pov ? (resolve ? resolve(scene.pov) : scene.pov) : '';
-            if (resolvedPov && resolvedPov === colValue) return '★ POV';
-            return '✓';
-        } else if (colSource === 'tags') {
-            return '✓';
-        } else if (colSource === 'locations') {
-            return '✓';
+            if (resolvedPov && resolvedPov === colValue) return `POV: ${colValue}`;
         }
-        // codex categories and any unknown source
-        return '✓';
+        return '';
     }
 
     // ── End sync helpers ────────────────────────────────────────────
