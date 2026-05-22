@@ -6,6 +6,22 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.17
+
+### New Features
+
+- **Custom sections gain rich field types** *([#121](https://github.com/PixeroJan/obsidian-storyline/issues/121))* — Fields inside a user-defined custom section (on Codex entries, Characters, and World/Location sheets) can now be more than just a single-line text input. The **Add Field** dialog now lets you pick a **Type** (Text, Text block, Dropdown, Multi-select, Checkbox), set a **Placeholder**, and supply **Options** for dropdowns / multi-selects — the same widgets you already know from universal field templates. Existing custom sections still work unchanged; legacy plain-string field entries are auto-treated as Text.
+- **Edit a custom field in place** — Each custom-section field now has a small **pencil** icon next to the move/delete chevrons. Click it to change the field's name, type, placeholder, or options without removing and re-adding. Field values are migrated automatically when you rename a field.
+- **Synopsis on the Scene Details tab** — The Synopsis textarea now appears inline on the Details tab as well, not only on the standalone Synopsis tab/sidebar. 6 rows tall by default so a couple of sentences fit without scrolling.
+- **Collapse view-tab labels on narrow toolbars** — When the StoryLine toolbar is too narrow to fit every view tab's label, the labels are now hidden automatically and only the icon (Corkboard, Timeline, Codex, …) is shown. Toggle off under **Settings → Display Options → Collapse view-tab labels when toolbar is narrow** if you prefer the labels to wrap.
+- **Hide the "StoryLine" title row** — A new toggle under **Settings → Display Options → Hide "StoryLine" title above view tabs** hides the duplicated **StoryLine - Projectname** header at the top of every view, reclaiming ~30–45px of vertical space. Defaults to **on** for new installs (the project name is already visible in the tab title and project selector). Flip it back off under Display Options if you want the old layout.
+
+### Bug Fixes
+
+- **Custom-section field icons match the rest of StoryLine** — The Edit / Move-up / Move-down / Remove icons on each custom-section field row are now hover-only (matching how built-in field icons fade in on mouse-over) and sized exactly to 14×14 to line up with the standard field chevrons. Previously they were always visible and visibly larger than the rest of the form.
+- **Project modal no longer auto-opens on mobile** — On iOS / iPadOS / Android, the "New StoryLine Project" dialog used to appear automatically when the vault file system hadn't finished syncing yet (common with iCloud / Dropbox / OneDrive), risking accidental duplicate projects. On mobile, StoryLine now shows a brief notice instead and waits for the user to invoke **Create new project** from the command palette once everything has loaded. Desktop behavior is unchanged.
+
+---
 ## Version 1.10.16
 
 ### Changes

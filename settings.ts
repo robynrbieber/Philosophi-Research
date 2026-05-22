@@ -613,6 +613,25 @@ export interface SceneCardsSettings {
     // Hide frontmatter (properties) in live preview / reading mode
     hideFrontmatter: boolean;
 
+    /**
+     * Hide the Obsidian tab header ("StoryLine - Projectname") above the
+     * StoryLine toolbar to save ~30–45px of vertical space at the top of
+     * every StoryLine view. Default `true` because the project name is
+     * already shown elsewhere (in the tab title and project selector) and
+     * the duplication wastes vertical real estate on smaller screens.
+     * Users who liked the old layout can toggle it back on under
+     * Settings → Display Options.
+     */
+    hideToolbarTitle?: boolean;
+
+    /**
+     * Show only the icon (not the text label) on each view-switcher tab
+     * when the toolbar is too narrow to fit both. Default `true` because
+     * the auto-hide is silent and additive — wide toolbars still show
+     * label + icon as before.
+     */
+    autoHideViewLabels?: boolean;
+
     // DOCX export settings (adapted from ToWord plugin)
     docxSettings: SLDocxSettings;
 
@@ -643,14 +662,36 @@ export interface SceneCardsSettings {
     // in this category, the listed field names are pre-populated with empty values.
     // Keyed by category id (e.g. 'items', 'creatures', or a custom id).
     codexCategoryFieldTemplates?: Record<string, string[]>;
-    // Per-category user-defined custom sections (#114). Each section has a title
-    // and a list of field names. Field values live in CodexEntry.custom keyed by
-    // a composite `${sectionTitle} :: ${fieldName}` to keep them grouped.
-    codexCategoryCustomSections?: Record<string, Array<{ title: string; fields: string[] }>>;
-    /** User-defined custom sections shared across all characters (#120). */
-    characterCustomSections?: Array<{ title: string; fields: string[] }>;
-    /** User-defined custom sections shared across all locations / worlds (#120). */
-    locationCustomSections?: Array<{ title: string; fields: string[] }>;
+    // Per-category user-defined custom sections (#114). Each section has a title,
+    // an ordered list of fields, and an optional `position` slot describing where
+    // the section is inserted among the built-in sections.
+    //
+    // Field entries can be either:
+    //   * a bare string (legacy v1.10.15 — equivalent to `{ name, type: 'text' }`), or
+    //   * a rich `{ name, type, placeholder?, options? }` definition added in
+    //     v1.10.17 so users get the same input types they're used to from
+    //     universal field templates (text, textarea, dropdown, multi-select,
+    //     checkbox).
+    //
+    // Field values still live in `<entity>.custom` keyed by the composite
+    // `${sectionTitle} :: ${fieldName}` so existing data round-trips cleanly.
+    codexCategoryCustomSections?: Record<string, Array<{
+        title: string;
+        fields: Array<string | { name: string; type?: string; placeholder?: string; options?: string[] }>;
+        position?: number;
+    }>>;
+    /** User-defined custom sections shared across all characters (#120 / v1.10.17). */
+    characterCustomSections?: Array<{
+        title: string;
+        fields: Array<string | { name: string; type?: string; placeholder?: string; options?: string[] }>;
+        position?: number;
+    }>;
+    /** User-defined custom sections shared across all locations / worlds (#120 / v1.10.17). */
+    locationCustomSections?: Array<{
+        title: string;
+        fields: Array<string | { name: string; type?: string; placeholder?: string; options?: string[] }>;
+        position?: number;
+    }>;
     /** Which codex category IDs should appear in the Scene Inspector sidebar */
     codexSidebarCategories: string[];
     /** Series name — groups projects that share a common universe / codex */
@@ -801,6 +842,8 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     ignoredCharacters: [],
 
     hideFrontmatter: true,
+    hideToolbarTitle: true,
+    autoHideViewLabels: true,
 
     docxSettings: { ...SL_DEFAULT_DOCX_SETTINGS },
 
@@ -892,6 +935,28 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     // Re-apply scoped hiding to currently open markdown leaves (issue #104)
                     this.plugin.updateFrontmatterVisibility();
+                }));
+
+        new Setting(containerEl)
+            .setName('Hide "StoryLine" title above view tabs')
+            .setDesc('Saves ~30–45px of vertical space at the top of every StoryLine view. The view-switcher tabs and project name still appear; only the duplicated "StoryLine" header is removed.')
+            .addToggle(toggle => toggle
+                .setValue(!!this.plugin.settings.hideToolbarTitle)
+                .onChange(async (value) => {
+                    this.plugin.settings.hideToolbarTitle = value;
+                    await this.plugin.saveSettings();
+                    this.plugin.updateToolbarVisibility();
+                }));
+
+        new Setting(containerEl)
+            .setName('Collapse view-tab labels when toolbar is narrow')
+            .setDesc('When the StoryLine toolbar is too narrow to fit every view-tab label, show only the icon (Corkboard, Timeline, etc.). Disable to always show both icon and text — the labels will wrap or be clipped if the toolbar is small.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.autoHideViewLabels !== false)
+                .onChange(async (value) => {
+                    this.plugin.settings.autoHideViewLabels = value;
+                    await this.plugin.saveSettings();
+                    this.plugin.updateToolbarVisibility();
                 }));
 
         // ═══════════════════════════════════════════

@@ -243,6 +243,13 @@ body.theme-dark {
     align-items: center;
     gap: 8px;
 }
+/* User-opt-in: hide the Obsidian tab header ("StoryLine - Projectname")
+   above the StoryLine toolbar to save vertical space. Targets the
+   `.view-header` sibling of any StoryLine view container.
+   (Setting → "Hide title above view tabs", v1.10.17.) */
+body.sl-hide-toolbar-title .workspace-leaf-content[data-type^="story-line-"] > .view-header {
+    display: none;
+}
 /* Project name shown next to the StoryLine header */
 .story-line-project-name {
     font-size: 0.95em;
@@ -534,6 +541,20 @@ body.theme-dark {
 
 .view-tab-label {
     line-height: 1;
+}
+
+/* Auto-hide view-tab labels when the toolbar is too narrow to fit them
+   alongside the icons (v1.10.17). The `sl-collapsed` class is toggled by a
+   ResizeObserver in `components/ViewSwitcher.ts` — see `installAutoHideLabels`.
+   CSS container queries can't be used directly because the switcher is
+   `width: auto` (= its content width), so the container never reports a
+   constrained width to query against. */
+body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .view-tab-label {
+    display: none;
+}
+body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-view-tab {
+    padding-left: 6px;
+    padding-right: 6px;
 }
 
 .story-line-group-control {
@@ -8980,22 +9001,131 @@ body.theme-dark .location-field-input.dropdown {
     gap: 6px;
 }
 .codex-custom-field-row .codex-field-input { flex: 1; }
-.codex-custom-field-remove {
+
+/* Multi-select widget used inside custom-section fields (v1.10.17). Compact
+   pills + a free-form text input. Comma-friendly storage on save. */
+.codex-custom-multi-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.codex-custom-multi-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.codex-custom-multi-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: var(--background-modifier-hover);
+    border-radius: 10px;
+    font-size: 0.85em;
+}
+.codex-custom-multi-pill-x {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.codex-custom-multi-pill-x:hover {
+    color: var(--text-error);
+}
+.codex-custom-checkbox {
+    /* Use the host view's accent for checked state but otherwise inherit. */
+    accent-color: var(--interactive-accent);
+    width: auto;
+    flex: 0 0 auto;
+}
+
+/* Row-action icons (Edit / Move-up / Move-down / Remove) on custom-section
+   fields. The renderer in `components/CustomSectionsRenderer.ts` builds the
+   class name from the host view's `cssPrefix`, so the same control is
+   `codex-custom-field-remove` on Codex, `character-custom-field-remove` on
+   Characters, and `location-custom-field-remove` on Locations. We list all
+   three so the rule fires on every view. */
+.codex-custom-field-remove,
+.character-custom-field-remove,
+.location-custom-field-remove {
     background: none;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    padding: 4px;
+    /* Tight padding + 14×14 icon to exactly match the built-in field
+       chevrons (`.field-move-btn` / `.field-hide-btn`). */
+    padding: 0 2px;
+    margin-left: 2px;
+    border-radius: 4px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    /* Hover-only visibility, matching the `.field-hide-btn` and
+       `.field-move-btn` chevrons on built-in fields. */
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
 }
-.codex-custom-field-remove:hover { color: var(--text-error); }
-.codex-custom-field-remove[data-disabled="true"] {
-    opacity: 0.35;
+.codex-custom-field-row:hover .codex-custom-field-remove,
+.codex-custom-field-row:hover .character-custom-field-remove,
+.codex-custom-field-row:hover .location-custom-field-remove,
+.character-custom-field-row:hover .codex-custom-field-remove,
+.character-custom-field-row:hover .character-custom-field-remove,
+.character-custom-field-row:hover .location-custom-field-remove,
+.location-custom-field-row:hover .codex-custom-field-remove,
+.location-custom-field-row:hover .character-custom-field-remove,
+.location-custom-field-row:hover .location-custom-field-remove {
+    opacity: 0.6;
+}
+.codex-custom-field-remove:hover,
+.character-custom-field-remove:hover,
+.location-custom-field-remove:hover {
+    color: var(--text-accent);
+    opacity: 1;
+}
+.codex-custom-field-remove[data-disabled="true"],
+.character-custom-field-remove[data-disabled="true"],
+.location-custom-field-remove[data-disabled="true"] {
+    /* Disabled (first/last) field icons stay hidden by default and only
+       fade in to a faint ghost when the row is hovered. */
+    opacity: 0;
     cursor: default;
     pointer-events: none;
 }
-.codex-custom-field-remove .svg-icon {
+.codex-custom-field-row:hover .codex-custom-field-remove[data-disabled="true"],
+.codex-custom-field-row:hover .character-custom-field-remove[data-disabled="true"],
+.codex-custom-field-row:hover .location-custom-field-remove[data-disabled="true"],
+.character-custom-field-row:hover .codex-custom-field-remove[data-disabled="true"],
+.character-custom-field-row:hover .character-custom-field-remove[data-disabled="true"],
+.character-custom-field-row:hover .location-custom-field-remove[data-disabled="true"],
+.location-custom-field-row:hover .codex-custom-field-remove[data-disabled="true"],
+.location-custom-field-row:hover .character-custom-field-remove[data-disabled="true"],
+.location-custom-field-row:hover .location-custom-field-remove[data-disabled="true"] {
+    opacity: 0.25;
+}
+/* Force the SVG inside the row buttons to exactly 14×14. `setIcon()` may
+   write inline `width`/`height` attributes on the SVG element; we rely
+   on the fact that an attribute selector with the parent row class chain
+   gives us higher CSS specificity than the inline attributes, while still
+   following Obsidian's plugin-style guidelines (no `!important`). */
+.codex-custom-field-row .codex-custom-field-remove svg,
+.codex-custom-field-row .codex-custom-field-remove .svg-icon,
+.codex-custom-field-row .character-custom-field-remove svg,
+.codex-custom-field-row .character-custom-field-remove .svg-icon,
+.codex-custom-field-row .location-custom-field-remove svg,
+.codex-custom-field-row .location-custom-field-remove .svg-icon,
+.character-custom-field-row .codex-custom-field-remove svg,
+.character-custom-field-row .codex-custom-field-remove .svg-icon,
+.character-custom-field-row .character-custom-field-remove svg,
+.character-custom-field-row .character-custom-field-remove .svg-icon,
+.character-custom-field-row .location-custom-field-remove svg,
+.character-custom-field-row .location-custom-field-remove .svg-icon,
+.location-custom-field-row .codex-custom-field-remove svg,
+.location-custom-field-row .codex-custom-field-remove .svg-icon,
+.location-custom-field-row .character-custom-field-remove svg,
+.location-custom-field-row .character-custom-field-remove .svg-icon,
+.location-custom-field-row .location-custom-field-remove svg,
+.location-custom-field-row .location-custom-field-remove .svg-icon {
     width: 14px;
     height: 14px;
 }
@@ -9032,17 +9162,41 @@ body.theme-dark .location-field-input.dropdown {
     display: inline-flex;
     align-items: center;
     user-select: none;
+    /* Hover-only visibility (v1.10.17). The Move-up / Move-down / Rename /
+       Delete icons on a custom-section header are hidden by default and
+       fade in when the user hovers anywhere on the section, matching the
+       behavior of the field-row icons below. */
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+.codex-section-custom:hover .codex-section-action-btn,
+.character-section-custom:hover .codex-section-action-btn,
+.location-section-custom:hover .codex-section-action-btn {
+    opacity: 0.6;
 }
 .codex-section-action-btn:hover {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
+    opacity: 1;
 }
 .codex-section-action-btn[data-disabled="true"] {
-    opacity: 0.35;
+    /* Disabled (boundary) chevrons stay hidden by default and only fade
+       in to a faint ghost on section hover. */
+    opacity: 0;
     cursor: default;
     pointer-events: none;
 }
-.codex-section-action-btn .svg-icon {
+.codex-section-custom:hover .codex-section-action-btn[data-disabled="true"],
+.character-section-custom:hover .codex-section-action-btn[data-disabled="true"],
+.location-section-custom:hover .codex-section-action-btn[data-disabled="true"] {
+    opacity: 0.25;
+}
+/* Higher-specificity selector to size the section action icons without
+   `!important` — the parent `.codex-section-actions` class adds the
+   specificity needed to beat the inline width/height attributes that
+   Obsidian's `setIcon()` writes on the SVG element. */
+.codex-section-actions .codex-section-action-btn .svg-icon,
+.codex-section-actions .codex-section-action-btn svg {
     width: 14px;
     height: 14px;
 }

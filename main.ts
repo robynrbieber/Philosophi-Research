@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { App, ButtonComponent, DropdownComponent, FuzzySuggestModal, Modal, Notice, Plugin, Setting, TFile, TextComponent, ToggleComponent, WorkspaceLeaf, normalizePath, parseYaml, setIcon } from 'obsidian';
+import { App, ButtonComponent, DropdownComponent, FuzzySuggestModal, Modal, Notice, Platform, Plugin, Setting, TFile, TextComponent, ToggleComponent, WorkspaceLeaf, normalizePath, parseYaml, setIcon } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { asRecord, asString, asNumber, asBool, isRecord } from './utils/narrow';
 import type { FilterPreset } from './models/Scene';
@@ -213,6 +213,10 @@ export default class SceneCardsPlugin extends Plugin {
             try {
             // Apply frontmatter visibility (scoped to StoryLine files only — issue #104)
             this.updateFrontmatterVisibility();
+            // Apply toolbar visibility settings (v1.10.17) — hide the
+            // "StoryLine" title row and/or auto-collapse view-tab labels
+            // when the toolbar is narrow.
+            this.updateToolbarVisibility();
 
             await this.bootstrapProjects();
             // Re-initialize scene index now that the active project is set.
@@ -659,6 +663,31 @@ export default class SceneCardsPlugin extends Plugin {
             } else {
                 target.classList.remove('sl-hide-frontmatter');
             }
+        }
+    }
+
+    /**
+     * Apply the toolbar-related settings (v1.10.17):
+     *   - `hideToolbarTitle`   → toggle `sl-hide-toolbar-title` on body
+     *   - `autoHideViewLabels` → toggle `sl-auto-hide-tab-labels` on body
+     *
+     * Both are pure CSS toggles — no DOM re-render is needed since every
+     * StoryLine view's toolbar uses the shared `.story-line-title-row`
+     * and `.view-tab-label` classes.
+     */
+    public updateToolbarVisibility(): void {
+        const body = activeDocument.body;
+        if (!body) return;
+        if (this.settings.hideToolbarTitle) {
+            body.classList.add('sl-hide-toolbar-title');
+        } else {
+            body.classList.remove('sl-hide-toolbar-title');
+        }
+        // Default true; only opt out if explicitly false.
+        if (this.settings.autoHideViewLabels === false) {
+            body.classList.remove('sl-auto-hide-tab-labels');
+        } else {
+            body.classList.add('sl-auto-hide-tab-labels');
         }
     }
 
@@ -2146,7 +2175,25 @@ export default class SceneCardsPlugin extends Plugin {
                 }
             }
 
-            // Prompt user to name their first project instead of auto-creating "Default"
+            // Mobile (iOS / iPadOS / Android) suppression: the vault file
+            // system on mobile can take a long time to populate, especially
+            // with iCloud / Dropbox / OneDrive sync. Auto-opening the New
+            // Project modal in that window leads to users seeing the dialog
+            // before their existing projects have shown up, and accidentally
+            // creating duplicates. Show a one-time notice instead and let
+            // the user invoke the modal manually from the command palette
+            // ("StoryLine: Create new project") once everything has loaded.
+            if (Platform.isMobile) {
+                new Notice(
+                    'StoryLine: no projects found yet. If sync is still running, give it a moment. ' +
+                    'Otherwise use the command palette → "StoryLine: Create new project".',
+                    8000,
+                );
+                return;
+            }
+
+            // Desktop: prompt the user to name their first project instead
+            // of auto-creating a "Default" one.
             const project = await this.openNewProjectModal();
             if (project) {
                 try {

@@ -18,9 +18,39 @@ import { attachTooltip } from './Tooltip';
 /** Composite-key separator used to namespace fields inside custom sections. */
 export const CUSTOM_SECTION_KEY_SEP = ' :: ';
 
+/**
+ * Supported input types for a custom-section field. Mirrors the universal
+ * field template types so users get the same set of widgets they're already
+ * familiar with from the universal fields feature.
+ */
+export type CustomFieldType = 'text' | 'textarea' | 'dropdown' | 'multi-select' | 'checkbox';
+
+/**
+ * Rich field definition stored inside a custom section. Legacy data may
+ * still have plain `string` entries in `CustomSection.fields`; those are
+ * promoted to `{ name, type: 'text' }` on access via {@link normalizeField}.
+ */
+export interface CustomFieldDef {
+    /** Field name — also the suffix of the composite key in draft.custom. */
+    name: string;
+    /** Input type. Defaults to 'text' for legacy / minimal field entries. */
+    type?: CustomFieldType;
+    /** Placeholder / hint text shown in empty inputs. */
+    placeholder?: string;
+    /** Selectable options for dropdown / multi-select types. */
+    options?: string[];
+}
+
+/**
+ * Either the legacy bare-string field (= just a name, text input) or the
+ * rich definition above. Renderers go through {@link normalizeField} to
+ * always work with a `CustomFieldDef`.
+ */
+export type CustomFieldEntry = string | CustomFieldDef;
+
 export interface CustomSection {
     title: string;
-    fields: string[];
+    fields: CustomFieldEntry[];
     /**
      * Slot at which this section renders within the host view.
      *   0                       → above the first built-in section
@@ -30,6 +60,22 @@ export interface CustomSection {
      * the slot is determined by their order in the `sections` array.
      */
     position?: number;
+}
+
+/** Normalise any legacy bare-string entry to a {@link CustomFieldDef}. */
+export function normalizeField(entry: CustomFieldEntry): CustomFieldDef {
+    if (typeof entry === 'string') return { name: entry, type: 'text' };
+    return {
+        name: entry.name,
+        type: entry.type ?? 'text',
+        placeholder: entry.placeholder,
+        options: entry.options,
+    };
+}
+
+/** Get the field name from any (legacy or rich) entry. */
+export function fieldName(entry: CustomFieldEntry): string {
+    return typeof entry === 'string' ? entry : entry.name;
 }
 
 export interface CustomSectionsHost<TDraft extends { custom?: Record<string, string> }> {
@@ -96,8 +142,8 @@ function seedDraftCustom<T extends { custom?: Record<string, string> }>(
     if (sections.length === 0) return;
     if (!draft.custom) draft.custom = {};
     for (const sec of sections) {
-        for (const fname of sec.fields) {
-            const key = compositeKey(sec.title, fname);
+        for (const entry of sec.fields) {
+            const key = compositeKey(sec.title, fieldName(entry));
             if (!(key in draft.custom)) draft.custom[key] = '';
         }
     }
@@ -357,7 +403,8 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                 }
                 // Migrate composite keys in draft.custom from old → new title.
                 if (draft.custom) {
-                    for (const fname of sec.fields) {
+                    for (const entry of sec.fields) {
+                        const fname = fieldName(entry);
                         const oldKey = compositeKey(sec.title, fname);
                         const newKey = compositeKey(trimmed, fname);
                         if (oldKey in draft.custom) {
@@ -389,8 +436,8 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
             );
             if (!choice) return;
             if (draft.custom) {
-                for (const fname of sec.fields) {
-                    delete draft.custom[compositeKey(sec.title, fname)];
+                for (const entry of sec.fields) {
+                    delete draft.custom[compositeKey(sec.title, fieldName(entry))];
                 }
                 if (Object.keys(draft.custom).length === 0) draft.custom = undefined;
             }
@@ -415,20 +462,172 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
         const body = section.createDiv(bodyLabel);
 
         for (let fIdx = 0; fIdx < sec.fields.length; fIdx++) {
-            const fname = sec.fields[fIdx];
+            const entry = sec.fields[fIdx];
+            const def = normalizeField(entry);
+            const fname = def.name;
             const key = compositeKey(sec.title, fname);
             const row = body.createDiv(`${fieldRowLabel} ${customRowLabel}`);
             row.createEl('label', { cls: fieldLabelLabel, text: fname });
 
-            const input = row.createEl('input', {
-                cls: fieldInputLabel,
-                attr: { type: 'text', placeholder: `Value for ${fname}` },
+            // Render the input element appropriate for the field's type.
+            // Mirrors the universal field renderers so users get the same
+            // widgets they're used to from `AddFieldModal`.
+            const currentValue = (draft.custom && draft.custom[key]) || '';
+            const placeholderHint = def.placeholder || `Value for ${fname}`;
+            switch (def.type) {
+                case 'textarea': {
+                    const ta = row.createEl('textarea', {
+                        cls: fieldInputLabel,
+                        attr: { placeholder: placeholderHint, rows: '3' },
+                    });
+                    ta.value = currentValue;
+                    ta.addEventListener('input', () => {
+                        if (!draft.custom) draft.custom = {};
+                        draft.custom[key] = ta.value;
+                        host.scheduleSave(draft);
+                    });
+                    break;
+                }
+                case 'dropdown': {
+                    const sel = row.createEl('select', { cls: `${fieldInputLabel} dropdown` });
+                    sel.createEl('option', { text: placeholderHint, value: '' });
+                    const opts = def.options ?? [];
+                    for (const opt of opts) {
+                        const o = sel.createEl('option', { text: opt, value: opt });
+                        if (currentValue === opt) o.selected = true;
+                    }
+                    if (currentValue && !opts.includes(currentValue)) {
+                        const o = sel.createEl('option', { text: currentValue, value: currentValue });
+                        o.selected = true;
+                    }
+                    sel.addEventListener('change', () => {
+                        if (!draft.custom) draft.custom = {};
+                        draft.custom[key] = sel.value;
+                        host.scheduleSave(draft);
+                    });
+                    break;
+                }
+                case 'multi-select': {
+                    // Lightweight tag-pill UI: pills container + free-form input.
+                    // Heavier dropdown/folder-source autocomplete would
+                    // duplicate the InlineSuggest infrastructure used by
+                    // universal fields; users wanting that can keep using
+                    // universal fields. Here we just provide comma-friendly
+                    // storage (joined by ", ") and a clear visual layout.
+                    const wrap = row.createDiv('codex-custom-multi-wrap');
+                    const pills = wrap.createDiv('codex-custom-multi-pills');
+                    const inp = wrap.createEl('input', {
+                        cls: fieldInputLabel,
+                        attr: { type: 'text', placeholder: placeholderHint },
+                    });
+                    let values = currentValue
+                        ? currentValue.split(',').map(v => v.trim()).filter(Boolean)
+                        : [];
+                    const allowed = def.options ?? [];
+                    const renderPills = () => {
+                        pills.empty();
+                        for (let i = 0; i < values.length; i++) {
+                            const v = values[i];
+                            const pill = pills.createSpan({ cls: 'codex-custom-multi-pill' });
+                            pill.createSpan({ text: v });
+                            const x = pill.createSpan({ cls: 'codex-custom-multi-pill-x', text: '×' });
+                            x.addEventListener('click', () => {
+                                values.splice(i, 1);
+                                if (!draft.custom) draft.custom = {};
+                                draft.custom[key] = values.join(', ');
+                                host.scheduleSave(draft);
+                                renderPills();
+                            });
+                        }
+                    };
+                    renderPills();
+                    inp.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const v = inp.value.trim();
+                            if (!v) return;
+                            if (allowed.length > 0 && !allowed.includes(v)) {
+                                new Notice(`"${v}" is not one of the allowed options.`);
+                                return;
+                            }
+                            if (!values.includes(v)) {
+                                values.push(v);
+                                if (!draft.custom) draft.custom = {};
+                                draft.custom[key] = values.join(', ');
+                                host.scheduleSave(draft);
+                                renderPills();
+                            }
+                            inp.value = '';
+                        }
+                    });
+                    break;
+                }
+                case 'checkbox': {
+                    const cb = row.createEl('input', {
+                        cls: `${fieldInputLabel} codex-custom-checkbox`,
+                        attr: { type: 'checkbox' },
+                    });
+                    cb.checked = currentValue === 'true' || currentValue === 'yes' || currentValue === '1';
+                    cb.addEventListener('change', () => {
+                        if (!draft.custom) draft.custom = {};
+                        draft.custom[key] = cb.checked ? 'true' : 'false';
+                        host.scheduleSave(draft);
+                    });
+                    break;
+                }
+                case 'text':
+                default: {
+                    const input = row.createEl('input', {
+                        cls: fieldInputLabel,
+                        attr: { type: 'text', placeholder: placeholderHint },
+                    });
+                    input.value = currentValue;
+                    input.addEventListener('input', () => {
+                        if (!draft.custom) draft.custom = {};
+                        draft.custom[key] = input.value;
+                        host.scheduleSave(draft);
+                    });
+                    break;
+                }
+            }
+
+            // Edit field — opens the Add modal pre-filled so users can
+            // tweak type, placeholder, options without removing/re-adding.
+            const editBtn = row.createSpan({
+                cls: customRemoveLabel,
+                attr: { 'aria-label': 'Edit field', role: 'button' },
             });
-            input.value = (draft.custom && draft.custom[key]) || '';
-            input.addEventListener('input', () => {
-                if (!draft.custom) draft.custom = {};
-                draft.custom[key] = input.value;
-                host.scheduleSave(draft);
+            setIcon(editBtn, 'pencil');
+            editBtn.addEventListener('click', () => {
+                const modal = new AddSectionFieldModal(app, (result) => {
+                    if (!result || !result.name) return;
+                    const trimmedName = result.name.trim();
+                    if (!trimmedName) return;
+                    // Detect rename
+                    if (trimmedName !== fname && sec.fields.some(f => fieldName(f) === trimmedName)) {
+                        new Notice(`Field "${trimmedName}" already exists in this section.`);
+                        return;
+                    }
+                    // Migrate composite key if renamed
+                    if (trimmedName !== fname && draft.custom) {
+                        const oldKey = compositeKey(sec.title, fname);
+                        const newKey = compositeKey(sec.title, trimmedName);
+                        if (oldKey in draft.custom) {
+                            draft.custom[newKey] = draft.custom[oldKey];
+                            delete draft.custom[oldKey];
+                        }
+                    }
+                    sec.fields[fIdx] = {
+                        name: trimmedName,
+                        type: result.type ?? 'text',
+                        placeholder: result.placeholder,
+                        options: result.options,
+                    };
+                    host.persistSections();
+                    host.scheduleSave(draft);
+                    host.requestRerender();
+                }, def);
+                modal.open();
             });
 
             // Move field up — icon-only span
@@ -441,7 +640,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
             fUpBtn.addEventListener('click', () => {
                 if (fUpBtn.hasAttribute('data-disabled')) return;
                 const tmp = sec.fields[fIdx - 1];
-                sec.fields[fIdx - 1] = fname;
+                sec.fields[fIdx - 1] = entry;
                 sec.fields[fIdx] = tmp;
                 host.persistSections();
                 host.requestRerender();
@@ -457,7 +656,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
             fDownBtn.addEventListener('click', () => {
                 if (fDownBtn.hasAttribute('data-disabled')) return;
                 const tmp = sec.fields[fIdx + 1];
-                sec.fields[fIdx + 1] = fname;
+                sec.fields[fIdx + 1] = entry;
                 sec.fields[fIdx] = tmp;
                 host.persistSections();
                 host.requestRerender();
@@ -475,7 +674,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                     `Cancel = keep field.`
                 );
                 if (!choice) return;
-                sec.fields = sec.fields.filter(n => n !== fname);
+                sec.fields = sec.fields.filter(f => fieldName(f) !== fname);
                 if (draft.custom) delete draft.custom[key];
                 host.persistSections();
                 host.scheduleSave(draft);
@@ -490,14 +689,20 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
             text: '+ Add field to this section',
         });
         addFieldBtn.addEventListener('click', () => {
-            const modal = new AddSectionFieldModal(app, (name) => {
-                const trimmed = name.trim();
+            const modal = new AddSectionFieldModal(app, (result) => {
+                if (!result || !result.name) return;
+                const trimmed = result.name.trim();
                 if (!trimmed) return;
-                if (sec.fields.includes(trimmed)) {
+                if (sec.fields.some(f => fieldName(f) === trimmed)) {
                     new Notice(`Field "${trimmed}" already exists in this section.`);
                     return;
                 }
-                sec.fields.push(trimmed);
+                sec.fields.push({
+                    name: trimmed,
+                    type: result.type ?? 'text',
+                    placeholder: result.placeholder,
+                    options: result.options,
+                });
                 if (!draft.custom) draft.custom = {};
                 draft.custom[compositeKey(sec.title, trimmed)] = '';
                 host.persistSections();
@@ -565,31 +770,48 @@ export class AddCustomSectionModal extends Modal {
 //  Add a field to an existing custom section
 // ═══════════════════════════════════════════════════
 
+/**
+ * Add / edit a field inside a custom section. Returns a partial
+ * {@link CustomFieldDef} so callers can decide how to merge it with an
+ * existing entry (rename vs. replace etc.).
+ */
 export class AddSectionFieldModal extends Modal {
-    private callback: (name: string) => void;
+    private callback: (result: CustomFieldDef | null) => void;
+    private existing?: CustomFieldDef;
 
-    constructor(app: App, callback: (name: string) => void) {
+    constructor(
+        app: App,
+        callback: (result: CustomFieldDef | null) => void,
+        existing?: CustomFieldDef,
+    ) {
         super(app);
         this.callback = callback;
+        this.existing = existing;
     }
 
     onOpen(): void {
-        this.titleEl.setText('Add Field to Section');
-        let fieldName = '';
+        const isEdit = !!this.existing;
+        this.titleEl.setText(isEdit ? 'Edit Field' : 'Add Field to Section');
+
+        let name = this.existing?.name ?? '';
+        let type: CustomFieldType = this.existing?.type ?? 'text';
+        let placeholder = this.existing?.placeholder ?? '';
+        let optionsCsv = (this.existing?.options ?? []).join(', ');
         let nameInput: HTMLInputElement | null = null;
+
         new Setting(this.contentEl)
             .setName('Field name')
             .addText(text => {
                 text.setPlaceholder('e.g. The Lie, The Truth…');
-                text.onChange(v => { fieldName = v; });
+                text.setValue(name);
+                text.onChange(v => { name = v; });
                 nameInput = text.inputEl;
                 text.inputEl.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') {
-                        const v = (nameInput?.value || fieldName).trim();
+                        const v = (nameInput?.value || name).trim();
                         if (v) {
                             e.preventDefault();
-                            this.close();
-                            this.callback(v);
+                            this.submit();
                         }
                     }
                 });
@@ -597,16 +819,79 @@ export class AddSectionFieldModal extends Modal {
             });
 
         new Setting(this.contentEl)
+            .setName('Type')
+            .setDesc('Pick the input type for this field.')
+            .addDropdown(dd => {
+                dd.addOption('text', 'Text');
+                dd.addOption('textarea', 'Text block');
+                dd.addOption('dropdown', 'Dropdown');
+                dd.addOption('multi-select', 'Multi-select (tags)');
+                dd.addOption('checkbox', 'Checkbox (yes/no)');
+                dd.setValue(type);
+                dd.onChange(v => {
+                    type = v as CustomFieldType;
+                    refreshOptionsRow();
+                });
+            });
+
+        new Setting(this.contentEl)
+            .setName('Placeholder')
+            .setDesc('Hint text shown in empty inputs (optional).')
+            .addText(t => {
+                t.setPlaceholder('e.g. “What does this character lie to themselves about?”');
+                t.setValue(placeholder);
+                t.onChange(v => { placeholder = v; });
+            });
+
+        const optionsContainer = this.contentEl.createDiv();
+        const refreshOptionsRow = () => {
+            optionsContainer.empty();
+            if (type !== 'dropdown' && type !== 'multi-select') return;
+            new Setting(optionsContainer)
+                .setName('Options')
+                .setDesc('Comma-separated list of choices.')
+                .addTextArea(ta => {
+                    ta.setPlaceholder('option 1, option 2, option 3');
+                    ta.setValue(optionsCsv);
+                    ta.onChange(v => { optionsCsv = v; });
+                    ta.inputEl.rows = 2;
+                });
+        };
+        refreshOptionsRow();
+
+        new Setting(this.contentEl)
             .addButton(btn => btn
-                .setButtonText('Add')
+                .setButtonText(isEdit ? 'Save' : 'Add')
                 .setCta()
-                .onClick(() => {
-                    const v = (nameInput?.value || fieldName).trim();
-                    if (v) {
-                        this.close();
-                        this.callback(v);
-                    }
-                }));
+                .onClick(() => this.submit()));
+
+        // Keep a closure-stable reference for submit()
+        const self = this;
+        function buildResult(): CustomFieldDef | null {
+            const finalName = (nameInput?.value || name).trim();
+            if (!finalName) return null;
+            const opts = (type === 'dropdown' || type === 'multi-select')
+                ? optionsCsv.split(',').map(o => o.trim()).filter(Boolean)
+                : undefined;
+            return {
+                name: finalName,
+                type,
+                placeholder: placeholder.trim() || undefined,
+                options: opts && opts.length > 0 ? opts : undefined,
+            };
+        }
+        this.submit = () => {
+            const result = buildResult();
+            if (!result) {
+                new Notice('Please enter a field name.');
+                return;
+            }
+            self.close();
+            self.callback(result);
+        };
     }
+
+    /** Replaced inside onOpen with a closure that captures the working state. */
+    private submit: () => void = () => {};
 }
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises */

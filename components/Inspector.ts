@@ -566,6 +566,31 @@ export class InspectorComponent {
         };
         renderTagChips();
 
+        // ── Synopsis (editable) ──
+        // Same field that powers the standalone Synopsis tab/sidebar, but
+        // exposed inline so users who keep the Details tab open can edit the
+        // synopsis without flipping to the Synopsis tab. (User request,
+        // v1.10.17.)
+        {
+            const synSection = this.container.createDiv('inspector-section');
+            synSection.createSpan({ cls: 'inspector-label', text: 'Synopsis:' });
+            const synInput = synSection.createEl('textarea', {
+                cls: 'inspector-synopsis-input',
+                attr: { placeholder: 'One- or two-sentence summary of the scene…', rows: '6' },
+            });
+            synInput.value = scene.synopsis || '';
+            styleInput(synInput);
+            synInput.setCssStyles({
+                padding: '6px 8px',
+                resize: 'vertical',
+            });
+            synInput.addEventListener('change', async () => {
+                const val = synInput.value.trim() || undefined;
+                await this.sceneManager.updateScene(scene.filePath, { synopsis: val });
+                scene.synopsis = val;
+            });
+        }
+
         // ── Scene Draft (body text — editable) ──
         {
             const descSection = this.container.createDiv('inspector-section');

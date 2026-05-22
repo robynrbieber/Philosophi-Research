@@ -111,7 +111,66 @@ export function renderViewSwitcher(
         new ExportModal(plugin).open();
     });
 
+    // v1.10.17 — collapse view-tab labels when the toolbar is too narrow
+    // to fit everything on one row. CSS container queries on the switcher
+    // itself don't work here because the switcher is `width: auto` (= its
+    // natural content width). Instead we observe the parent toolbar and
+    // toggle a class on the switcher when the labels would overflow.
+    //
+    // Opt-out: setting `autoHideViewLabels = false` clears the body class
+    // `sl-auto-hide-tab-labels`; we honor that here by short-circuiting.
+    if (plugin.settings.autoHideViewLabels !== false) {
+        installAutoHideLabels(switcher);
+    }
+
     return switcher;
+}
+
+/**
+ * Toggle the `sl-collapsed` class on the switcher based on whether its
+ * natural width would overflow its parent (the toolbar). Re-measured on
+ * every parent resize and once after layout settles.
+ */
+function installAutoHideLabels(switcher: HTMLElement): void {
+    const parent = switcher.parentElement;
+    if (!parent) return;
+
+    const measure = () => {
+        // Temporarily remove the collapsed class so we can measure the
+        // switcher's natural (uncollapsed) width.
+        const wasCollapsed = switcher.classList.contains('sl-collapsed');
+        switcher.classList.remove('sl-collapsed');
+        // Force a reflow read.
+        const naturalWidth = switcher.scrollWidth;
+        const available = parent.clientWidth;
+        // Reserve ~80px for the project selector / title that sits next to
+        // the switcher in the toolbar so we don't fight for the last pixel.
+        const shouldCollapse = naturalWidth > available - 80;
+        if (shouldCollapse) {
+            switcher.classList.add('sl-collapsed');
+        } else if (wasCollapsed) {
+            // Already removed above; nothing more to do.
+        }
+    };
+
+    // Initial measure after layout.
+    window.requestAnimationFrame(measure);
+
+    // Re-measure on parent resize.
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(parent);
+
+    // Clean up when the switcher is removed from the DOM.
+    const cleanup = () => ro.disconnect();
+    const mo = new MutationObserver(() => {
+        if (!switcher.isConnected) {
+            cleanup();
+            mo.disconnect();
+        }
+    });
+    if (switcher.parentNode) {
+        mo.observe(switcher.parentNode, { childList: true });
+    }
 }
 
 // ── Codex dropdown ─────────────────────────────────────
