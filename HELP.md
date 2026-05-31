@@ -677,10 +677,11 @@ For non-linear narratives (flashbacks, time jumps, in medias res), StoryLine sup
 
 ### How to Use
 
-1. **Set chronological order** in the Inspector's **Time & Order** modal, or directly in the scene's YAML frontmatter.
-2. **Switch order in Timeline View** — use the order dropdown in the toolbar to toggle between "Reading Order" and "Chronological Order".
-3. **Dual-order badges** appear on scene cards showing both numbers (e.g., `R:5 / C:2` means reading order 5, chronological order 2).
-4. **Drag-and-drop** in the Timeline respects the currently active order mode.
+1. **Set story dates** — fill in the `storyDate` and `storyTime` fields on each scene. When you switch the Timeline to Chronological Order, scenes are automatically sorted by these fields.
+2. **Set chronological order manually** — if you prefer, set `chronologicalOrder` in the Inspector's **Time & Order** section, or directly in the scene's YAML frontmatter. Scenes without a story date fall back to this number.
+3. **Switch order in Timeline View** — use the order dropdown in the toolbar to toggle between "Reading Order" and "Chronological Order".
+4. **Dual-order badges** appear on scene cards showing both numbers (e.g., `R:5 / C:2` means reading order 5, chronological order 2).
+5. **Drag-and-drop** in the Timeline respects the currently active order mode.
 
 ### Export
 

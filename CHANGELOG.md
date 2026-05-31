@@ -16,6 +16,7 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 - **Prologue & Epilogue support** — Act 0 displays as "Prologue", Act 99 as "Epilogue" across all views. Quick-select buttons in the Inspector let you set these with one click.
 - **Beat sheet scene creation** — Applying a beat sheet template now optionally creates placeholder scenes from each beat, with correct act and chapter assignment. A custom structure builder lets you define your own act/chapter layout.
 - **Setup/Payoff inline picker** — Linking setup and payoff scenes now uses an inline autocomplete dropdown instead of a separate modal. Type a scene title to search and select.
+- **Chronological order sorts by story date** *([#136](https://github.com/PixeroJan/obsidian-storyline/issues/136))* — Switching the Timeline to Chronological Order now sorts scenes by their Story Date and Story Time fields automatically. Scenes without dates fall back to their sequence number.
 
 ### Bug Fixes
 
