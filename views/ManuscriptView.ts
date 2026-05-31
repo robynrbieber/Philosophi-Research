@@ -9,7 +9,7 @@ import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { FiltersComponent } from '../components/Filters';
 import { applyMobileClass, isMobile, isPhone, isTablet } from '../components/MobileAdapter';
 import { buildFormattingToolbar } from '../components/FormattingToolbar';
-import { compareActChapter } from '../utils/actChapter';
+import { compareActChapter, getActDisplayLabel } from '../utils/actChapter';
 import SceneCardsPlugin from '../main';
 import { MANUSCRIPT_VIEW_TYPE } from '../constants';
 
@@ -350,9 +350,11 @@ export class ManuscriptView extends ItemView {
                 lastChapter = undefined;
                 if (prevBlock) prevBlock.classList.add('is-before-divider');
                 const actDiv = this.scrollArea.createDiv('sl-manuscript-act-divider');
+                const actLabel = this.sceneManager.getActLabel(Number(scene.act));
+                const actDisplay = getActDisplayLabel(scene.act);
                 actDiv.createEl('span', {
                     cls: 'sl-manuscript-act-label',
-                    text: `Act ${scene.act}`,
+                    text: actLabel ? `${actDisplay}: ${actLabel}` : actDisplay,
                 });
             }
 
@@ -361,9 +363,10 @@ export class ManuscriptView extends ItemView {
                 lastChapter = scene.chapter;
                 if (prevBlock) prevBlock.classList.add('is-before-divider');
                 const chapDiv = this.scrollArea.createDiv('sl-manuscript-chapter-divider');
+                const chapLabel = this.sceneManager.getChapterLabel(Number(scene.chapter));
                 chapDiv.createEl('span', {
                     cls: 'sl-manuscript-chapter-label',
-                    text: `Chapter ${scene.chapter}`,
+                    text: chapLabel ? `Chapter ${scene.chapter}: ${chapLabel}` : `Chapter ${scene.chapter}`,
                 });
             }
 
@@ -405,7 +408,9 @@ export class ManuscriptView extends ItemView {
             this.lazyObserver.observe(editorWrap);
             editorContainers.push({ el: editorWrap, path: scene.filePath });
 
-            totalWords += scene.wordcount ?? 0;
+            if (!(this.plugin.settings.excludeArcAnchorFromWordcount && scene.arcAnchor)) {
+                totalWords += scene.wordcount ?? 0;
+            }
         }
 
         // Footer
@@ -666,7 +671,9 @@ export class ManuscriptView extends ItemView {
                 .filter(s => !s.corkboardNote);
         let totalWords = 0;
         for (const s of scenes) {
-            totalWords += s.wordcount ?? 0;
+            if (!(this.plugin.settings.excludeArcAnchorFromWordcount && s.arcAnchor)) {
+                totalWords += s.wordcount ?? 0;
+            }
         }
         const wordLabel = totalWords === 1 ? 'word' : 'words';
         this.footerEl.setText(`${scenes.length} scenes · ${totalWords.toLocaleString()} ${wordLabel}`);

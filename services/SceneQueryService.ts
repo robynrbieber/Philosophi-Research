@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { Scene, SceneFilter, SortConfig, getStatusOrder } from '../models/Scene';
-import { compareActChapter } from '../utils/actChapter';
+import { compareActChapter, getActDisplayLabel } from '../utils/actChapter';
 
 /**
  * Read-only interface for accessing the scene store.
@@ -101,7 +101,7 @@ export class SceneQueryService {
             let key: string;
             switch (field) {
                 case 'act':
-                    key = scene.act !== undefined ? `Act ${scene.act}` : 'No Act';
+                    key = scene.act !== undefined ? getActDisplayLabel(scene.act) : 'No Act';
                     break;
                 case 'chapter':
                     key = scene.chapter !== undefined ? `Chapter ${scene.chapter}` : 'No Chapter';
@@ -217,7 +217,7 @@ export class SceneQueryService {
     /**
      * Get project statistics
      */
-    getStatistics() {
+    getStatistics(excludeArcAnchor = false) {
         const scenes = this.sceneStore.getAllScenes();
         const totalScenes = scenes.length;
         const statusCounts: Record<string, number> = {};
@@ -229,16 +229,21 @@ export class SceneQueryService {
         let orphanedScenes = 0;
 
         for (const scene of scenes) {
+            // Skip Arc Point scenes from word totals when setting is enabled
+            const skipWords = excludeArcAnchor && scene.arcAnchor;
+
             // Status
             const status = scene.status || 'unknown';
             statusCounts[status] = (statusCounts[status] || 0) + 1;
 
             // Words
-            totalWords += scene.wordcount || 0;
-            totalTargetWords += scene.target_wordcount || 0;
+            if (!skipWords) {
+                totalWords += scene.wordcount || 0;
+                totalTargetWords += scene.target_wordcount || 0;
+            }
 
             // Acts
-            const act = scene.act !== undefined ? `Act ${scene.act}` : 'No Act';
+            const act = scene.act !== undefined ? getActDisplayLabel(scene.act) : 'No Act';
             actCounts[act] = (actCounts[act] || 0) + 1;
 
             // POV
@@ -321,6 +326,12 @@ export class SceneQueryService {
                 ...(scene.tags || []),
             ].filter(Boolean).join(' ').toLowerCase();
             if (!searchIn.includes(searchLower)) return false;
+        }
+        if (filter.arcAnchorFilter === 'arcPoints' && !scene.arcAnchor) {
+            return false;
+        }
+        if (filter.arcAnchorFilter === 'scenes' && scene.arcAnchor) {
+            return false;
         }
         return true;
     }

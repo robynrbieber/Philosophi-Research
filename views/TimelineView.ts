@@ -14,6 +14,7 @@ import { attachTooltip } from '../components/Tooltip';
 import { ButtonComponent, DropdownComponent, ItemView, Menu, Modal, Notice, Setting, TFile, TextComponent, WorkspaceLeaf } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { BUILTIN_BEAT_SHEETS, Scene, SceneStatus, TIMELINE_MODES, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+import { getActDisplayLabel } from '../utils/actChapter';
 
 /**
  * Timeline ordering mode
@@ -447,9 +448,10 @@ export class TimelineView extends ItemView {
             const currentAct = scene.act !== undefined ? Number(scene.act) : undefined;
             if (currentAct !== lastRenderedAct) {
                 const beatLabel = currentAct !== undefined ? this.sceneManager.getActLabel(currentAct) : undefined;
-                const cleanBeat = beatLabel?.replace(/^Act\s*\d+\s*—\s*/i, '');
+                const cleanBeat = beatLabel?.replace(/^(Act|Prologue|Epilogue)\s*\d*\s*[—:]\s*/i, '');
+                const actDisplay = getActDisplayLabel(currentAct);
                 const actLabel = currentAct !== undefined
-                    ? (cleanBeat ? `Act ${currentAct} — ${cleanBeat}` : `Act ${currentAct}`)
+                    ? (cleanBeat ? `${actDisplay} — ${cleanBeat}` : actDisplay)
                     : 'No Act';
                 tlItems.push({ kind: 'divider', actLabel, actNum: currentAct });
                 lastRenderedAct = currentAct;
@@ -461,8 +463,9 @@ export class TimelineView extends ItemView {
         for (const actNum of sortedActs) {
             if (!actsWithScenes.has(Number(actNum))) {
                 const beatLabel = this.sceneManager.getActLabel(actNum);
-                const cleanBeat = beatLabel?.replace(/^Act\s*\d+\s*—\s*/i, '');
-                const actLabel = cleanBeat ? `Act ${actNum} — ${cleanBeat}` : `Act ${actNum}`;
+                const cleanBeat = beatLabel?.replace(/^(Act|Prologue|Epilogue)\s*\d*\s*[—:]\s*/i, '');
+                const actDisplay = getActDisplayLabel(actNum);
+                const actLabel = cleanBeat ? `${actDisplay} — ${cleanBeat}` : actDisplay;
                 tlItems.push({ kind: 'empty-act', actLabel, actNum });
             }
         }
@@ -588,9 +591,10 @@ export class TimelineView extends ItemView {
             const currentAct = scene.act !== undefined ? Number(scene.act) : undefined;
             if (currentAct !== lastAct) {
                 const beatLabel = currentAct !== undefined ? this.sceneManager.getActLabel(currentAct) : undefined;
-                const cleanBeat = beatLabel?.replace(/^Act\s*\d+\s*—\s*/i, '');
+                const cleanBeat = beatLabel?.replace(/^(Act|Prologue|Epilogue)\s*\d*\s*[—:]\s*/i, '');
+                const actDisplay = getActDisplayLabel(currentAct);
                 const label = currentAct !== undefined
-                    ? (cleanBeat ? `Act ${currentAct} — ${cleanBeat}` : `Act ${currentAct}`)
+                    ? (cleanBeat ? `${actDisplay} — ${cleanBeat}` : actDisplay)
                     : 'No Act';
                 rows.push({ type: 'act-divider', actLabel: label, actNum: currentAct });
                 lastAct = currentAct;
@@ -1268,15 +1272,16 @@ export class TimelineView extends ItemView {
                 const desc = actDescriptions[act] || '';
                 const wrapper = actsList.createDiv('structure-item-wrapper');
                 const row = wrapper.createDiv('structure-row');
-                const cleanLabel = label?.replace(/^Act\s*\d+\s*—\s*/i, '');
-                const labelText = cleanLabel ? `Act ${act} — ${cleanLabel}` : `Act ${act}`;
+                const cleanLabel = label?.replace(/^(Act|Prologue|Epilogue)\s*\d*\s*[—:]\s*/i, '');
+                const actDisplay = getActDisplayLabel(act);
+                const labelText = cleanLabel ? `${actDisplay} — ${cleanLabel}` : actDisplay;
                 row.createSpan({ cls: 'structure-label', text: labelText });
                 row.createSpan({ cls: 'structure-count', text: `${count} scene${count !== 1 ? 's' : ''}` });
 
                 // Edit label button
                 const editBtn = row.createEl('button', {
                     cls: 'clickable-icon structure-edit',
-                    attr: { 'aria-label': `Edit label for Act ${act}` }
+                    attr: { 'aria-label': `Edit label for ${actDisplay}` }
                 });
                 editBtn.textContent = '✎';
                 editBtn.addEventListener('click', () => {

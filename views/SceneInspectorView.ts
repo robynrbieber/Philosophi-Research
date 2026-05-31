@@ -174,6 +174,7 @@ export class SceneInspectorView extends ItemView {
             this.app.workspace.on('active-leaf-change', (leaf) => {
                 if (!leaf) return;
                 if (leaf === this.leaf) return;
+                if (this.notesPanel?.isNotesEditorLeaf(leaf)) return;
                 // Markdown editor — follow it
                 if (leaf.view instanceof MarkdownView) {
                     this.updateForActiveFile();
@@ -189,8 +190,12 @@ export class SceneInspectorView extends ItemView {
 
         // Refresh scene data when files are modified.
         this.registerEvent(
-            this.app.vault.on('modify', () => {
+            this.app.vault.on('modify', (file) => {
                 if (!this.hasSceneShown()) return;
+                if (this.notesPanel?.isNotesFilePath(file.path)) {
+                    void this.notesPanel.refreshNotesFromDisk();
+                    return;
+                }
                 if (Date.now() - this.lastEditTime < 2000) return;
                 window.setTimeout(() => this.refreshCurrentScene(), 600);
             })
@@ -319,6 +324,12 @@ export class SceneInspectorView extends ItemView {
         if (panelsHost) {
             const isEmbed = id === 'research' || id === 'help';
             panelsHost.toggleClass('is-embed-active', isEmbed);
+        }
+        if (id === 'notes') {
+            void this.notesPanel?.refreshNotesFromDisk();
+        }
+        if (id === 'details') {
+            this.refreshCurrentScene();
         }
         this.refreshEmptyState();
     }

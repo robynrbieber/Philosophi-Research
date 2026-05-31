@@ -19,6 +19,67 @@
 
 export type ActChapterValue = number | string | undefined | null;
 
+// ── Prologue / Epilogue conventions ────────────────────────────────
+// Act 0 = Prologue, Act 99 = Epilogue.  These numeric values sort
+// correctly (0 before 1, 99 after 3) and are recognised by the
+// display-label helper below.  The string forms "Prologue" / "Epilogue"
+// are also accepted for backwards compatibility and free-text input.
+
+/** Numeric act value that represents a Prologue */
+export const PROLOGUE_ACT = 0;
+/** Numeric act value that represents an Epilogue */
+export const EPILOGUE_ACT = 99;
+
+/**
+ * Returns true if the given act value represents a Prologue.
+ * Recognises: 0, "0", "Prologue" (case-insensitive).
+ */
+export function isPrologueAct(act: ActChapterValue): boolean {
+    if (act === undefined || act === null) return false;
+    if (act === PROLOGUE_ACT || act === '0') return true;
+    return typeof act === 'string' && act.trim().toLowerCase() === 'prologue';
+}
+
+/**
+ * Returns true if the given act value represents an Epilogue.
+ * Recognises: 99, "99", "Epilogue" (case-insensitive).
+ */
+export function isEpilogueAct(act: ActChapterValue): boolean {
+    if (act === undefined || act === null) return false;
+    if (act === EPILOGUE_ACT || act === '99') return true;
+    return typeof act === 'string' && act.trim().toLowerCase() === 'epilogue';
+}
+
+/**
+ * Returns a human-friendly display label for an act value.
+ *
+ * - 0 / "Prologue" → "Prologue"
+ * - 99 / "Epilogue" → "Epilogue"
+ * - 1–98 → "Act N"
+ * - Any other string → the string itself (e.g. "1.1")
+ *
+ * Use this everywhere an act label is shown to the user instead of
+ * raw `Act ${act}` concatenation.
+ */
+export function getActDisplayLabel(act: ActChapterValue): string {
+    if (isPrologueAct(act)) return 'Prologue';
+    if (isEpilogueAct(act)) return 'Epilogue';
+    if (act === undefined || act === null || act === '') return '';
+    const n = toActChapterNumber(act);
+    if (!isNaN(n) && n >= 1 && n <= 98) return `Act ${n}`;
+    return String(act);
+}
+
+/**
+ * Returns the act display label with an optional subtitle (e.g. act label).
+ * Example: "Prologue: Before the Storm" or "Act 1: Setup"
+ */
+export function getActLabelWithSubtitle(act: ActChapterValue, subtitle?: string): string {
+    const label = getActDisplayLabel(act);
+    if (!label) return '';
+    return subtitle ? `${label}: ${subtitle}` : label;
+}
+
 /**
  * Characters that are illegal in folder/file names on Windows.
  * Used by {@link sanitizeActChapterForPath}.
@@ -49,9 +110,18 @@ export function isPureNumericActChapter(value: ActChapterValue): boolean {
  * Convert an act/chapter value to a number for arithmetic, or `NaN` if the
  * value is not purely numeric.  Use {@link isPureNumericActChapter} first
  * if you need to branch.
+ *
+ * Special cases:
+ *  - "Prologue" (case-insensitive) → 0
+ *  - "Epilogue" (case-insensitive) → 99
  */
 export function toActChapterNumber(value: ActChapterValue): number {
     if (value === undefined || value === null) return NaN;
+    if (typeof value === 'string') {
+        const trimmed = value.trim().toLowerCase();
+        if (trimmed === 'prologue') return PROLOGUE_ACT;
+        if (trimmed === 'epilogue') return EPILOGUE_ACT;
+    }
     if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
     return isPureNumericActChapter(value) ? Number(value) : NaN;
 }
@@ -117,6 +187,10 @@ export function parseActChapterInput(raw: string | null | undefined): number | s
     if (raw == null) return undefined;
     const trimmed = String(raw).trim();
     if (trimmed === '') return undefined;
+    // Normalize Prologue / Epilogue to their numeric conventions
+    const lower = trimmed.toLowerCase();
+    if (lower === 'prologue') return PROLOGUE_ACT;
+    if (lower === 'epilogue') return EPILOGUE_ACT;
     // Only fold into a number when the string is a clean integer — keep
     // "1.1" as a string so it doesn't collapse to the float 1.1 and lose
     // its hierarchical meaning.

@@ -40,6 +40,8 @@ export interface StoryLineProject {
     codexFolder: string;
     /** Derived notes folder path (corkboard sticky notes live here) */
     notesFolder: string;
+    /** Derived scene notes folder path (external per-scene notes files) */
+    sceneNotesFolder: string;
     /** Derived archive folder path (archived / cut scenes) */
     archiveFolder: string;
     /** Derived research folder path (research posts) */
@@ -93,7 +95,7 @@ export interface SeriesMetadata {
 export function deriveProjectFolders(
     rootFolder: string,
     title: string
-): { sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string; archiveFolder: string; researchFolder: string } {
+): { sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string; sceneNotesFolder: string; archiveFolder: string; researchFolder: string } {
     const base = `${rootFolder}/${title}`;
     return {
         sceneFolder: `${base}/Scenes`,
@@ -101,6 +103,7 @@ export function deriveProjectFolders(
         locationFolder: `${base}/Codex/Locations`,
         codexFolder: `${base}/Codex`,
         notesFolder: `${base}/Notes`,
+        sceneNotesFolder: `${base}/SceneNotes`,
         archiveFolder: `${base}/Archive`,
         researchFolder: `${base}/Research`,
     };
@@ -116,7 +119,7 @@ export function deriveProjectFolders(
  */
 export function deriveProjectFoldersFromFilePath(
     filePath: string
-): { baseFolder: string; sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string; archiveFolder: string; researchFolder: string } {
+): { baseFolder: string; sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string; sceneNotesFolder: string; archiveFolder: string; researchFolder: string } {
     const lastSlash = filePath.lastIndexOf('/');
     const parentDir = lastSlash >= 0 ? filePath.substring(0, lastSlash) : '';
     const basename = (filePath.split('/').pop() ?? '').replace(/\.md$/i, '');
@@ -131,6 +134,7 @@ export function deriveProjectFoldersFromFilePath(
         locationFolder: `${baseFolder}/Codex/Locations`,
         codexFolder: `${baseFolder}/Codex`,
         notesFolder: `${baseFolder}/Notes`,
+        sceneNotesFolder: `${baseFolder}/SceneNotes`,
         archiveFolder: `${baseFolder}/Archive`,
         researchFolder: `${baseFolder}/Research`,
     };

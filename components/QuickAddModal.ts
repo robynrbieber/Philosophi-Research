@@ -3,7 +3,7 @@ import { Scene, SceneStatus, SceneTemplate, BUILTIN_SCENE_TEMPLATES, getStatusOr
 import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
 import { renderAutocompleteInput, renderTagPillInput } from './InlineSuggest';
-import { isPureNumericActChapter, nextNumericActChapter } from '../utils/actChapter';
+import { isPureNumericActChapter, nextNumericActChapter, getActDisplayLabel } from '../utils/actChapter';
 import { App, Modal, Notice, Setting } from 'obsidian';
 
 /**
@@ -84,14 +84,18 @@ export class QuickAddModal extends Modal {
             this.sceneManager.getAllScenes().map(s => s.act),
         ) - 1;
         const actCount = Math.max(5, maxExistingAct + 2);
+        // Add Prologue option at the top
+        actSelect.createEl('option', { text: 'Prologue', value: '0' });
         for (let i = 1; i <= actCount; i++) {
-            actSelect.createEl('option', { text: `Act ${i}`, value: String(i) });
+            actSelect.createEl('option', { text: getActDisplayLabel(i), value: String(i) });
         }
+        // Add Epilogue option at the bottom
+        actSelect.createEl('option', { text: 'Epilogue', value: '99' });
         if (this.result.act != null) {
             // If the prefilled act isn't in the dropdown (e.g. a string act),
             // append it as a one-off option so the user sees it preserved.
             if (!isPureNumericActChapter(this.result.act)) {
-                actSelect.createEl('option', { text: `Act ${this.result.act}`, value: String(this.result.act) });
+                actSelect.createEl('option', { text: getActDisplayLabel(this.result.act), value: String(this.result.act) });
             }
             actSelect.value = String(this.result.act);
         }
@@ -230,17 +234,16 @@ export class QuickAddModal extends Modal {
             conflictSetting.settingEl.setCssStyles({ display: checkbox.checked ? 'none' : '' });
         });
 
-        // Tags / Plotlines
-        new Setting(contentEl)
-            .setName('Tags / Plotlines')
-            .addText(text => {
-                text.setPlaceholder('plotline/main, theme/courage, ...')
-                    .onChange(value => {
-                        this.result.tags = value
-                            ? value.split(',').map(t => t.trim()).filter(Boolean)
-                            : undefined;
-                    });
-            });
+        // Tags / Plotlines (autocomplete tag-pill input)
+        const tagSetting = new Setting(contentEl).setName('Tags / Plotlines');
+        const tagContainer = tagSetting.controlEl.createDiv('sl-quickadd-tagpill');
+        renderTagPillInput({
+            container: tagContainer,
+            values: this.result.tags || [],
+            getSuggestions: () => this.sceneManager.queryService.getAllTags().sort(),
+            onChange: (values) => { this.result.tags = values.length > 0 ? values : undefined; },
+            placeholder: 'Add plotline…',
+        });
 
         // Status
         new Setting(contentEl)

@@ -328,10 +328,15 @@ export class SeriesManager {
         const vaultConfig = ((this.app.vault as unknown as { config?: Record<string, unknown> }).config) ?? {};
 
         // Obsidian stores the "Automatically update internal links" toggle
-        // under the internal key `promptDelete`. When it is `true`, auto-update
-        // is *disabled* (Obsidian prompts on delete instead of silently updating).
-        // Default (undefined) = auto-update is ON.
-        if (vaultConfig.promptDelete === true) {
+        // under the internal key `alwaysUpdateLinks`. When it is `true`,
+        // auto-update is enabled (links are silently updated when files move).
+        // Default (undefined / false) = auto-update is OFF — Obsidian prompts
+        // or leaves stale links.
+        // Note: older Obsidian versions used `promptDelete` for a different
+        // setting ("Confirm before deleting"), so we check both keys for
+        // maximum compatibility, but `alwaysUpdateLinks` is the correct one.
+        const alwaysUpdate = vaultConfig.alwaysUpdateLinks === true;
+        if (!alwaysUpdate) {
             throw new Error(
                 'Series migration requires "Automatically update internal links" to be ON.\n\n' +
                 'Go to Settings → Files & Links and enable it, then try again.'

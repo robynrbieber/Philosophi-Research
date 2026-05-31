@@ -9,6 +9,7 @@ import { STATS_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
 import { ItemView, WorkspaceLeaf } from 'obsidian';
 import { Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+import { getActDisplayLabel } from '../utils/actChapter';
 import { PlotWarning, Validator } from '../services/Validator';
 import {
     tokenizeWords,
@@ -87,7 +88,7 @@ export class StatsView extends ItemView {
         renderViewSwitcher(toolbar, STATS_VIEW_TYPE, this.plugin, this.leaf);
 
         const content = container.createDiv('story-line-stats-content');
-        const stats = this.sceneManager.queryService.getStatistics();
+        const stats = this.sceneManager.queryService.getStatistics(this.plugin.settings.excludeArcAnchorFromWordcount ?? true);
         const allScenes = this.sceneManager.getAllScenes();
 
         // 1. Overview (always open)
@@ -267,7 +268,7 @@ export class StatsView extends ItemView {
 
         const updateTimerDisplay = () => {
             const stats = this.sceneManager.queryService.getStatistics();
-            const totalNow = stats.totalWords;
+            const totalNow = this.sceneManager.queryService.getStatistics(this.plugin.settings.excludeArcAnchorFromWordcount ?? true).totalWords;
             if (tracker.isSprintRunning()) {
                 const remaining = tracker.getSprintRemaining();
                 const mins = Math.floor(remaining / 60_000);
@@ -307,7 +308,7 @@ export class StatsView extends ItemView {
         startBtn.addEventListener('click', () => {
             sprintEndChimePlayed = false;
             const stats = this.sceneManager.queryService.getStatistics();
-            tracker.startSprint(stats.totalWords);
+            tracker.startSprint(this.sceneManager.queryService.getStatistics(this.plugin.settings.excludeArcAnchorFromWordcount ?? true).totalWords);
             if (this.sprintTimerId) window.clearInterval(this.sprintTimerId);
             this.sprintTimerId = window.setInterval(updateTimerDisplay, 1000);
             updateTimerDisplay();
@@ -315,7 +316,7 @@ export class StatsView extends ItemView {
 
         stopBtn.addEventListener('click', () => {
             const stats = this.sceneManager.queryService.getStatistics();
-            const entry = tracker.stopSprint(stats.totalWords);
+            const entry = tracker.stopSprint(this.sceneManager.queryService.getStatistics(this.plugin.settings.excludeArcAnchorFromWordcount ?? true).totalWords);
             if (this.sprintTimerId) { window.clearInterval(this.sprintTimerId); this.sprintTimerId = null; }
             updateTimerDisplay();
             // Persist and re-render to show updated log
@@ -968,7 +969,7 @@ export class StatsView extends ItemView {
 
         const actWordMap: Record<string, { total: number; count: number }> = {};
         for (const s of allScenes) {
-            const k = s.act !== undefined ? `Act ${s.act}` : 'No Act';
+            const k = s.act !== undefined ? getActDisplayLabel(s.act) : 'No Act';
             if (!actWordMap[k]) actWordMap[k] = { total: 0, count: 0 };
             actWordMap[k].total += s.wordcount || 0;
             actWordMap[k].count += 1;
@@ -1076,7 +1077,7 @@ export class StatsView extends ItemView {
             const dlg = countDialogueCharacters(body, locale);
             totalDlg += dlg;
             totalAll += total;
-            const k = scene.act !== undefined ? `Act ${scene.act}` : 'No Act';
+            const k = scene.act !== undefined ? getActDisplayLabel(scene.act) : 'No Act';
             if (!actDlg[k]) actDlg[k] = { dialogue: 0, total: 0 };
             actDlg[k].dialogue += dlg;
             actDlg[k].total += total;
@@ -1519,7 +1520,7 @@ export class StatsView extends ItemView {
                 dot.addClass('pacing-has-conflict');
             }
 
-            const actLabel = scene.act !== undefined ? ` (Act ${scene.act})` : '';
+            const actLabel = scene.act !== undefined ? ` (${getActDisplayLabel(scene.act)})` : '';
             bar.setAttribute('title', `${scene.title || 'Untitled'}${actLabel}\n${wc.toLocaleString()} words${hasConflict ? '\n✓ Has conflict' : '\n✗ No conflict'}`);
         }
 

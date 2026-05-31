@@ -6,6 +6,19 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.18
+
+### New Features
+
+- **Arc Points** *([#128](https://github.com/PixeroJan/obsidian-storyline/issues/128))* — Mark key turning points in your story as Arc Points. Toggle the checkbox in the Scene Details panel. Arc Points show a diamond badge on Board cards and appear as filled diamonds (◆) on the StoryLine subway map. Filter the Board and StoryLine views to show All, Scenes only, or Arc Points only.
+- **Live Markdown Notes** — The Notes tab in the Scene Details sidebar now renders as a full Obsidian Live Preview editor. Write with markdown formatting, wikilinks, and tags — just like a regular note file.
+- **Research images** — Add image-type research posts with a built-in image picker. Image previews appear inline on expanded research cards.
+
+### Bug Fixes
+
+- **Notes edits no longer revert** — Switching between the Details and Notes tabs now correctly preserves edits. Both tabs read from the same external notes file in real time.
+
+---
 ## Version 1.10.17
 
 ### New Features

@@ -591,6 +591,33 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     padding: 8px 16px;
 }
 
+/* Arc Points filter toggle (All / Scenes / Arc Points) */
+.story-line-arc-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid var(--sc-card-border);
+    border-radius: var(--sc-radius);
+    overflow: hidden;
+}
+.story-line-arc-filter-btn {
+    background: transparent;
+    border: none;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.story-line-arc-filter-btn:hover {
+    background: var(--background-secondary);
+}
+.story-line-arc-filter-btn.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
 .story-line-search-wrapper { display: flex; align-items: center; gap: 8px; }
 .relation-builder-hidden-select {
     position: absolute;
@@ -1837,6 +1864,32 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     color: var(--sc-text-muted);
 }
 
+/* ─── Prologue / Epilogue quick-select buttons ─── */
+.sl-inspector-act-quick {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+.sl-inspector-act-quick-btn {
+    font-size: 0.75em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.sl-inspector-act-quick-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+.sl-inspector-act-quick-btn.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent, #fff);
+    border-color: var(--interactive-accent);
+}
+
 .inspector-target {
     color: var(--sc-text-faint);
     font-size: 0.85em;
@@ -1929,10 +1982,12 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
 /* Inspector Notes / Comments */
 .inspector-notes { margin-top: 10px; }
 .inspector-notes-header { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
-.inspector-notes-header .inspector-label { font-weight: 600; font-size: 0.85em; }
+.inspector-notes-header .inspector-label { font-weight: 600; font-size: 0.85em; flex: 1; }
+.inspector-notes-header .clickable-icon { padding: 2px 4px; color: var(--sc-text-muted); cursor: pointer; }
+.inspector-notes-header .clickable-icon:hover { color: var(--interactive-accent); }
 .inspector-notes-textarea {
     width: 100%;
-    min-height: 70px;
+    min-height: 130px;
     resize: vertical;
     font-size: 0.85em;
     padding: 6px 8px;
@@ -1945,6 +2000,49 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
 .inspector-notes-textarea:focus {
     border-color: var(--sc-accent);
     outline: none;
+}
+.inspector-notes-container { width: 100%; }
+.inspector-notes-live {
+    width: 100%;
+    min-height: 40px;
+    border-radius: var(--sc-radius, 4px);
+    font-size: 0.85em;
+    line-height: 1.5;
+}
+.inspector-notes-live.is-preview {
+    padding: 6px 8px;
+    border: 1px solid var(--sc-card-border, var(--background-modifier-border));
+    background: var(--sc-card-bg, var(--background-primary));
+    color: var(--sc-text, var(--text-normal));
+    cursor: text;
+    min-height: 130px;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.inspector-notes-live.is-preview:hover {
+    border-color: var(--sc-accent, var(--interactive-accent));
+}
+.inspector-notes-live.is-preview p { margin: 0.3em 0; }
+.inspector-notes-live.is-preview ul, .inspector-notes-live.is-preview ol { margin: 0.3em 0; padding-left: 1.5em; }
+.inspector-notes-live.is-preview input[type="checkbox"] { margin-right: 4px; cursor: pointer; }
+.inspector-notes-live.is-preview .task-list-item { list-style: none; }
+.inspector-notes-live.is-preview a { color: var(--interactive-accent); }
+.inspector-notes-live.is-empty {
+    padding: 12px 8px;
+    border: 1px dashed var(--sc-card-border, var(--background-modifier-border));
+    cursor: pointer;
+}
+.inspector-notes-live.is-empty:hover {
+    border-color: var(--sc-accent, var(--interactive-accent));
+    background: var(--sc-card-bg, var(--background-primary));
+}
+.inspector-notes-placeholder {
+    color: var(--sc-text-muted, var(--text-muted));
+    font-style: italic;
+    text-align: center;
+}
+.inspector-notes-live.is-editing {
+    /* editor mode — textarea fills this */
 }
 
 /* --- Snapshots --- */
@@ -6821,6 +6919,26 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     margin: 4px 0;
 }
 
+/* Arc Point badge (issue #128) */
+.scene-card-arc-point-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    line-height: 1.3;
+    white-space: nowrap;
+    margin: 2px 0 4px 0;
+    background: var(--sl-arc-point-bg, rgba(255, 152, 0, 0.15));
+    color: var(--sl-arc-point-fg, #E65100);
+}
+.scene-card-arc-point-badge svg {
+    width: 12px;
+    height: 12px;
+}
+
 /* ── Per-mode colors ── */
 .timeline-mode-flashback {
     background: var(--sl-mode-flashback-bg, rgba(156, 39, 176, 0.15));
@@ -10498,6 +10616,26 @@ body /* ── Plain-text mode: hide link/tag decorations ───────�
     padding-top: 6px;
 }
 
+/* Image preview in research cards */
+.sl-research-card-image-preview {
+    margin-top: 8px;
+    text-align: center;
+    padding: 6px;
+    border-radius: 6px;
+    background: var(--background-secondary);
+}
+.sl-research-image-not-found {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.85em;
+    padding: 12px;
+}
+/* Image preview in create/edit modal */
+.sl-research-image-preview {
+    margin-top: 4px;
+    text-align: center;
+}
+
 .sl-research-card-source {
     font-size: 0.8em;
     color: var(--text-muted);
@@ -11178,6 +11316,128 @@ body.sl-focus-active-global .titlebar {
     color: var(--text-normal);
     box-sizing: border-box;
 }
+.sl-info-notes-open-btn {
+    float: right;
+    padding: 2px 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+}
+.sl-info-notes-open-btn:hover {
+    color: var(--interactive-accent);
+}
+.sl-info-notes-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.sl-info-notes-header .sl-info-section-label { flex: 1; }
+.sl-info-notes-header .clickable-icon {
+    padding: 2px 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border: none;
+    background: none;
+}
+.sl-info-notes-header .clickable-icon:hover { color: var(--interactive-accent); }
+.sl-info-notes-container { width: 100%; }
+.sl-info-notes-editor-host {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    overflow: hidden;
+}
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .workspace-tabs,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .workspace-tab-container,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .workspace-leaf,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .workspace-leaf-content,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .view-content,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .markdown-source-view,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .markdown-reading-view,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .cm-editor {
+    height: 100%;
+    min-height: 0;
+    width: 100%;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .view-header,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .workspace-tab-header-container,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .workspace-leaf-resize-handle {
+    display: none;
+}
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .inline-title {
+    display: none !important;
+}
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .view-content {
+    padding: 0;
+    overflow: hidden;
+}
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .cm-scroller {
+    overflow: auto !important;
+}
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .cm-content,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .markdown-preview-sizer {
+    min-height: 100%;
+}
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .sl-notes-hidden-heading {
+    display: none !important;
+}
+.sl-info-notes-live {
+    width: 100%;
+    min-height: 40px;
+    border-radius: 6px;
+    font-size: var(--font-ui-small);
+    line-height: 1.5;
+}
+.sl-info-notes-live.is-preview {
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    cursor: text;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.sl-info-notes-live.is-preview:hover {
+    border-color: var(--interactive-accent);
+}
+.sl-info-notes-live.is-preview p { margin: 0.3em 0; }
+.sl-info-notes-live.is-preview ul, .sl-info-notes-live.is-preview ol { margin: 0.3em 0; padding-left: 1.5em; }
+.sl-info-notes-live.is-preview input[type="checkbox"] { margin-right: 4px; cursor: pointer; }
+.sl-info-notes-live.is-preview .task-list-item { list-style: none; }
+.sl-info-notes-live.is-preview a { color: var(--interactive-accent); }
+.sl-info-notes-live.is-empty {
+    padding: 16px 8px;
+    border: 1px dashed var(--background-modifier-border);
+    cursor: pointer;
+}
+.sl-info-notes-live.is-empty:hover {
+    border-color: var(--interactive-accent);
+    background: var(--background-primary);
+}
+.sl-info-notes-placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+}
+.sl-info-notes-live.is-editing {
+    /* editor mode — textarea fills this */
+}
 
 /* Dedicated Synopsis / Notes inspector tabs: full-width, full-height,
    no resize handle on the textarea — the textarea grows to fill the
@@ -11218,7 +11478,11 @@ body.sl-focus-active-global .titlebar {
 }
 .sl-inspector-panel-synopsis .sl-info-synopsis-textarea,
 .sl-inspector-panel-notes .sl-info-notes-textarea,
-.sl-notes-view .sl-info-notes-textarea {
+.sl-inspector-panel-notes .sl-info-notes-container,
+.sl-inspector-panel-notes .sl-info-notes-live,
+.sl-notes-view .sl-info-notes-textarea,
+.sl-notes-view .sl-info-notes-container,
+.sl-notes-view .sl-info-notes-live {
     flex: 1 1 auto;
     width: 100%;
     min-height: 0;
@@ -11248,6 +11512,78 @@ body.sl-focus-active-global .titlebar {
     flex-direction: column;
     padding: 8px 10px 12px;
     box-sizing: border-box;
+}
+
+.sl-notes-editor-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 2px 8px;
+}
+.sl-notes-editor-title {
+    flex: 1 1 auto;
+    font-weight: 600;
+    font-size: var(--font-ui-medium);
+    color: var(--text-normal);
+}
+.sl-notes-open-btn {
+    flex: 0 0 auto;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.sl-notes-open-btn:hover {
+    color: var(--interactive-accent);
+}
+.sl-notes-editor-host {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    overflow: hidden;
+}
+.sl-notes-embedded-split.sl-notes-embedded-split {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+.sl-notes-embedded-split.sl-notes-embedded-split .workspace-tabs,
+.sl-notes-embedded-split.sl-notes-embedded-split .workspace-tab-container,
+.sl-notes-embedded-split.sl-notes-embedded-split .workspace-leaf,
+.sl-notes-embedded-split.sl-notes-embedded-split .workspace-leaf-content,
+.sl-notes-embedded-split.sl-notes-embedded-split .view-content,
+.sl-notes-embedded-split.sl-notes-embedded-split .markdown-source-view,
+.sl-notes-embedded-split.sl-notes-embedded-split .markdown-reading-view,
+.sl-notes-embedded-split.sl-notes-embedded-split .cm-editor {
+    height: 100%;
+    min-height: 0;
+    width: 100%;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+.sl-notes-embedded-split.sl-notes-embedded-split .view-header,
+.sl-notes-embedded-split.sl-notes-embedded-split .workspace-tab-header-container,
+.sl-notes-embedded-split.sl-notes-embedded-split .workspace-leaf-resize-handle {
+    display: none;
+}
+.sl-notes-embedded-split.sl-notes-embedded-split .view-content {
+    padding: 0;
+    overflow: hidden;
+}
+.sl-notes-embedded-split.sl-notes-embedded-split .cm-scroller {
+    overflow: auto !important;
+}
+.sl-notes-embedded-split.sl-notes-embedded-split .cm-content,
+.sl-notes-embedded-split.sl-notes-embedded-split .markdown-preview-sizer {
+    min-height: 100%;
 }
 
 /* Standalone Synopsis sidebar view — same flex chain as Notes. */

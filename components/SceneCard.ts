@@ -115,6 +115,14 @@ export class SceneCardComponent {
             }
         }
 
+        // Arc Point badge (issue #128)
+        if (!options?.compact && scene.arcAnchor) {
+            const arcBadge = card.createDiv({ cls: 'scene-card-arc-point-badge' });
+            const arcIcon = arcBadge.createSpan();
+            obsidian.setIcon(arcIcon, 'diamond');
+            arcBadge.createSpan({ text: ' Arc Point' });
+        }
+
         if (!options?.compact) {
             const footer = card.createDiv('scene-card-footer');
             if (this.plugin.settings.showWordCounts) {

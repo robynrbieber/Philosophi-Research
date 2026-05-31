@@ -19,7 +19,7 @@ import { resolveStickyNoteColors } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import { resolveImagePath } from '../components/ImagePicker';
 import type SceneCardsPlugin from '../main';
-import { compareActChapter, parseActChapterInput } from '../utils/actChapter';
+import { compareActChapter, parseActChapterInput, getActDisplayLabel } from '../utils/actChapter';
 
 type BoardMode = 'kanban' | 'corkboard';
 
@@ -1917,12 +1917,12 @@ export class BoardView extends ItemView {
                 const actValues = this.sceneManager.queryService.getUniqueValues('act');
                 actValues.forEach(act => {
                     menu.addItem(item => {
-                        item.setTitle(`Act ${act}`)
+                        item.setTitle(getActDisplayLabel(act))
                             .onClick(async () => {
                                 for (const fp of this.selectedScenes) {
                                     await this.sceneManager.updateScene(fp, { act: Number(act) || act });
                                 }
-                                new Notice(`Moved ${count} scenes to Act ${act}`);
+                                new Notice(`Moved ${count} scenes to ${getActDisplayLabel(act)}`);
                                 this.selectedScenes.clear();
                                 this.refreshBoard();
                                 this.updateBulkBar();
@@ -1932,12 +1932,12 @@ export class BoardView extends ItemView {
             } else {
                 acts.forEach(act => {
                     menu.addItem(item => {
-                        item.setTitle(`Act ${act}`)
+                        item.setTitle(getActDisplayLabel(act))
                             .onClick(async () => {
                                 for (const fp of this.selectedScenes) {
                                     await this.sceneManager.updateScene(fp, { act });
                                 }
-                                new Notice(`Moved ${count} scenes to Act ${act}`);
+                                new Notice(`Moved ${count} scenes to ${getActDisplayLabel(act)}`);
                                 this.selectedScenes.clear();
                                 this.refreshBoard();
                                 this.updateBulkBar();
@@ -2202,8 +2202,9 @@ export class BoardView extends ItemView {
             for (const act of definedActs) {
                 menu.addItem(item => {
                     const rawActLabel = this.sceneManager.getActLabel(act);
-                    const actLabel = rawActLabel?.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
-                    const display = actLabel ? `Act ${act} — ${actLabel}` : `Act ${act}`;
+                    const cleanActLabel = rawActLabel?.replace(/^(Act|Prologue|Epilogue)\s*\d*\s*[—:]\s*/i, '');
+                    const actDisplay = getActDisplayLabel(act);
+                    const display = cleanActLabel ? `${actDisplay} — ${cleanActLabel}` : actDisplay;
                     item.setTitle(display)
                         .setChecked(scene.act === act)
                         .onClick(async () => {
@@ -2337,7 +2338,8 @@ export class BoardView extends ItemView {
         if (actMatch) {
             const actNum = parseInt(actMatch[1], 10);
             const label = this.sceneManager.getActLabel(actNum);
-            return label ? label : groupKey;
+            const actDisplay = getActDisplayLabel(actNum);
+            return label ? `${actDisplay}: ${label}` : actDisplay;
         }
         const chMatch = groupKey.match(/^Chapter\s+(\d+)$/);
         if (chMatch) {
@@ -2403,10 +2405,11 @@ export class BoardView extends ItemView {
                 item.setTitle('Delete Act')
                     .setIcon('trash')
                     .onClick(() => {
+                        const actDisplay = getActDisplayLabel(actNum);
                         if (scenes.length > 0) {
                             openConfirmModal(this.app, {
                                 title: 'Delete Act',
-                                message: `Act ${actNum} contains ${scenes.length} scene(s). Deleting the act removes the column but keeps the scenes (they'll become unassigned). Continue?`,
+                                message: `${actDisplay} contains ${scenes.length} scene(s). Deleting the act removes the column but keeps the scenes (they'll become unassigned). Continue?`,
                                 onConfirm: async () => {
                                     // Unassign scenes from this act
                                     for (const s of scenes) {
@@ -2415,7 +2418,7 @@ export class BoardView extends ItemView {
                                     await this.sceneManager.removeAct(actNum);
                                     await this.sceneManager.setActLabel(actNum, '');
                                     this.refreshBoard();
-                                    new Notice(`Deleted Act ${actNum}`);
+                                    new Notice(`Deleted ${actDisplay}`);
                                 },
                             });
                         } else {
@@ -2586,10 +2589,11 @@ export class BoardView extends ItemView {
         const rawChLbl = this.sceneManager.getChapterLabel(value);
         const cleanChLbl = rawChLbl?.replace(/^Ch(?:apter)?\s*\d+\s*[—:]\s*/i, '');
         const rawActLbl = this.sceneManager.getActLabel(value);
-        const cleanActLbl = rawActLbl?.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
+        const cleanActLbl = rawActLbl?.replace(/^(Act|Prologue|Epilogue)\s*\d*\s*[—:]\s*/i, '');
+        const actDisplay = getActDisplayLabel(value);
         const label = field === 'chapter'
             ? `Chapter ${value}` + (cleanChLbl ? ` — ${cleanChLbl}` : '')
-            : `Act ${value}` + (cleanActLbl ? ` — ${cleanActLbl}` : '');
+            : actDisplay + (cleanActLbl ? ` — ${cleanActLbl}` : '');
         modal.titleEl.setText(`Add scenes to ${label}`);
 
         const { contentEl } = modal;
@@ -2689,6 +2693,16 @@ export class BoardView extends ItemView {
             text: 'Apply a template to pre-populate your act/chapter structure with named beats.'
         });
 
+        // Global toggle: create placeholder scenes from beats
+        let createPlaceholderScenes = false;
+        new Setting(contentEl)
+            .setName('Create placeholder scenes from beats')
+            .setDesc('When enabled, applying a beat sheet also creates one "idea" scene per beat with the beat\'s title, act, chapter, and synopsis.')
+            .addToggle(toggle => {
+                toggle.setValue(false);
+                toggle.onChange(v => { createPlaceholderScenes = v; });
+            });
+
         const templateGrid = contentEl.createDiv('beat-sheet-list');
         for (const template of BUILTIN_BEAT_SHEETS) {
             const row = templateGrid.createDiv('beat-sheet-row');
@@ -2729,10 +2743,47 @@ export class BoardView extends ItemView {
 
             const applyBtn = row.createEl('button', { text: 'Apply', cls: 'mod-cta beat-sheet-apply-btn' });
             applyBtn.addEventListener('click', async () => {
-                await this.sceneManager.applyBeatSheet(template);
-                renderActsList();
-                renderChaptersList();
-                new Notice(`Applied "${template.name}" template`);
+                // Confirmation dialog if project already has structure
+                const existingActs = this.sceneManager.getDefinedActs();
+                const existingChapters = this.sceneManager.getDefinedChapters();
+                if (existingActs.length > 0 || existingChapters.length > 0) {
+                    openConfirmModal(this.app, {
+                        title: 'Apply Beat Sheet',
+                        message: `Applying "${template.name}" will merge its acts, chapters, and labels into your existing structure. Existing scenes are not modified. Continue?`,
+                        confirmLabel: 'Apply',
+                        confirmClass: 'mod-cta',
+                        onConfirm: async () => {
+                            await this.sceneManager.applyBeatSheet(template);
+                            // Optionally create placeholder scenes
+                            if (createPlaceholderScenes) {
+                                const count = await this.sceneManager.createScenesFromBeats(template);
+                                if (count > 0) {
+                                    new Notice(`Applied "${template.name}" — created ${count} placeholder scene(s)`);
+                                } else {
+                                    new Notice(`Applied "${template.name}" template`);
+                                }
+                            } else {
+                                new Notice(`Applied "${template.name}" template`);
+                            }
+                            renderActsList();
+                            renderChaptersList();
+                        },
+                    });
+                } else {
+                    await this.sceneManager.applyBeatSheet(template);
+                    if (createPlaceholderScenes) {
+                        const count = await this.sceneManager.createScenesFromBeats(template);
+                        if (count > 0) {
+                            new Notice(`Applied "${template.name}" — created ${count} placeholder scene(s)`);
+                        } else {
+                            new Notice(`Applied "${template.name}" template`);
+                        }
+                    } else {
+                        new Notice(`Applied "${template.name}" template`);
+                    }
+                    renderActsList();
+                    renderChaptersList();
+                }
             });
         }
 
@@ -2763,13 +2814,14 @@ export class BoardView extends ItemView {
                 const count = scenesPerAct.get(act) || 0;
                 const label = actLabels[act];
                 const row = actsList.createDiv('structure-row');
-                const cleanLabel = label?.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
-                const labelText = cleanLabel ? `Act ${act} — ${cleanLabel}` : `Act ${act}`;
+                const cleanLabel = label?.replace(/^(Act|Prologue|Epilogue)\s*\d*\s*[—:]\s*/i, '');
+                const actDisplay = getActDisplayLabel(act);
+                const labelText = cleanLabel ? `${actDisplay} — ${cleanLabel}` : actDisplay;
                 row.createSpan({ cls: 'structure-label', text: labelText });
                 row.createSpan({ cls: 'structure-count', text: `${count} scene${count !== 1 ? 's' : ''}` });
                 const removeBtn = row.createEl('button', {
                     cls: 'clickable-icon structure-remove',
-                    attr: { 'aria-label': `Remove Act ${act}` }
+                    attr: { 'aria-label': `Remove ${actDisplay}` }
                 });
                 removeBtn.textContent = '×';
                 removeBtn.addEventListener('click', async () => {
@@ -2914,6 +2966,73 @@ export class BoardView extends ItemView {
             .addToggle(toggle => {
                 toggle.setValue(false);
                 toggle.onChange(v => { createScenesForChapters = v; });
+            });
+
+        // ── Custom Structure Builder ──
+        contentEl.createEl('h3', { text: 'Custom Structure Builder' });
+        contentEl.createEl('p', {
+            cls: 'setting-item-description',
+            text: 'Quickly generate a custom act/chapter structure with optional placeholder scenes.'
+        });
+
+        let customActs = 3;
+        let customChaptersPerAct = 5;
+        let customScenesPerChapter = 1;
+        let customCreateScenes = false;
+
+        const customRow = contentEl.createDiv('structure-add-row');
+        new Setting(customRow)
+            .setName('Number of acts')
+            .addText(text => {
+                text.setValue('3');
+                text.inputEl.type = 'number';
+                text.inputEl.style.width = '60px';
+                text.onChange(v => { customActs = parseInt(v) || 3; });
+            });
+        new Setting(customRow)
+            .setName('Chapters per act')
+            .addText(text => {
+                text.setValue('5');
+                text.inputEl.type = 'number';
+                text.inputEl.style.width = '60px';
+                text.onChange(v => { customChaptersPerAct = parseInt(v) || 5; });
+            });
+        new Setting(customRow)
+            .setName('Scenes per chapter')
+            .setDesc('Set to 0 to skip creating scenes.')
+            .addText(text => {
+                text.setValue('1');
+                text.inputEl.type = 'number';
+                text.inputEl.style.width = '60px';
+                text.onChange(v => { customScenesPerChapter = parseInt(v) || 0; });
+            });
+        new Setting(customRow)
+            .setName('Create placeholder scenes')
+            .setDesc('Generate one "idea" scene per chapter (or per scene slot if > 1).')
+            .addToggle(toggle => {
+                toggle.setValue(false);
+                toggle.onChange(v => { customCreateScenes = v; });
+            });
+
+        const customApplyRow = contentEl.createDiv('structure-close-row');
+        customApplyRow.createEl('button', { text: 'Apply Custom Structure', cls: 'mod-cta' })
+            .addEventListener('click', async () => {
+                if (customActs < 1 || customChaptersPerAct < 1) {
+                    new Notice('Enter at least 1 act and 1 chapter per act.');
+                    return;
+                }
+                const result = await this.sceneManager.applyCustomStructure(
+                    customActs,
+                    customChaptersPerAct,
+                    customScenesPerChapter,
+                    customCreateScenes,
+                );
+                renderActsList();
+                renderChaptersList();
+                const msg = customCreateScenes
+                    ? `Created ${result.acts} acts, ${result.chapters} chapters, ${result.scenes} placeholder scene(s).`
+                    : `Created ${result.acts} acts and ${result.chapters} chapters.`;
+                new Notice(msg);
             });
 
         // Close button

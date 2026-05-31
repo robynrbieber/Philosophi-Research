@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises -- Obsidian's API surface forces dynamic dispatch; floating promises are intentional in DOM/event handlers */
-import { EventRef, ItemView, MarkdownView, WorkspaceLeaf } from 'obsidian';
+import { EventRef, ItemView, MarkdownView, TFile, WorkspaceLeaf, WorkspaceSplit, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
-import { InfoPanelComponent } from '../components/InfoPanel';
 import { ManuscriptView } from './ManuscriptView';
 import { MANUSCRIPT_VIEW_TYPE, NOTES_VIEW_TYPE } from '../constants';
 
@@ -17,9 +16,12 @@ import { MANUSCRIPT_VIEW_TYPE, NOTES_VIEW_TYPE } from '../constants';
 export class NotesView extends ItemView {
     private plugin: SceneCardsPlugin;
     private sceneManager: SceneManager;
-    private notesPanel: InfoPanelComponent | null = null;
+    private editorHost: HTMLElement | null = null;
+    private editorLeaf: WorkspaceLeaf | null = null;
+    private currentScenePath: string | null = null;
+    private currentNotesPath: string | null = null;
+    private saveTimer: number | null = null;
     private emptyEl: HTMLElement | null = null;
-    private lastEditTime = 0;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -46,9 +48,24 @@ export class NotesView extends ItemView {
 
         const container = viewContent.createDiv('sl-notes-view');
 
-        // Notes panel host — flex-fills the sidebar so the textarea grows.
-        const panelEl = container.createDiv('sl-inspector-panel is-active sl-inspector-panel-notes sl-info-panel-host');
-        this.notesPanel = new InfoPanelComponent(panelEl, this.plugin, this.sceneManager, 'notes');
+        const header = container.createDiv('sl-notes-editor-header');
+        header.createDiv({ cls: 'sl-notes-editor-title', text: 'Scene Notes' });
+        const openBtn = header.createEl('button', {
+            cls: 'clickable-icon sl-notes-open-btn',
+            attr: { title: 'Open notes file in separate tab', 'aria-label': 'Open notes file' },
+        });
+        setIcon(openBtn, 'file-text');
+        openBtn.addEventListener('click', async () => {
+            if (!this.currentNotesPath) return;
+            const file = this.app.vault.getAbstractFileByPath(this.currentNotesPath);
+            if (file instanceof TFile) {
+                await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
+            }
+        });
+
+        // Real embedded Obsidian MarkdownView. This is intentionally not the
+        // custom InfoPanel notes renderer: it gives native Live Preview editing.
+        this.editorHost = container.createDiv('sl-notes-editor-host');
 
         // Empty state
         this.emptyEl = container.createDiv('sl-scene-inspector-empty');
@@ -57,18 +74,18 @@ export class NotesView extends ItemView {
         // Follow active markdown / manuscript leaves.
         this.registerEvent(
             this.app.workspace.on('active-leaf-change', (leaf) => {
-                if (!leaf || leaf === this.leaf) return;
+                if (!leaf || leaf === this.leaf || leaf === this.editorLeaf) return;
                 if (leaf.view instanceof MarkdownView || leaf.view instanceof ManuscriptView) {
                     this.updateForActiveFile();
                 }
             })
         );
 
-        // Refresh on external file modifications (skip while user is typing).
+        // Refresh when the focused scene file changes externally.
         this.registerEvent(
-            this.app.vault.on('modify', () => {
-                if (!this.notesPanel?.getCurrentScene()) return;
-                if (Date.now() - this.lastEditTime < 2000) return;
+            this.app.vault.on('modify', (file) => {
+                if (!this.currentScenePath) return;
+                if (file.path === this.currentNotesPath) return;
                 window.setTimeout(() => this.refreshCurrentScene(), 600);
             })
         );
@@ -78,7 +95,6 @@ export class NotesView extends ItemView {
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(
                 'storyline:scene-focus',
                 (filePath: string) => {
-                    if (Date.now() - this.lastEditTime < 2000) return;
                     this.showScene(filePath);
                 },
             ),
@@ -87,7 +103,6 @@ export class NotesView extends ItemView {
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(
                 'storyline:manuscript-focus',
                 (filePath: string) => {
-                    if (Date.now() - this.lastEditTime < 2000) return;
                     this.showScene(filePath);
                 },
             ),
@@ -97,13 +112,18 @@ export class NotesView extends ItemView {
     }
 
     async onClose(): Promise<void> {
-        this.notesPanel = null;
+        this.detachEditor();
+        this.editorHost = null;
+        this.currentScenePath = null;
+        this.currentNotesPath = null;
     }
 
-    private showScene(filePath: string): void {
+    private async showScene(filePath: string): Promise<void> {
         const scene = this.sceneManager.getScene(filePath);
         if (!scene) return;
-        this.notesPanel?.show(scene);
+        this.currentScenePath = scene.filePath;
+        const notesPath = await this.sceneManager.getOrCreateSceneNotesFile(scene);
+        await this.mountNotesEditor(notesPath);
         this.refreshEmptyState();
     }
 
@@ -112,8 +132,7 @@ export class NotesView extends ItemView {
         if (activeFile && activeFile.extension === 'md') {
             const scene = this.sceneManager.getScene(activeFile.path);
             if (scene) {
-                this.notesPanel?.show(scene);
-                this.refreshEmptyState();
+                this.showScene(scene.filePath);
                 return;
             }
         }
@@ -124,28 +143,89 @@ export class NotesView extends ItemView {
             if (view instanceof ManuscriptView && view.focusedScenePath) {
                 const scene = this.sceneManager.getScene(view.focusedScenePath);
                 if (scene) {
-                    this.notesPanel?.show(scene);
-                    this.refreshEmptyState();
+                    this.showScene(scene.filePath);
                     return;
                 }
             }
         }
 
-        this.notesPanel?.hide();
+        this.currentScenePath = null;
+        this.currentNotesPath = null;
+        this.detachEditor();
         this.refreshEmptyState();
     }
 
     private refreshCurrentScene(): void {
-        const current = this.notesPanel?.getCurrentScene();
-        if (!current) return;
-        const fresh = this.sceneManager.getScene(current.filePath);
-        if (fresh) this.notesPanel?.show(fresh);
+        if (!this.currentScenePath) return;
+        const activeLeaf = this.app.workspace.activeLeaf;
+        if (activeLeaf && activeLeaf === this.editorLeaf) return;
+        const fresh = this.sceneManager.getScene(this.currentScenePath);
+        if (fresh) this.showScene(fresh.filePath);
+    }
+
+    private async mountNotesEditor(notesPath: string): Promise<void> {
+        if (!this.editorHost) return;
+        if (this.currentNotesPath === notesPath && this.editorLeaf) return;
+
+        this.detachEditor();
+        this.currentNotesPath = notesPath;
+
+        const file = this.app.vault.getAbstractFileByPath(notesPath);
+        if (!(file instanceof TFile)) return;
+
+        this.editorHost.empty();
+
+        const split = new (WorkspaceSplit as unknown as new (workspace: unknown, dir: string) => WorkspaceSplit)(this.app.workspace, 'vertical');
+        const splitEl: HTMLElement = (split as unknown as { containerEl: HTMLElement }).containerEl;
+        splitEl.addClass('sl-notes-embedded-split');
+        this.editorHost.appendChild(splitEl);
+
+        const leaf = this.app.workspace.createLeafInParent(split, 0);
+        await leaf.openFile(file, { state: { mode: 'source', source: false } });
+        this.editorLeaf = leaf;
+        this.attachAutosave(splitEl, leaf, file);
+    }
+
+    private attachAutosave(splitEl: HTMLElement, leaf: WorkspaceLeaf, file: TFile): void {
+        const saveNow = (): void => {
+            const editor = (leaf.view as unknown as { editor?: { getValue: () => string } })?.editor;
+            if (!editor) return;
+            const value = editor.getValue();
+            void this.app.vault.read(file).then((diskValue) => {
+                if (diskValue !== value) {
+                    return this.app.vault.modify(file, value);
+                }
+            });
+        };
+
+        const scheduleSave = (): void => {
+            if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
+            this.saveTimer = window.setTimeout(() => {
+                this.saveTimer = null;
+                saveNow();
+            }, 250);
+        };
+
+        splitEl.addEventListener('input', scheduleSave, true);
+        splitEl.addEventListener('keyup', scheduleSave, true);
+        splitEl.addEventListener('focusout', saveNow, true);
+    }
+
+    private detachEditor(): void {
+        if (this.saveTimer !== null) {
+            window.clearTimeout(this.saveTimer);
+            this.saveTimer = null;
+        }
+        this.editorLeaf?.detach();
+        this.editorLeaf = null;
+        this.editorHost?.empty();
     }
 
     private refreshEmptyState(): void {
         if (!this.emptyEl) return;
-        const hasScene = !!this.notesPanel?.getCurrentScene();
+        const hasScene = !!this.currentScenePath;
         this.emptyEl.setCssStyles({ display: hasScene ? 'none' : 'block' });
+        this.editorHost?.setCssStyles({ display: hasScene ? 'flex' : 'none' });
     }
 }
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises -- end of file-wide suppression block opened at line 1 */

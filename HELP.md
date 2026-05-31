@@ -36,6 +36,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Reading Order vs Chronological Order](#reading-order-vs-chronological-order)
 - [Beat Sheet Templates](#beat-sheet-templates)
 - [Scene Notes](#scene-notes)
+- [Arc Points](#arc-points)
 - [Scene Snapshots](#scene-snapshots)
 - [View Snapshots](#view-snapshots)
 - [Scene Templates](#scene-templates)
@@ -454,6 +455,7 @@ A right-sidebar panel for collecting and browsing research material alongside yo
 - **Open question badge** - shows a red badge with the count of unresolved questions.
 - **Inline detail** - click a card to expand it and read the full content, source URL, and action buttons.
 - **Create** - click the + button to create a new research post with title, type, tags, optional source URL, and content.
+- **Image posts** - when creating or editing an Image-type post, use the built-in image picker to import or choose a vault image. Image previews appear inline on expanded cards.
 - **Open / Resolve / Delete** - expanded cards include buttons to open the file in the editor, toggle question resolved status, or delete the post.
 
 #### How to Open
@@ -732,6 +734,34 @@ Each scene has an optional **notes** field for editorial comments, reminders, an
 - Notes are separate from the scene body — they're for author-facing comments that won't appear in the manuscript.
 - Notes are included in **outline exports** (Markdown, JSON, CSV) so you can share them with editors.
 - Type `[[` *(new in 1.9.9)* to get inline wikilink autocomplete — link to characters, locations, research notes, or anything else in your vault directly from the comments field.
+
+- **Live Markdown editor** *(new in 1.10.18)* — The Notes tab in the Scene Details sidebar now renders as a full Obsidian Live Preview editor. Write with markdown formatting, wikilinks, and tags — just like a regular note file. Edits are saved automatically.
+
+---
+
+## Arc Points *(new in 1.10.18)*
+
+Arc Points mark key turning points in your story — moments where the plot pivots, a character makes a crucial decision, or the stakes change. They are still regular scenes with all the same fields (word count, status, characters, etc.); the Arc Point flag is just an extra label.
+
+### How to mark a scene as an Arc Point
+
+Open the Scene Details sidebar and check the **Arc Point** checkbox on the Details tab. The scene's frontmatter gets `arcAnchor: true`.
+
+### Where Arc Points appear
+
+- **Board cards** — an orange "◆ Arc Point" badge is shown below the title.
+- **StoryLine subway map** — Arc Points render as filled diamonds (◆) instead of hollow circles, making them stand out at a glance.
+- **Tooltip** — hovering a subway-map node shows "★ Arc Point" in the tooltip.
+
+### Filtering
+
+Both the Board and StoryLine views have an **All / Scenes / Arc Points** toggle in the toolbar:
+
+- **All** — show everything (default).
+- **Scenes** — show only regular scenes (no Arc Points).
+- **Arc Points** — show only Arc Points.
+
+Arc Points are included in word counts, stats, and exports just like any other scene. If you prefer to exclude Arc Point scenes from aggregate word counts (Stats view, Manuscript footer), enable **Settings → Scene Cards → Exclude Arc Points from word count**. This is on by default. Individual scene cards still show their own word count regardless of this setting.
 
 ---
 

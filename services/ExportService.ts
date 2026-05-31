@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { StoryLineProject } from '../models/StoryLineProject';
 import { SceneManager } from './SceneManager';
-import { compareActChapter } from '../utils/actChapter';
+import { compareActChapter, getActDisplayLabel } from '../utils/actChapter';
 import { CharacterManager } from './CharacterManager';
 import { LocationManager } from './LocationManager';
 import { SLMarkdownToDocxConverter, SLDocxSettings, SLObsidianFontSettings } from './DocxConverter';
@@ -177,7 +177,9 @@ export class ExportService {
             // Act heading
             if (scene.act !== undefined && scene.act !== currentAct) {
                 currentAct = scene.act;
-                lines.push(`## Act ${currentAct}`);
+                const actLabel = this.sceneManager.getActLabel(Number(currentAct));
+                const actDisplay = getActDisplayLabel(currentAct);
+                lines.push(actLabel ? `## ${actDisplay}: ${actLabel}` : `## ${actDisplay}`);
                 lines.push('');
                 currentChapter = undefined; // reset chapter on act change
             }
@@ -185,7 +187,8 @@ export class ExportService {
             // Chapter heading
             if (scene.chapter !== undefined && scene.chapter !== currentChapter) {
                 currentChapter = scene.chapter;
-                lines.push(`### Chapter ${currentChapter}`);
+                const chapLabel = this.sceneManager.getChapterLabel(Number(currentChapter));
+                lines.push(chapLabel ? `### Chapter ${currentChapter}: ${chapLabel}` : `### Chapter ${currentChapter}`);
                 lines.push('');
             }
 
@@ -552,13 +555,18 @@ ${body}
         for (const scene of scenes) {
             if (scene.act !== undefined && scene.act !== currentAct) {
                 currentAct = scene.act;
-                parts.push(`<h2>Act ${this.escHtml(String(currentAct))}</h2>`);
+                const actLabel = this.sceneManager.getActLabel(Number(currentAct));
+                const actDisplay = getActDisplayLabel(currentAct);
+                const actText = actLabel ? `${actDisplay}: ${actLabel}` : actDisplay;
+                parts.push(`<h2>${this.escHtml(actText)}</h2>`);
                 currentChapter = undefined;
             }
 
             if (scene.chapter !== undefined && scene.chapter !== currentChapter) {
                 currentChapter = scene.chapter;
-                parts.push(`<h3>Chapter ${this.escHtml(String(currentChapter))}</h3>`);
+                const chapLabel = this.sceneManager.getChapterLabel(Number(currentChapter));
+                const chapText = chapLabel ? `Chapter ${currentChapter}: ${chapLabel}` : `Chapter ${currentChapter}`;
+                parts.push(`<h3>${this.escHtml(chapText)}</h3>`);
             }
 
             sceneNumber++;

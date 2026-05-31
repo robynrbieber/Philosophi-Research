@@ -5,6 +5,7 @@ import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
 import type { SceneFilter, SortConfig, SortField, FilterPreset } from '../models/Scene';
 import { getStatusOrder } from '../models/Scene';
+import { getActDisplayLabel } from '../utils/actChapter';
 
 type FocusModeCallback = (active: boolean) => void;
 
@@ -98,6 +99,26 @@ export class FiltersComponent {
             this.emitChange();
         });
 
+        // Arc Points filter toggle (All / Scenes / Arc Points)
+        const arcFilterContainer = topBar.createDiv('story-line-arc-filter');
+        const arcModes: { value: 'all' | 'scenes' | 'arcPoints'; label: string }[] = [
+            { value: 'all', label: 'All' },
+            { value: 'scenes', label: 'Scenes' },
+            { value: 'arcPoints', label: 'Arc Points' },
+        ];
+        for (const mode of arcModes) {
+            const btn = arcFilterContainer.createEl('button', {
+                cls: `story-line-arc-filter-btn${(this.currentFilter.arcAnchorFilter || 'all') === mode.value ? ' is-active' : ''}`,
+                text: mode.label,
+            });
+            btn.addEventListener('click', () => {
+                this.currentFilter.arcAnchorFilter = mode.value === 'all' ? undefined : mode.value;
+                arcFilterContainer.querySelectorAll('.story-line-arc-filter-btn').forEach(b => b.removeClass('is-active'));
+                btn.addClass('is-active');
+                this.emitChange();
+            });
+        }
+
         // Filter toggle button (Lucide icon)
         const toggleBtn = topBar.createEl('button', {
             cls: 'story-line-filter-toggle clickable-icon',
@@ -154,7 +175,7 @@ export class FiltersComponent {
             actValues.forEach(act => {
                 const chip = actContainer.createEl('button', {
                     cls: 'story-line-chip',
-                    text: `Act ${act}`,
+                    text: getActDisplayLabel(act),
                 });
                 chip.addEventListener('click', () => {
                     if (!this.currentFilter.act) this.currentFilter.act = [];

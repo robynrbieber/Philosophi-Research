@@ -391,6 +391,19 @@ export default class SceneCardsPlugin extends Plugin {
         });
 
         this.addCommand({
+            id: 'open-scene-notes-file',
+            name: 'Open scene notes as file',
+            checkCallback: (checking: boolean) => {
+                const scene = this.sceneManager.getScene(this.app.workspace.getActiveFile()?.path ?? '');
+                if (!scene) return false;
+                if (!checking) {
+                    this.sceneManager.openSceneNotes(scene);
+                }
+                return true;
+            },
+        });
+
+        this.addCommand({
             id: 'open-scene-synopsis',
             name: 'Open scene synopsis sidebar',
             callback: () => this.openSynopsisView(),

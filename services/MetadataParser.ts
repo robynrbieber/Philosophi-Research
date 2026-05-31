@@ -125,6 +125,7 @@ export class MetadataParser {
             modified: frontmatter.modified,
             body,
             notes: frontmatter.notes,
+            notesFile: frontmatter.notesFile ?? (frontmatter.notes_file as string | undefined),
             synopsis: frontmatter.synopsis,
             corkboardNote: this.parseBooleanFlag(frontmatter.corkboardNote ?? (frontmatter.corkboard_note as boolean | undefined)),
             corkboardNoteColor: frontmatter.corkboardNoteColor ?? (frontmatter.corkboard_note_color as string | undefined),
@@ -143,6 +144,7 @@ export class MetadataParser {
                     : undefined,
             ) as Record<string, string | string[]> | undefined,
             beatsheet: frontmatter.beatsheet,
+            arcAnchor: this.parseBooleanFlag(frontmatter.arcAnchor ?? (frontmatter.arc_anchor as boolean | undefined)),
         };
     }
 
@@ -193,6 +195,7 @@ export class MetadataParser {
             if (key === 'subtitle' && !value) { delete frontmatter[key]; continue; }
             if (key === 'color' && !value) { delete frontmatter[key]; continue; }
             if (key === 'beatsheet' && !value) { delete frontmatter[key]; continue; }
+            if (key === 'arcAnchor' && !value) { delete frontmatter[key]; continue; }
             if (key === 'ignored_detections') {
                 if (Array.isArray(value) && value.length > 0) frontmatter[key] = value;
                 else delete frontmatter[key];
@@ -279,6 +282,7 @@ export class MetadataParser {
         if (scene.setup_scenes?.length) fm.setup_scenes = wrapArray(scene.setup_scenes);
         if (scene.payoff_scenes?.length) fm.payoff_scenes = wrapArray(scene.payoff_scenes);
         if (scene.notes) fm.notes = scene.notes;
+        if (scene.notesFile) fm.notesFile = scene.notesFile;
         if (scene.synopsis) fm.synopsis = scene.synopsis;
         if (scene.corkboardNote) fm.corkboardNote = true;
         if (scene.corkboardNoteColor) fm.corkboardNoteColor = scene.corkboardNoteColor;
@@ -290,6 +294,7 @@ export class MetadataParser {
         if (scene.subtitle) fm.subtitle = scene.subtitle;
         if (scene.color) fm.color = scene.color;
         if (scene.beatsheet) fm.beatsheet = scene.beatsheet;
+        if (scene.arcAnchor) fm.arcAnchor = true;
         if (scene.codexLinks && Object.keys(scene.codexLinks).some(k => scene.codexLinks![k]?.length)) {
             fm.codexLinks = scene.codexLinks;
         }

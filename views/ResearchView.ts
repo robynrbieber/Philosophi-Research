@@ -6,6 +6,7 @@ import { ResearchManager } from '../services/ResearchManager';
 import { ResearchPost, ResearchType, RESEARCH_TYPE_CONFIG } from '../models/Research';
 import { RESEARCH_VIEW_TYPE } from '../constants';
 import { attachTooltip } from '../components/Tooltip';
+import { pickImage, resolveImagePath } from '../components/ImagePicker';
 import { tokenizeWords, isScriptioContinuaLocale, DEFAULT_STORYLINE_LOCALE, type StoryLineLocale } from '../utils/locale';
 
 /**
@@ -305,16 +306,52 @@ export class ResearchView extends ItemView {
 
         // Expanded detail
         if (isExpanded) {
+            // Image preview for image-type posts
+            if (post.researchType === 'image') {
+                const imagePreviewEl = card.createDiv('sl-research-card-image-preview');
+                // Extract image path from body (format: ![[path]] or ![](path))
+                const wikiMatch = post.body.match(/!\[\[([^\]]+)\]\]/);
+                const mdMatch = post.body.match(/!\[.*?\]\(([^)]+)\)/);
+                const imgPath = wikiMatch ? wikiMatch[1] : mdMatch ? mdMatch[1] : null;
+                if (imgPath) {
+                    try {
+                        const imgSrc = resolveImagePath(this.app, imgPath);
+                        const img = imagePreviewEl.createEl('img', { attr: { src: imgSrc, alt: post.title } });
+                        img.setCssStyles({
+                            maxWidth: '100%',
+                            maxHeight: '250px',
+                            borderRadius: '6px',
+                            objectFit: 'contain',
+                            border: '1px solid var(--background-modifier-border)',
+                        });
+                        img.onerror = () => {
+                            img.remove();
+                            imagePreviewEl.createDiv({ cls: 'sl-research-image-not-found', text: 'Image not found in vault' });
+                        };
+                    } catch {
+                        imagePreviewEl.createDiv({ cls: 'sl-research-image-not-found', text: 'Image not found in vault' });
+                    }
+                } else {
+                    imagePreviewEl.createDiv({ cls: 'sl-research-image-not-found', text: 'No image reference found' });
+                }
+            }
+
             // Body preview
             if (post.body) {
                 const bodyEl = card.createDiv('sl-research-card-body');
-                obsidian.MarkdownRenderer.render(
-                    this.app,
-                    post.body.substring(0, 2000),
-                    bodyEl,
-                    post.filePath,
-                    this,
-                );
+                // For image posts, strip the image embed from the body preview (it's shown above)
+                const bodyContent = post.researchType === 'image'
+                    ? post.body.replace(/!\[\[[^\]]+\]\]\n*/g, '').replace(/!\[.*?\]\([^)]+\)\n*/g, '').trim()
+                    : post.body;
+                if (bodyContent) {
+                    obsidian.MarkdownRenderer.render(
+                        this.app,
+                        bodyContent.substring(0, 2000),
+                        bodyEl,
+                        post.filePath,
+                        this,
+                    );
+                }
             }
 
             // Source URL
@@ -458,6 +495,7 @@ export class ResearchView extends ItemView {
         let tags = '';
         let sourceUrl = '';
         let body = '';
+        let imagePath = ''; // vault-relative path for image type
 
         // Dynamic fields container — rebuilt when type changes
         const dynamicContainer = modal.contentEl.createDiv();
@@ -471,6 +509,7 @@ export class ResearchView extends ItemView {
                     text.setPlaceholder(
                         researchType === 'question' ? 'Your question…'
                             : researchType === 'webclip' ? 'Page title or description'
+                            : researchType === 'image' ? 'Image title or caption'
                             : 'Research topic'
                     ).setValue(title).onChange(v => { title = v; });
                     if (!title) window.setTimeout(() => text.inputEl.focus(), 50);
@@ -489,6 +528,65 @@ export class ResearchView extends ItemView {
                     .addText(text => {
                         text.setPlaceholder('https://...')
                             .setValue(sourceUrl).onChange(v => { sourceUrl = v; });
+                    });
+            }
+
+            if (researchType === 'image') {
+                // Image picker setting
+                const imageSetting = new Setting(dynamicContainer)
+                    .setName('Image')
+                    .setDesc(imagePath ? `Selected: ${imagePath.split('/').pop()}` : 'No image selected');
+                
+                // Image preview
+                if (imagePath) {
+                    const previewEl = imageSetting.controlEl.createDiv('sl-research-image-preview');
+                    try {
+                        const imgSrc = resolveImagePath(this.app, imagePath);
+                        const img = previewEl.createEl('img', { attr: { src: imgSrc } });
+                        img.setCssStyles({
+                            maxWidth: '120px',
+                            maxHeight: '80px',
+                            borderRadius: '4px',
+                            objectFit: 'cover',
+                            border: '1px solid var(--background-modifier-border)',
+                        });
+                        img.onerror = () => { img.remove(); previewEl.setText('Image not found'); };
+                    } catch { previewEl.setText('Image not found'); }
+                }
+
+                imageSetting.addButton(btn => {
+                    btn.setButtonText(imagePath ? 'Change Image' : 'Select Image');
+                    btn.setClass('mod-cta');
+                    btn.onClick(async () => {
+                        const project = this.plugin.sceneManager?.activeProject;
+                        const sceneFolder = project?.sceneFolder || '';
+                        const result = await pickImage(this.app, sceneFolder, imagePath || undefined);
+                        if (result !== undefined) {
+                            imagePath = result;
+                            rebuildFields();
+                        }
+                    });
+                });
+
+                if (imagePath) {
+                    imageSetting.addButton(btn => {
+                        btn.setButtonText('Remove');
+                        btn.setClass('mod-destructive');
+                        btn.onClick(() => {
+                            imagePath = '';
+                            rebuildFields();
+                        });
+                    });
+                }
+
+                // Optional notes for image
+                new Setting(dynamicContainer)
+                    .setName('Notes')
+                    .addTextArea(text => {
+                        text.setPlaceholder('Optional notes about this image…')
+                            .setValue(body).onChange(v => { body = v; });
+                        text.inputEl.rows = 3;
+                        text.inputEl.setCssStyles({ width: '100%' });
                     });
             }
 
@@ -537,8 +635,18 @@ export class ResearchView extends ItemView {
                 new Notice('Title is required');
                 return;
             }
+            if (researchType === 'image' && !imagePath) {
+                new Notice('Please select an image');
+                return;
+            }
             const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
-            await this.manager.createPost(title.trim(), researchType, body, tagList, sourceUrl || undefined);
+            // For image type, embed the image reference in the body
+            let finalBody = body;
+            if (researchType === 'image' && imagePath) {
+                const imageRef = `![[${imagePath}]]`;
+                finalBody = body ? `${imageRef}\n\n${body}` : imageRef;
+            }
+            await this.manager.createPost(title.trim(), researchType, finalBody, tagList, sourceUrl || undefined);
             modal.close();
             this.refresh();
             new Notice(`Research post "${title.trim()}" created`);
@@ -557,6 +665,14 @@ export class ResearchView extends ItemView {
         let title = post.title;
         let tags = post.tags.join(', ');
         let sourceUrl = post.sourceUrl || '';
+        let imagePath = '';
+
+        // Extract current image path from body for image-type posts
+        if (post.researchType === 'image') {
+            const wikiMatch = post.body.match(/!\[\[([^\]]+)\]\]/);
+            const mdMatch = post.body.match(/!\[.*?\]\(([^)]+)\)/);
+            imagePath = wikiMatch ? wikiMatch[1] : mdMatch ? mdMatch[1] : '';
+        }
 
         new Setting(modal.contentEl)
             .setName('Title')
@@ -582,6 +698,43 @@ export class ResearchView extends ItemView {
                 });
         }
 
+        if (post.researchType === 'image') {
+            const imageSetting = new Setting(modal.contentEl)
+                .setName('Image')
+                .setDesc(imagePath ? `Selected: ${imagePath.split('/').pop()}` : 'No image selected');
+
+            if (imagePath) {
+                const previewEl = imageSetting.controlEl.createDiv('sl-research-image-preview');
+                try {
+                    const imgSrc = resolveImagePath(this.app, imagePath);
+                    const img = previewEl.createEl('img', { attr: { src: imgSrc } });
+                    img.setCssStyles({
+                        maxWidth: '120px',
+                        maxHeight: '80px',
+                        borderRadius: '4px',
+                        objectFit: 'cover',
+                        border: '1px solid var(--background-modifier-border)',
+                    });
+                    img.onerror = () => { img.remove(); previewEl.setText('Image not found'); };
+                } catch { previewEl.setText('Image not found'); }
+            }
+
+            imageSetting.addButton(btn => {
+                btn.setButtonText(imagePath ? 'Change Image' : 'Select Image');
+                btn.setClass('mod-cta');
+                btn.onClick(async () => {
+                    const project = this.plugin.sceneManager?.activeProject;
+                    const sceneFolder = project?.sceneFolder || '';
+                    const result = await pickImage(this.app, sceneFolder, imagePath || undefined);
+                    if (result !== undefined) {
+                        imagePath = result;
+                        modal.close();
+                        this.openEditModal(post); // Re-open to refresh preview
+                    }
+                });
+            });
+        }
+
         const btnRow = modal.contentEl.createDiv('sl-research-modal-buttons');
         const saveBtn = btnRow.createEl('button', { cls: 'mod-cta', text: 'Save' });
         saveBtn.addEventListener('click', async () => {
@@ -590,11 +743,32 @@ export class ResearchView extends ItemView {
                 return;
             }
             const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
-            await this.manager.updatePost(post.filePath, {
+            const updates: Partial<Pick<ResearchPost, 'title' | 'tags' | 'researchType' | 'sourceUrl' | 'resolved'>> = {
                 title: title.trim(),
                 tags: tagList,
                 sourceUrl: sourceUrl || undefined,
-            });
+            };
+            await this.manager.updatePost(post.filePath, updates);
+
+            // If image path changed, update the body
+            if (post.researchType === 'image' && imagePath) {
+                const wikiMatch = post.body.match(/!\[\[([^\]]+)\]\]/);
+                const oldPath = wikiMatch ? wikiMatch[1] : '';
+                if (oldPath !== imagePath) {
+                    const newBody = post.body.replace(/!\[\[[^\]]+\]\]/, `![[${imagePath}]]`);
+                    // Need to write the file directly since updatePost doesn't handle body
+                    const file = this.app.vault.getAbstractFileByPath(post.filePath);
+                    if (file instanceof TFile) {
+                        const content = await this.app.vault.read(file);
+                        const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+                        if (fmMatch) {
+                            const newContent = content.substring(0, fmMatch[0].length) + '\n' + newBody;
+                            await this.app.vault.modify(file, newContent);
+                        }
+                    }
+                }
+            }
+
             modal.close();
             this.refresh();
         });

@@ -138,6 +138,8 @@ export interface Scene {
     body?: string;
     /** Editorial notes / revision comments (not part of manuscript) */
     notes?: string;
+    /** Vault-relative path to an external notes markdown file (SceneNotes folder) */
+    notesFile?: string;
     /** Brief scene synopsis (planning sketch — shown in the Info side panel) */
     synopsis?: string;
     /** True when this item is a corkboard note card (not a regular scene card) */
@@ -166,6 +168,8 @@ export interface Scene {
     beatsheet?: string;
     /** Issue #89 — names of detected codex links the user explicitly ignored in this scene */
     ignored_detections?: string[];
+    /** Issue #128 — marks this scene as an Arc Point (key turning point in the story) */
+    arcAnchor?: boolean;
 }
 
 /**
@@ -191,6 +195,8 @@ export interface SceneFilter {
     searchText?: string;
     /** Filter by custom (universal) field values — keyed by template id → list of accepted values */
     customFields?: Record<string, string[]>;
+    /** Arc Point filter: 'all' (default) | 'scenes' (non-arc-point only) | 'arcPoints' (arc points only) */
+    arcAnchorFilter?: 'all' | 'scenes' | 'arcPoints';
 }
 
 /**
@@ -325,6 +331,8 @@ export type BoardGroupBy = 'act' | 'chapter' | 'status' | 'pov' | (string & {});
 export interface BeatDefinition {
     /** Act number this beat belongs to */
     act: number;
+    /** Optional chapter number this beat belongs to (derived from beat order when absent) */
+    chapter?: number;
     /** Beat label (e.g. "Opening Image", "Catalyst") */
     label: string;
     /** Short description of the beat's purpose */

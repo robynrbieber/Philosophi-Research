@@ -20,6 +20,9 @@ export class InfoPanelComponent {
     private container: HTMLElement;
     private currentScene: Scene | null = null;
     private mode: InfoPanelMode;
+    private notesLeaf: obsidian.WorkspaceLeaf | null = null;
+    private notesPath: string | null = null;
+    private notesSaveTimer: number | null = null;
 
     constructor(container: HTMLElement, plugin: SceneCardsPlugin, sceneManager: SceneManager, mode: InfoPanelMode = 'full') {
         this.container = container;
@@ -30,7 +33,7 @@ export class InfoPanelComponent {
 
     show(scene: Scene): void {
         // Don't clobber active typing inside the panel
-        if (this.container.querySelector('input:focus, textarea:focus, select:focus')) {
+        if (this.container.querySelector('input:focus, textarea:focus, select:focus, .cm-focused')) {
             this.currentScene = scene;
             return;
         }
@@ -40,6 +43,7 @@ export class InfoPanelComponent {
 
     hide(): void {
         this.currentScene = null;
+        this.detachNotesEditor();
         this.container.empty();
     }
 
@@ -51,7 +55,35 @@ export class InfoPanelComponent {
         return this.currentScene;
     }
 
+    isNotesEditorLeaf(leaf: obsidian.WorkspaceLeaf | null | undefined): boolean {
+        return !!leaf && leaf === this.notesLeaf;
+    }
+
+    isNotesFilePath(filePath: string | null | undefined): boolean {
+        return !!filePath && !!this.notesPath && filePath === this.notesPath;
+    }
+
+    isNotesEditorFocused(): boolean {
+        return !!this.container.querySelector('.sl-info-notes-embedded-split .cm-focused');
+    }
+
+    async refreshNotesFromDisk(): Promise<void> {
+        if (!this.notesLeaf || !this.notesPath || this.isNotesEditorFocused()) return;
+
+        const file = this.plugin.app.vault.getAbstractFileByPath(this.notesPath);
+        if (!(file instanceof obsidian.TFile)) return;
+
+        const editor = (this.notesLeaf.view as unknown as { editor?: obsidian.Editor })?.editor;
+        if (!editor) return;
+
+        const diskValue = await this.plugin.app.vault.read(file);
+        if (editor.getValue() !== diskValue) {
+            editor.setValue(diskValue);
+        }
+    }
+
     private render(): void {
+        this.detachNotesEditor();
         this.container.empty();
         const scene = this.currentScene;
         if (!scene) return;
@@ -201,16 +233,217 @@ export class InfoPanelComponent {
     private renderNotes(scene: Scene): void {
         const section = this.container.createDiv('sl-info-section');
         section.createDiv({ cls: 'sl-info-section-label', text: 'Notes' });
+        const notesContainer = section.createDiv('sl-info-notes-container sl-info-notes-editor-host');
+        void this.mountNotesEditor(notesContainer, scene);
+    }
 
-        const textarea = section.createEl('textarea', {
+    private async mountNotesEditor(container: HTMLElement, scene: Scene): Promise<void> {
+        container.empty();
+        const notesPath = await this.sceneManager.getOrCreateSceneNotesFile(scene);
+        this.notesPath = notesPath;
+
+        const file = this.plugin.app.vault.getAbstractFileByPath(notesPath);
+        if (!(file instanceof obsidian.TFile)) {
+            container.createDiv({ cls: 'sl-info-notes-placeholder', text: 'Unable to open notes file.' });
+            return;
+        }
+
+        const raw = await this.plugin.app.vault.read(file);
+        const cleaned = this.stripRedundantNotesHeadings(raw, scene);
+        if (cleaned !== raw) {
+            await this.plugin.app.vault.modify(file, cleaned);
+        }
+
+        const split = new (obsidian.WorkspaceSplit as unknown as new (workspace: unknown, dir: string) => obsidian.WorkspaceSplit)(this.plugin.app.workspace, 'vertical');
+        const splitEl = (split as unknown as { containerEl: HTMLElement }).containerEl;
+        splitEl.addClass('sl-info-notes-embedded-split');
+        container.appendChild(splitEl);
+
+        const leaf = this.plugin.app.workspace.createLeafInParent(split, 0);
+        await leaf.openFile(file, { state: { mode: 'source', source: false } });
+        this.notesLeaf = leaf;
+        this.attachNotesAutosave(splitEl, leaf, file);
+        window.requestAnimationFrame(() => this.hideEmbeddedNotesHeadings(splitEl));
+    }
+
+    private attachNotesAutosave(splitEl: HTMLElement, leaf: obsidian.WorkspaceLeaf, file: obsidian.TFile): void {
+        const saveNow = (): void => {
+            const editor = (leaf.view as unknown as { editor?: obsidian.Editor })?.editor;
+            if (!editor) return;
+            const value = editor.getValue();
+            void this.plugin.app.vault.read(file).then((diskValue) => {
+                if (diskValue !== value) {
+                    return this.plugin.app.vault.modify(file, value);
+                }
+            });
+        };
+
+        const scheduleSave = (): void => {
+            if (this.notesSaveTimer !== null) window.clearTimeout(this.notesSaveTimer);
+            this.notesSaveTimer = window.setTimeout(() => {
+                this.notesSaveTimer = null;
+                saveNow();
+            }, 250);
+        };
+
+        splitEl.addEventListener('input', scheduleSave, true);
+        splitEl.addEventListener('keyup', scheduleSave, true);
+        splitEl.addEventListener('focusout', saveNow, true);
+    }
+
+    private stripRedundantNotesHeadings(content: string, scene: Scene): string {
+        const title = (scene.title || 'Untitled').trim();
+        const lines = content.replace(/^\uFEFF/, '').split(/\r?\n/);
+
+        let index = 0;
+        while (index < lines.length && lines[index].trim() === '') index++;
+
+        while (index < lines.length) {
+            const text = lines[index].trim().replace(/^#{1,6}\s+/, '').trim();
+            const isHeading = /^#{1,6}\s+/.test(lines[index].trim());
+            const isRedundant = isHeading && (
+                text === title ||
+                text === `Notes: ${title}` ||
+                text === 'Notes'
+            );
+            if (!isRedundant) break;
+            lines.splice(index, 1);
+            while (index < lines.length && lines[index].trim() === '') lines.splice(index, 1);
+        }
+
+        return lines.join('\n').trimStart();
+    }
+
+    private hideEmbeddedNotesHeadings(splitEl: HTMLElement): void {
+        // Hide legacy headings already present in previously-created notes files
+        // so the Notes tab only shows the small scene title/header above it.
+        const headingSelectors = [
+            '.cm-line.HyperMD-header-1',
+            '.cm-line.HyperMD-header-2',
+            '.markdown-preview-view h1',
+            '.markdown-preview-view h2',
+        ];
+        for (const selector of headingSelectors) {
+            splitEl.querySelectorAll(selector).forEach((el) => {
+                const text = (el.textContent || '').trim();
+                if (text === this.currentScene?.title || text.startsWith('Notes:')) {
+                    (el as HTMLElement).addClass('sl-notes-hidden-heading');
+                }
+            });
+        }
+    }
+
+    private detachNotesEditor(): void {
+        if (this.notesSaveTimer !== null) {
+            window.clearTimeout(this.notesSaveTimer);
+            this.notesSaveTimer = null;
+        }
+        this.notesLeaf?.detach();
+        this.notesLeaf = null;
+        this.notesPath = null;
+    }
+
+    /**
+     * Live markdown notes: rendered preview by default.
+     * Click to edit (textarea), blur to save & return to preview.
+     * Checkboxes are interactive in preview mode.
+     */
+    private renderNotesLive(container: HTMLElement, scene: Scene): void {
+        container.empty();
+
+        if (!scene.notes) {
+            // Empty state — show a clickable placeholder that opens the editor
+            const placeholder = container.createDiv('sl-info-notes-live is-empty');
+            placeholder.createDiv({ cls: 'sl-info-notes-placeholder', text: 'Click to add notes…' });
+            placeholder.addEventListener('click', () => {
+                this.renderNotesEditor(container, scene);
+            });
+            return;
+        }
+
+        // Rendered markdown preview
+        const previewEl = container.createDiv('sl-info-notes-live is-preview');
+        obsidian.MarkdownRenderer.render(
+            this.plugin.app,
+            scene.notes,
+            previewEl,
+            scene.filePath,
+            this,
+        );
+
+        // Click on preview → switch to editor (but not on links/checkboxes)
+        previewEl.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'A' || target.tagName === 'INPUT') return;
+            this.renderNotesEditor(container, scene);
+        });
+
+        // Interactive checkboxes
+        previewEl.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+            const checkbox = cb as HTMLInputElement;
+            checkbox.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const checked = checkbox.checked;
+                const notes = scene.notes || '';
+                const lines = notes.split('\n');
+                let lineIdx = 0;
+                let foundIdx = -1;
+                for (const line of lines) {
+                    const match = line.match(/^(\s*-\s*)\[([ xX])\]/);
+                    if (match) {
+                        if (previewEl.querySelectorAll('input[type="checkbox"]')[lineIdx] === checkbox) {
+                            foundIdx = lines.indexOf(line);
+                            break;
+                        }
+                        lineIdx++;
+                    }
+                }
+                if (foundIdx >= 0) {
+                    lines[foundIdx] = lines[foundIdx].replace(/- \[[ xX]\]/, checked ? '- [x]' : '- [ ]');
+                    const newNotes = lines.join('\n');
+                    await this.sceneManager.updateScene(scene.filePath, { notes: newNotes });
+                    scene.notes = newNotes;
+                    if (scene.notesFile) {
+                        await this.sceneManager.writeSceneNotes(scene, `# Notes: ${scene.title || 'Untitled'}\n\n${newNotes}\n`);
+                    }
+                    this.renderNotesLive(container, scene);
+                }
+            });
+        });
+    }
+
+    private renderNotesEditor(container: HTMLElement, scene: Scene): void {
+        container.empty();
+        const editorEl = container.createDiv('sl-info-notes-live is-editing');
+
+        const textarea = editorEl.createEl('textarea', {
             cls: 'sl-info-notes-textarea',
-            attr: { placeholder: 'Notes & comments…' },
+            attr: { placeholder: 'Write notes in markdown… Use - [ ] for checkboxes, **bold**, [[wikilinks]]' },
         });
         textarea.value = scene.notes || '';
-        textarea.addEventListener('change', async () => {
-            const val = textarea.value.trim();
-            await this.sceneManager.updateScene(scene.filePath, { notes: val || undefined });
-            scene.notes = val || undefined;
+
+        // Auto-focus
+        requestAnimationFrame(() => textarea.focus());
+
+        // Save on blur → return to live preview
+        textarea.addEventListener('blur', async () => {
+            const val = textarea.value;
+            const trimmed = val.trim();
+            await this.sceneManager.updateScene(scene.filePath, { notes: trimmed || undefined });
+            scene.notes = trimmed || undefined;
+            if (scene.notesFile) {
+                await this.sceneManager.writeSceneNotes(scene, `# Notes: ${scene.title || 'Untitled'}\n\n${trimmed}\n`);
+            }
+            this.renderNotesLive(container, scene);
+        });
+
+        // Escape to finish editing
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                textarea.blur();
+            }
         });
     }
 

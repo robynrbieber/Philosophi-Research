@@ -17,7 +17,7 @@ import { enableDragToPan } from '../components/DragToPan';
 import { isMobile } from '../components/MobileAdapter';
 import { PLOTGRID_VIEW_TYPE } from '../constants';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors, contrastTextColor } from '../settings';
-import { compareActChapter } from '../utils/actChapter';
+import { compareActChapter, getActDisplayLabel } from '../utils/actChapter';
 import { attachTooltip } from '../components/Tooltip';
 import type SceneCardsPlugin from '../main';
 import { Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
@@ -666,8 +666,9 @@ export class PlotgridView extends ItemView {
                     const actNum = typeof scene.act === 'number' ? scene.act : parseInt(String(scene.act), 10);
                     const actLabels = (activeProject as unknown as { actLabels?: Record<number, string> })?.actLabels;
                     const rawActLabel = !isNaN(actNum) ? (actLabels?.[actNum] || '') : '';
-                    const cleanActLabel = rawActLabel.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
-                    dividers.push({ type: 'act', label: cleanActLabel ? `Act ${scene.act}: ${cleanActLabel}` : `Act ${scene.act}` });
+                    const cleanActLabel = rawActLabel.replace(/^(Act|Prologue|Epilogue)\s*\d*\s*[—:]\s*/i, '');
+                    const actDisplay = getActDisplayLabel(scene.act);
+                    dividers.push({ type: 'act', label: cleanActLabel ? `${actDisplay}: ${cleanActLabel}` : actDisplay });
                     prevChapter = undefined;
                 }
                 if (scene.chapter !== undefined && String(scene.chapter) !== String(prevChapter)) {

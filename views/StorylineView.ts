@@ -11,7 +11,7 @@ import { applyMobileClass } from '../components/MobileAdapter';
 import { enableDragToPan } from '../components/DragToPan';
 import { resolveTagColor, getPlotlineHSL, contrastTextColor } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
-import { compareScenesByActChapter } from '../utils/actChapter';
+import { compareScenesByActChapter, getActDisplayLabel } from '../utils/actChapter';
 
 type SortMode = 'alpha' | 'scenes-desc' | 'scenes-asc' | 'reading-order';
 type PlotlineViewMode = 'list' | 'subway';
@@ -30,6 +30,8 @@ export class StorylineView extends ItemView {
     private plotlineViewMode: PlotlineViewMode = 'subway';
     /** Set of plotline tag names that are hidden in the subway view */
     private hiddenPlotlines: Set<string> = new Set();
+    /** Arc Point filter: 'all' | 'scenes' | 'arcPoints' */
+    private arcAnchorFilter: 'all' | 'scenes' | 'arcPoints' = 'all';
     /** Cache key for skip-if-unchanged optimization */
     private _lastCacheVersion = -1;
     private _lastRenderKey = '';
@@ -109,6 +111,26 @@ export class StorylineView extends ItemView {
             });
             menu.showAtPosition({ x: e.clientX, y: e.clientY });
         });
+
+        // Arc Points filter toggle (All / Scenes / Arc Points)
+        const arcFilterContainer = controls.createDiv('story-line-arc-filter');
+        const arcModes: { value: 'all' | 'scenes' | 'arcPoints'; label: string }[] = [
+            { value: 'all', label: 'All' },
+            { value: 'scenes', label: 'Scenes' },
+            { value: 'arcPoints', label: 'Arc Points' },
+        ];
+        for (const mode of arcModes) {
+            const btn = arcFilterContainer.createEl('button', {
+                cls: `story-line-arc-filter-btn${this.arcAnchorFilter === mode.value ? ' is-active' : ''}`,
+                text: mode.label,
+            });
+            btn.addEventListener('click', () => {
+                this.arcAnchorFilter = mode.value;
+                arcFilterContainer.querySelectorAll('.story-line-arc-filter-btn').forEach(b => b.removeClass('is-active'));
+                btn.addClass('is-active');
+                this.refresh();
+            });
+        }
 
         // New plotline button
         const addPlotlineBtn = controls.createEl('button', {
@@ -191,8 +213,9 @@ export class StorylineView extends ItemView {
 
         const content = container.createDiv('story-line-storyline-content');
 
+        const arcFilter = this.arcAnchorFilter === 'all' ? undefined : { arcAnchorFilter: this.arcAnchorFilter };
         const scenes = this.sceneManager.queryService.getFilteredScenes(
-            undefined,
+            arcFilter,
             { field: 'sequence', direction: 'asc' }
         );
 
@@ -454,7 +477,7 @@ export class StorylineView extends ItemView {
             actLabel.setAttribute('font-size', '16');
             actLabel.setAttribute('font-weight', '700');
             actLabel.setAttribute('fill', 'var(--text-muted)');
-            actLabel.textContent = actNum > 0 ? `ACT ${actNum}` : '';
+            actLabel.textContent = getActDisplayLabel(actNum).toUpperCase();
             svg.appendChild(actLabel);
 
             // Vertical divider line before this act group (clear, visible)
@@ -565,18 +588,36 @@ export class StorylineView extends ItemView {
                 const x = colX(col);
                 const scene = orderedScenes[col];
 
-                // Circle node
-                const circle = activeDocument.createElementNS(svgNS, 'circle');
-                circle.setAttribute('cx', String(x));
-                circle.setAttribute('cy', String(y));
-                circle.setAttribute('r', String(NODE_RADIUS));
-                circle.setAttribute('fill', 'var(--background-primary)');
-                circle.setAttribute('stroke', color);
-                circle.setAttribute('stroke-width', '3.5');
-                circle.setCssStyles({ cursor: 'pointer' });
-                svg.appendChild(circle);
+                // Node shape: diamond for Arc Points, circle for regular scenes
+                const isArcPoint = !!scene.arcAnchor;
+                let nodeEl: SVGElement;
+                if (isArcPoint) {
+                    // Diamond shape for Arc Points
+                    const d = NODE_RADIUS * 1.3; // slightly larger to match visual weight
+                    const diamond = activeDocument.createElementNS(svgNS, 'polygon');
+                    diamond.setAttribute('points', `${x},${y - d} ${x + d},${y} ${x},${y + d} ${x - d},${y}`);
+                    diamond.setAttribute('fill', color);
+                    diamond.setAttribute('stroke', color);
+                    diamond.setAttribute('stroke-width', '2');
+                    diamond.setAttribute('opacity', '0.9');
+                    diamond.setCssStyles({ cursor: 'pointer' });
+                    svg.appendChild(diamond);
+                    nodeEl = diamond;
+                } else {
+                    // Circle node for regular scenes
+                    const circle = activeDocument.createElementNS(svgNS, 'circle');
+                    circle.setAttribute('cx', String(x));
+                    circle.setAttribute('cy', String(y));
+                    circle.setAttribute('r', String(NODE_RADIUS));
+                    circle.setAttribute('fill', 'var(--background-primary)');
+                    circle.setAttribute('stroke', color);
+                    circle.setAttribute('stroke-width', '3.5');
+                    circle.setCssStyles({ cursor: 'pointer' });
+                    svg.appendChild(circle);
+                    nodeEl = circle;
+                }
 
-                circle.addEventListener('click', (e) => {
+                nodeEl.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.openScene(scene);
                 });
@@ -586,12 +627,13 @@ export class StorylineView extends ItemView {
                 const actStr = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
                 const seqStr = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
                 let tip = `[${actStr}-${seqStr}] ${scene.title || 'Untitled'}`;
+                if (isArcPoint) tip += ' ★ Arc Point';
                 tip += `\nPlotlines: ${(scene.tags || []).join(', ')}`;
                 if (scene.storyDate) tip += `\nDate: ${scene.storyDate}`;
                 if (scene.storyTime) tip += `\nTime: ${scene.storyTime}`;
                 tip += '\nClick to open';
                 titleEl.textContent = tip;
-                circle.appendChild(titleEl);
+                nodeEl.appendChild(titleEl);
 
                 // Story time above node (small)
                 const timeStr = scene.storyTime || scene.storyDate || '';
@@ -799,7 +841,7 @@ export class StorylineView extends ItemView {
         // Group scenes by act for visual flow
         const actGroups = new Map<string, Scene[]>();
         for (const scene of scenes) {
-            const actKey = scene.act !== undefined ? `Act ${scene.act}` : 'No Act';
+            const actKey = scene.act !== undefined ? getActDisplayLabel(scene.act) : 'No Act';
             if (!actGroups.has(actKey)) actGroups.set(actKey, []);
             actGroups.get(actKey)!.push(scene);
         }

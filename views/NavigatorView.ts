@@ -5,7 +5,7 @@ import { ManuscriptView } from './ManuscriptView';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import { SceneCardComponent } from '../components/SceneCard';
-import { compareActChapter } from '../utils/actChapter';
+import { compareActChapter, getActDisplayLabel } from '../utils/actChapter';
 import { SceneManager } from '../services/SceneManager';
 import { MANUSCRIPT_VIEW_TYPE, NAVIGATOR_VIEW_TYPE } from '../constants';
 import { Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
@@ -298,7 +298,7 @@ export class NavigatorView extends ItemView {
 
         const groups = new Map<string, Scene[]>();
         for (const scene of scenes) {
-            const act = scene.act !== undefined ? `Act ${scene.act}` : 'Ungrouped';
+            const act = scene.act !== undefined ? getActDisplayLabel(scene.act) : 'Ungrouped';
             if (!groups.has(act)) groups.set(act, []);
             groups.get(act)!.push(scene);
         }

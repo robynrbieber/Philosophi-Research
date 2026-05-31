@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { Modal, App, FuzzySuggestModal, Notice } from 'obsidian';
+import { Modal, App, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { openConfirmModal } from './ConfirmModal';
 import { SplitSceneModal } from './SplitMergeModals';
@@ -7,11 +7,10 @@ import { isMobile } from './MobileAdapter';
 import { WikilinkSuggest } from './WikilinkSuggest';
 import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
-import { resolveTagColor, getPlotlineHSL, contrastTextColor } from '../settings';
 import { renderTagPillInput, renderAutocompleteInput } from './InlineSuggest';
 import { AddFieldModal } from './AddFieldModal';
 import { UniversalFieldTemplate } from '../services/FieldTemplateService';
-import { parseActChapterInput, actChapterHasIllegalPathChars } from '../utils/actChapter';
+import { parseActChapterInput, actChapterHasIllegalPathChars, isPrologueAct, isEpilogueAct, PROLOGUE_ACT, EPILOGUE_ACT } from '../utils/actChapter';
 import { Scene, SceneStatus, TIMELINE_MODES, TIMELINE_MODE_LABELS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 
 /**
@@ -233,6 +232,36 @@ export class InspectorComponent {
             }
             await this.sceneManager.updateScene(scene.filePath, { act: val });
             scene.act = val;
+            // Update quick-select button states
+            prologueBtn.classList.toggle('is-active', isPrologueAct(val));
+            epilogueBtn.classList.toggle('is-active', isEpilogueAct(val));
+        });
+
+        // Prologue / Epilogue quick-select buttons
+        const actQuickRow = actGroup.createDiv('sl-inspector-act-quick');
+        const prologueBtn = actQuickRow.createEl('button', {
+            cls: `sl-inspector-act-quick-btn ${isPrologueAct(scene.act) ? 'is-active' : ''}`,
+            text: 'Prologue',
+        });
+        prologueBtn.addEventListener('click', async () => {
+            const newVal = isPrologueAct(scene.act) ? undefined : PROLOGUE_ACT;
+            actInput.value = newVal !== undefined ? String(newVal) : '';
+            await this.sceneManager.updateScene(scene.filePath, { act: newVal });
+            scene.act = newVal;
+            prologueBtn.classList.toggle('is-active', isPrologueAct(newVal));
+            epilogueBtn.classList.toggle('is-active', isEpilogueAct(newVal));
+        });
+        const epilogueBtn = actQuickRow.createEl('button', {
+            cls: `sl-inspector-act-quick-btn ${isEpilogueAct(scene.act) ? 'is-active' : ''}`,
+            text: 'Epilogue',
+        });
+        epilogueBtn.addEventListener('click', async () => {
+            const newVal = isEpilogueAct(scene.act) ? undefined : EPILOGUE_ACT;
+            actInput.value = newVal !== undefined ? String(newVal) : '';
+            await this.sceneManager.updateScene(scene.filePath, { act: newVal });
+            scene.act = newVal;
+            prologueBtn.classList.toggle('is-active', isPrologueAct(newVal));
+            epilogueBtn.classList.toggle('is-active', isEpilogueAct(newVal));
         });
 
         // Chapter
@@ -434,6 +463,27 @@ export class InspectorComponent {
             scene.timeline_strand = val;
         });
 
+        // ── Arc Point toggle ──
+        const arcRow = this.container.createDiv('inspector-section');
+        arcRow.setCssStyles({ display: 'flex', alignItems: 'center', gap: '8px' });
+        const arcCheckbox = arcRow.createEl('input', {
+            attr: { type: 'checkbox', id: 'arc-anchor-toggle' },
+        });
+        arcCheckbox.checked = !!scene.arcAnchor;
+        arcCheckbox.style.cursor = 'pointer';
+        const arcLabel = arcRow.createEl('label', {
+            attr: { for: 'arc-anchor-toggle' },
+            text: 'Arc Point',
+        });
+        arcLabel.style.cursor = 'pointer';
+        arcLabel.style.fontWeight = '600';
+        arcLabel.style.fontSize = 'var(--font-ui-small)';
+        arcCheckbox.addEventListener('change', async () => {
+            const val = arcCheckbox.checked;
+            await this.sceneManager.updateScene(scene.filePath, { arcAnchor: val });
+            scene.arcAnchor = val || undefined;
+        });
+
         // ── Story Date / Time ──
         const dtRow = this.container.createDiv('inspector-section');
         dtRow.setCssStyles({
@@ -492,79 +542,28 @@ export class InspectorComponent {
             scene.target_wordcount = val;
         });
 
-        // ── Tags / Plotlines (editable chip list) ──
+        // ── Tags / Plotlines (autocomplete tag-pill input) ──
         const tagSection = this.container.createDiv('inspector-section');
         tagSection.createSpan({ cls: 'inspector-label', text: 'Plotlines / Tags:' });
-        const tagChips = tagSection.createDiv('inspector-chip-list');
-        tagChips.setCssStyles({
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '4px',
+        const tagPillContainer = tagSection.createDiv('inspector-chip-list');
+        tagPillContainer.setCssStyles({
             marginTop: '4px',
         });
 
         const tagColors = this.plugin.settings.tagColors || {};
         const scheme = this.plugin.settings.colorScheme;
         const allTagsSorted = this.sceneManager.queryService.getAllTags().sort();
-        const renderTagChips = () => {
-            tagChips.empty();
-            (scene.tags || []).forEach((t, idx) => {
-                const chip = tagChips.createSpan({ cls: 'inspector-chip', text: t });
-                chip.setCssStyles({
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    fontSize: '12px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                });
-                const chipColor = resolveTagColor(t, Math.max(0, allTagsSorted.indexOf(t)), scheme, tagColors, getPlotlineHSL(this.plugin.settings));
-                chip.setCssStyles({
-                    background: chipColor,
-                    color: contrastTextColor(chipColor),
-                });
-                const removeBtn = chip.createSpan({ text: '×', cls: 'inspector-chip-remove' });
-                removeBtn.setCssStyles({
-                    cursor: 'pointer',
-                    marginLeft: '2px',
-                });
-                removeBtn.addEventListener('click', async () => {
-                    const updated = (scene.tags || []).filter((_, i) => i !== idx);
-                    await this.sceneManager.updateScene(scene.filePath, { tags: updated });
-                    scene.tags = updated;
-                    renderTagChips();
-                });
-            });
-            // Add button
-            const addChip = tagChips.createSpan({ cls: 'inspector-chip inspector-chip-add', text: '+' });
-            addChip.setCssStyles({
-                padding: '2px 8px',
-                borderRadius: '10px',
-                fontSize: '12px',
-                background: 'var(--background-modifier-border)',
-                cursor: 'pointer',
-                opacity: '0.7',
-            });
-            addChip.addEventListener('click', () => {
-                const input = tagSection.createEl('input', { attr: { type: 'text', placeholder: 'plotline/main, theme/hope…' } });
-                styleInput(input);
-                input.focus();
-                const commitAdd = async () => {
-                    const raw = input.value.trim();
-                    if (raw) {
-                        const newTags = raw.split(',').map(t => t.trim()).filter(Boolean);
-                        const updated = [...(scene.tags || []), ...newTags.filter(t => !(scene.tags || []).includes(t))];
-                        await this.sceneManager.updateScene(scene.filePath, { tags: updated });
-                        scene.tags = updated;
-                    }
-                    input.remove();
-                    renderTagChips();
-                };
-                input.addEventListener('keydown', (e) => { if (e.key === 'Enter') commitAdd(); if (e.key === 'Escape') { input.remove(); } });
-                input.addEventListener('blur', commitAdd);
-            });
-        };
-        renderTagChips();
+
+        renderTagPillInput({
+            container: tagPillContainer,
+            values: scene.tags || [],
+            getSuggestions: () => allTagsSorted,
+            onChange: async (values) => {
+                await this.sceneManager.updateScene(scene.filePath, { tags: values });
+                scene.tags = values;
+            },
+            placeholder: 'Add plotline…',
+        });
 
         // ── Synopsis (editable) ──
         // Same field that powers the standalone Synopsis tab/sidebar, but
@@ -912,81 +911,101 @@ export class InspectorComponent {
         const section = this.container.createDiv('inspector-section inspector-setup-payoff');
         section.createSpan({ cls: 'inspector-label', text: 'Setup / Payoff:' });
 
-        // --- "Sets up" list (scenes this scene sets up) ---
+        const allSceneTitles = this.sceneManager.getAllScenes()
+            .filter(s => s.filePath !== scene.filePath)
+            .map(s => s.title)
+            .filter(Boolean);
+
+        // --- "Sets up" (scenes this scene sets up) ---
         const payoffLabel = section.createDiv('inspector-sp-row');
         const payoffIcon = payoffLabel.createSpan();
         obsidian.setIcon(payoffIcon, 'arrow-right');
         payoffLabel.createSpan({ text: ' Sets up:', cls: 'inspector-sp-label' });
 
-        const payoffList = section.createDiv('inspector-sp-list');
-        if (scene.payoff_scenes?.length) {
-            scene.payoff_scenes.forEach(target => {
-                const chip = payoffList.createDiv('inspector-sp-chip');
-                chip.createSpan({ text: target.replace(/^\[\[|\]\]$/g, '') });
-                const removeBtn = chip.createEl('button', { cls: 'inspector-sp-remove clickable-icon', text: '×' });
-                removeBtn.addEventListener('click', async () => {
-                    const updated = (scene.payoff_scenes || []).filter(s => s !== target);
-                    await this.sceneManager.updateScene(scene.filePath, { payoff_scenes: updated });
-                    // Also remove reverse link
-                    const targetScene = this.sceneManager.getAllScenes().find(s => s.title === target);
-                    if (targetScene && targetScene.setup_scenes?.includes(scene.title)) {
-                        const rev = targetScene.setup_scenes.filter(s => s !== scene.title);
-                        await this.sceneManager.updateScene(targetScene.filePath, { setup_scenes: rev });
-                    }
-                    // Refresh inspector
-                    const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
-                    if (fresh) this.show(fresh);
-                });
-            });
-        } else {
-            payoffList.createSpan({ cls: 'inspector-sp-empty', text: 'None' });
-        }
+        const payoffContainer = section.createDiv('inspector-sp-list');
+        renderTagPillInput({
+            container: payoffContainer,
+            values: scene.payoff_scenes || [],
+            getSuggestions: () => allSceneTitles,
+            onChange: async (values) => {
+                const oldValues = scene.payoff_scenes || [];
+                await this.sceneManager.updateScene(scene.filePath, { payoff_scenes: values });
 
-        const addPayoffBtn = section.createEl('button', { cls: 'story-line-chip inspector-sp-add', text: '+ Link payoff scene' });
-        addPayoffBtn.addEventListener('click', () => {
-            this.openScenePicker(scene, 'payoff');
+                // Add reverse links for new entries
+                for (const title of values) {
+                    if (!oldValues.includes(title)) {
+                        const targetScene = this.sceneManager.getAllScenes().find(s => s.title === title);
+                        if (targetScene) {
+                            const rev = targetScene.setup_scenes ? [...targetScene.setup_scenes] : [];
+                            if (!rev.includes(scene.title)) {
+                                rev.push(scene.title);
+                                await this.sceneManager.updateScene(targetScene.filePath, { setup_scenes: rev });
+                            }
+                        }
+                    }
+                }
+                // Remove reverse links for removed entries
+                for (const title of oldValues) {
+                    if (!values.includes(title)) {
+                        const targetScene = this.sceneManager.getAllScenes().find(s => s.title === title);
+                        if (targetScene && targetScene.setup_scenes?.includes(scene.title)) {
+                            const rev = targetScene.setup_scenes.filter(s => s !== scene.title);
+                            await this.sceneManager.updateScene(targetScene.filePath, { setup_scenes: rev });
+                        }
+                    }
+                }
+            },
+            placeholder: 'Search scenes…',
         });
 
-        // --- "Set up by" list (scenes that set this one up) ---
+        // --- "Set up by" (scenes that set this one up) ---
         const setupLabel = section.createDiv('inspector-sp-row');
         const setupIcon = setupLabel.createSpan();
         obsidian.setIcon(setupIcon, 'arrow-left');
         setupLabel.createSpan({ text: ' Set up by:', cls: 'inspector-sp-label' });
 
-        const setupList = section.createDiv('inspector-sp-list');
-        if (scene.setup_scenes?.length) {
-            scene.setup_scenes.forEach(source => {
-                const chip = setupList.createDiv('inspector-sp-chip');
-                chip.createSpan({ text: source.replace(/^\[\[|\]\]$/g, '') });
-                const removeBtn = chip.createEl('button', { cls: 'inspector-sp-remove clickable-icon', text: '×' });
-                removeBtn.addEventListener('click', async () => {
-                    const updated = (scene.setup_scenes || []).filter(s => s !== source);
-                    await this.sceneManager.updateScene(scene.filePath, { setup_scenes: updated });
-                    // Also remove reverse link
-                    const sourceScene = this.sceneManager.getAllScenes().find(s => s.title === source);
-                    if (sourceScene && sourceScene.payoff_scenes?.includes(scene.title)) {
-                        const rev = sourceScene.payoff_scenes.filter(s => s !== scene.title);
-                        await this.sceneManager.updateScene(sourceScene.filePath, { payoff_scenes: rev });
-                    }
-                    const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
-                    if (fresh) this.show(fresh);
-                });
-            });
-        } else {
-            setupList.createSpan({ cls: 'inspector-sp-empty', text: 'None' });
-        }
+        const setupContainer = section.createDiv('inspector-sp-list');
+        renderTagPillInput({
+            container: setupContainer,
+            values: scene.setup_scenes || [],
+            getSuggestions: () => allSceneTitles,
+            onChange: async (values) => {
+                const oldValues = scene.setup_scenes || [];
+                await this.sceneManager.updateScene(scene.filePath, { setup_scenes: values });
 
-        const addSetupBtn = section.createEl('button', { cls: 'story-line-chip inspector-sp-add', text: '+ Link setup scene' });
-        addSetupBtn.addEventListener('click', () => {
-            this.openScenePicker(scene, 'setup');
+                // Add reverse links for new entries
+                for (const title of values) {
+                    if (!oldValues.includes(title)) {
+                        const sourceScene = this.sceneManager.getAllScenes().find(s => s.title === title);
+                        if (sourceScene) {
+                            const rev = sourceScene.payoff_scenes ? [...sourceScene.payoff_scenes] : [];
+                            if (!rev.includes(scene.title)) {
+                                rev.push(scene.title);
+                                await this.sceneManager.updateScene(sourceScene.filePath, { payoff_scenes: rev });
+                            }
+                        }
+                    }
+                }
+                // Remove reverse links for removed entries
+                for (const title of oldValues) {
+                    if (!values.includes(title)) {
+                        const sourceScene = this.sceneManager.getAllScenes().find(s => s.title === title);
+                        if (sourceScene && sourceScene.payoff_scenes?.includes(scene.title)) {
+                            const rev = sourceScene.payoff_scenes.filter(s => s !== scene.title);
+                            await this.sceneManager.updateScene(sourceScene.filePath, { payoff_scenes: rev });
+                        }
+                    }
+                }
+            },
+            placeholder: 'Search scenes…',
         });
 
-        // Warning: dangling setup (this scene sets up something but the target doesn't exist or has no payoff back)
+        // Warning: dangling setup (this scene sets up something but the target doesn't exist)
         if (scene.payoff_scenes?.length) {
             const allScenes = this.sceneManager.getAllScenes();
             const dangling = scene.payoff_scenes.filter(target => {
                 const targetScene = allScenes.find(s => s.title === target);
-                return !targetScene; // Target scene doesn't exist in project
+                return !targetScene;
             });
             if (dangling.length > 0) {
                 const warn = section.createDiv('inspector-sp-warning');
@@ -995,46 +1014,6 @@ export class InspectorComponent {
                 warn.createSpan({ text: ` Missing payoff target: ${dangling.join(', ')}` });
             }
         }
-    }
-
-    /**
-     * Open a fuzzy picker to select a scene for setup/payoff linking
-     */
-    private openScenePicker(scene: Scene, direction: 'setup' | 'payoff'): void {
-        const allScenes = this.sceneManager.getAllScenes().filter(s => s.filePath !== scene.filePath);
-        const modal = new ScenePickerModal(this.plugin.app, allScenes, async (picked) => {
-            if (direction === 'payoff') {
-                // "This scene sets up picked scene"
-                const currentPayoff = scene.payoff_scenes ? [...scene.payoff_scenes] : [];
-                if (!currentPayoff.includes(picked.title)) {
-                    currentPayoff.push(picked.title);
-                    await this.sceneManager.updateScene(scene.filePath, { payoff_scenes: currentPayoff });
-                }
-                // Add reverse link: picked scene is set up by this scene
-                const pickedSetup = picked.setup_scenes ? [...picked.setup_scenes] : [];
-                if (!pickedSetup.includes(scene.title)) {
-                    pickedSetup.push(scene.title);
-                    await this.sceneManager.updateScene(picked.filePath, { setup_scenes: pickedSetup });
-                }
-            } else {
-                // "This scene is set up by picked scene"
-                const currentSetup = scene.setup_scenes ? [...scene.setup_scenes] : [];
-                if (!currentSetup.includes(picked.title)) {
-                    currentSetup.push(picked.title);
-                    await this.sceneManager.updateScene(scene.filePath, { setup_scenes: currentSetup });
-                }
-                // Add reverse link: picked scene pays off in this scene
-                const pickedPayoff = picked.payoff_scenes ? [...picked.payoff_scenes] : [];
-                if (!pickedPayoff.includes(scene.title)) {
-                    pickedPayoff.push(scene.title);
-                    await this.sceneManager.updateScene(picked.filePath, { payoff_scenes: pickedPayoff });
-                }
-            }
-            // Refresh inspector with updated scene data
-            const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
-            if (fresh) this.show(fresh);
-        });
-        modal.open();
     }
 
     /**
@@ -1238,7 +1217,10 @@ export class InspectorComponent {
     }
 
     /**
-     * Render an editable editorial notes / revision comments textarea.
+     * Render an editable editorial notes / revision comments section.
+     * Uses an embedded CodeMirror editor for rich markdown editing,
+     * plus an "Open notes file" button that creates/opens an external
+     * .md file in the SceneNotes folder.
      */
     private renderNotes(scene: Scene): void {
         const section = this.container.createDiv('inspector-section inspector-notes');
@@ -1247,11 +1229,101 @@ export class InspectorComponent {
         obsidian.setIcon(icon, 'message-square');
         labelRow.createSpan({ cls: 'inspector-label', text: ' Notes / Comments' });
 
-        const textarea = section.createEl('textarea', {
-            cls: 'inspector-notes-textarea',
-            attr: { placeholder: 'Add revision notes or editorial comments…', rows: '4' },
+        // "Open notes file" button — creates/opens an external .md file
+        const openFileBtn = labelRow.createEl('button', {
+            cls: 'clickable-icon',
+            attr: { title: 'Open as separate notes file', 'aria-label': 'Open notes file' },
         });
-        textarea.value = scene.notes || '';
+        obsidian.setIcon(openFileBtn, 'file-text');
+        openFileBtn.addEventListener('click', async () => {
+            await this.sceneManager.openSceneNotes(scene);
+        });
+
+        const notesContainer = section.createDiv('inspector-notes-container');
+        void this.renderInspectorNotesLive(notesContainer, scene);
+    }
+
+    /**
+     * Live markdown notes: rendered preview by default.
+     * Click to edit (textarea), blur to save & return to preview.
+     * Checkboxes are interactive in preview mode.
+     */
+    private async renderInspectorNotesLive(container: HTMLElement, scene: Scene): Promise<void> {
+        container.empty();
+        const notesText = await this.getCurrentSceneNotesText(scene);
+        scene.notes = notesText || undefined;
+
+        if (!notesText) {
+            // Empty state — show a clickable placeholder that opens the editor
+            const placeholder = container.createDiv('inspector-notes-live is-empty');
+            placeholder.createDiv({ cls: 'inspector-notes-placeholder', text: 'Click to add notes…' });
+            placeholder.addEventListener('click', () => {
+                this.renderInspectorNotesEditor(container, scene, '');
+            });
+            return;
+        }
+
+        // Rendered markdown preview
+        const previewEl = container.createDiv('inspector-notes-live is-preview');
+        obsidian.MarkdownRenderer.render(
+            this.plugin.app,
+            notesText,
+            previewEl,
+            scene.filePath,
+            this,
+        );
+
+        // Click on preview → switch to editor (but not on links/checkboxes)
+        previewEl.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'A' || target.tagName === 'INPUT') return;
+            void this.getCurrentSceneNotesText(scene).then((currentNotes) => {
+                this.renderInspectorNotesEditor(container, scene, currentNotes);
+            });
+        });
+
+        // Interactive checkboxes
+        previewEl.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
+            const checkbox = cb as HTMLInputElement;
+            checkbox.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const checked = checkbox.checked;
+                const notes = await this.getCurrentSceneNotesText(scene);
+                const lines = notes.split('\n');
+                let lineIdx = 0;
+                let foundIdx = -1;
+                for (const line of lines) {
+                    const match = line.match(/^(\s*-\s*)\[([ xX])\]/);
+                    if (match) {
+                        if (previewEl.querySelectorAll('input[type="checkbox"]')[lineIdx] === checkbox) {
+                            foundIdx = lines.indexOf(line);
+                            break;
+                        }
+                        lineIdx++;
+                    }
+                }
+                if (foundIdx >= 0) {
+                    lines[foundIdx] = lines[foundIdx].replace(/- \[[ xX]\]/, checked ? '- [x]' : '- [ ]');
+                    const newNotes = lines.join('\n');
+                    await this.sceneManager.updateScene(scene.filePath, { notes: newNotes });
+                    scene.notes = newNotes;
+                    await this.sceneManager.writeSceneNotes(scene, newNotes ? `${newNotes}\n` : '');
+                    void this.renderInspectorNotesLive(container, scene);
+                }
+            });
+        });
+    }
+
+    private renderInspectorNotesEditor(container: HTMLElement, scene: Scene, currentNotes: string): void {
+        container.empty();
+        const editorEl = container.createDiv('inspector-notes-live is-editing');
+
+        const textarea = editorEl.createEl('textarea', {
+            cls: 'inspector-notes-textarea',
+            attr: { placeholder: 'Write notes in markdown… Use - [ ] for checkboxes, **bold**, [[wikilinks]]', rows: '4' },
+        });
+        textarea.value = currentNotes;
 
         // Issue #84 — attach a wikilink autocomplete (`[[…]]`) so users
         // can quickly link to other notes from the comments field.
@@ -1259,12 +1331,52 @@ export class InspectorComponent {
         // Tear down the dropdown when the inspector re-renders.
         this.plugin.register(() => suggest.destroy());
 
-        // Save on blur (when the user leaves the field) so typing isn't interrupted
-        textarea.addEventListener('change', async () => {
-            const val = textarea.value.trim();
-            await this.sceneManager.updateScene(scene.filePath, { notes: val || undefined });
-            scene.notes = val || undefined;
+        // Auto-focus
+        requestAnimationFrame(() => textarea.focus());
+
+        // Save on blur → return to live preview
+        textarea.addEventListener('blur', async () => {
+            const val = textarea.value;
+            const trimmed = val.trim();
+            await this.sceneManager.updateScene(scene.filePath, { notes: trimmed || undefined });
+            scene.notes = trimmed || undefined;
+            await this.sceneManager.writeSceneNotes(scene, trimmed ? `${trimmed}\n` : '');
+            void this.renderInspectorNotesLive(container, scene);
         });
+
+        // Escape to finish editing
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                textarea.blur();
+            }
+        });
+    }
+
+    private stripRedundantNotesHeadings(content: string, scene: Scene): string {
+        const title = (scene.title || 'Untitled').trim();
+        const lines = content.replace(/^\uFEFF/, '').split(/\r?\n/);
+        let index = 0;
+        while (index < lines.length && lines[index].trim() === '') index++;
+        while (index < lines.length) {
+            const trimmed = lines[index].trim();
+            const text = trimmed.replace(/^#{1,6}\s+/, '').trim();
+            const isHeading = /^#{1,6}\s+/.test(trimmed);
+            const isRedundant = isHeading && (text === title || text === `Notes: ${title}` || text === 'Notes');
+            if (!isRedundant) break;
+            lines.splice(index, 1);
+            while (index < lines.length && lines[index].trim() === '') lines.splice(index, 1);
+        }
+        return lines.join('\n').trimStart();
+    }
+
+    private async getCurrentSceneNotesText(scene: Scene): Promise<string> {
+        const notesPath = await this.sceneManager.getOrCreateSceneNotesFile(scene);
+        const notesFile = this.plugin.app.vault.getAbstractFileByPath(notesPath);
+        const fileNotes = notesFile instanceof obsidian.TFile
+            ? await this.plugin.app.vault.read(notesFile)
+            : '';
+        return this.stripRedundantNotesHeadings(fileNotes, scene).trim();
     }
 
     /**
@@ -1400,34 +1512,6 @@ export class InspectorComponent {
         if (!lm) return (v) => v;
         const displayMap = lm.getDisplayNameMap();
         return (value: string) => displayMap.get(value) || value;
-    }
-}
-
-/**
- * Fuzzy search modal to pick a scene
- */
-class ScenePickerModal extends FuzzySuggestModal<Scene> {
-    private scenes: Scene[];
-    private onChoose: (scene: Scene) => void;
-
-    constructor(app: App, scenes: Scene[], onChoose: (scene: Scene) => void) {
-        super(app);
-        this.scenes = scenes;
-        this.onChoose = onChoose;
-        this.setPlaceholder('Search for a scene…');
-    }
-
-    getItems(): Scene[] {
-        return this.scenes;
-    }
-
-    getItemText(scene: Scene): string {
-        const act = scene.act !== undefined ? `Act ${scene.act} — ` : '';
-        return `${act}${scene.title || 'Untitled'}`;
-    }
-
-    onChooseItem(scene: Scene): void {
-        this.onChoose(scene);
     }
 }
 

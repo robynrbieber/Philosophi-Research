@@ -143,6 +143,13 @@ export class SceneManager implements ISceneStore {
         return `${root}/Notes`;
     }
 
+    /** Computed scene notes folder for the active project (external per-scene notes files) */
+    getSceneNotesFolder(): string {
+        if (this._activeProject) return this._activeProject.sceneNotesFolder;
+        const root = this.plugin.settings.storyLineRoot;
+        return `${root}/SceneNotes`;
+    }
+
     /** Computed archive folder for the active project (cut / archived scenes) */
     getArchiveFolder(): string {
         if (this._activeProject) return this._activeProject.archiveFolder;
@@ -1490,6 +1497,227 @@ export class SceneManager implements ISceneStore {
         }
         this._activeProject.activeBeatSheet = template.name;
         await this.saveProjectFrontmatter(this._activeProject);
+    }
+
+    /**
+     * Create placeholder scenes from a beat sheet template's beat definitions.
+     * Each beat becomes a scene with act, chapter, title, synopsis, and status='idea'.
+     *
+     * Chapter assignment logic:
+     *  - If the beat has an explicit `chapter` field, use it.
+     *  - If the template has a `chapters` array, derive chapter from beat index
+     *    (beat index → template.chapters[index]).
+     *  - Otherwise, derive chapter from beat order within each act
+     *    (1st beat in act 1 → chapter 1, 2nd → chapter 2, etc.).
+     */
+    async createScenesFromBeats(template: BeatSheetTemplate): Promise<number> {
+        if (!this._activeProject) return 0;
+        let created = 0;
+
+        // Global chapter counter for templates without a chapters array.
+        // Each beat gets the next chapter number globally so chapters are
+        // unique across all acts (beat 1 in act 1 → ch 1, beat 1 in act 2 → ch 4, etc.).
+        let globalChapter = 0;
+
+        // Global sequence counter — always assign sequential sequence numbers
+        // so placeholder scenes sort correctly regardless of autoGenerateSequence.
+        const allSequences = this.getAllScenes()
+            .map(s => s.sequence ?? 0)
+            .sort((a, b) => a - b);
+        let nextSeq = allSequences.length > 0 ? allSequences[allSequences.length - 1] + 1 : 1;
+
+        for (let i = 0; i < template.beats.length; i++) {
+            const beat = template.beats[i];
+
+            // Determine chapter
+            let chapter: number | undefined;
+            if (beat.chapter !== undefined) {
+                // Explicit chapter on beat definition
+                chapter = beat.chapter;
+            } else if (template.chapters.length > 0 && i < template.chapters.length) {
+                // Template has chapters array — map beat index to chapter
+                chapter = template.chapters[i];
+            } else {
+                // No chapters array — assign globally incrementing chapter numbers
+                globalChapter++;
+                chapter = globalChapter;
+            }
+
+            // Fill missing chapter labels from beat labels for act-only templates
+            if (chapter !== undefined && !this._activeProject.chapterLabels[chapter]) {
+                this._activeProject.chapterLabels[chapter] = beat.label;
+            }
+
+            await this.createScene({
+                title: beat.label,
+                act: beat.act,
+                chapter,
+                sequence: nextSeq++,
+                beatsheet: template.name,
+                synopsis: beat.description,
+                status: 'idea' as SceneStatus,
+            });
+            created++;
+        }
+
+        // Save any chapter labels we filled in
+        if (created > 0) {
+            await this.saveProjectFrontmatter(this._activeProject);
+        }
+
+        return created;
+    }
+
+    /**
+     * Apply a custom story structure with the given number of acts,
+     * chapters per act, and optionally create placeholder scenes.
+     */
+    async applyCustomStructure(
+        numActs: number,
+        chaptersPerAct: number,
+        scenesPerChapter: number,
+        createScenes: boolean,
+    ): Promise<{ acts: number; chapters: number; scenes: number }> {
+        if (!this._activeProject) return { acts: 0, chapters: 0, scenes: 0 };
+
+        const acts: number[] = [];
+        const chapters: number[] = [];
+        let scenesCreated = 0;
+
+        // Global sequence counter for placeholder scenes
+        const allSequences = this.getAllScenes()
+            .map(s => s.sequence ?? 0)
+            .sort((a, b) => a - b);
+        let nextSeq = allSequences.length > 0 ? allSequences[allSequences.length - 1] + 1 : 1;
+
+        for (let a = 1; a <= numActs; a++) {
+            acts.push(a);
+            for (let c = 1; c <= chaptersPerAct; c++) {
+                const chapterNum = (a - 1) * chaptersPerAct + c;
+                chapters.push(chapterNum);
+
+                if (createScenes) {
+                    for (let s = 1; s <= scenesPerChapter; s++) {
+                        const chLabel = this._activeProject.chapterLabels[chapterNum];
+                        const title = chLabel
+                            ? `Chapter ${chapterNum} — ${chLabel}`
+                            : `Chapter ${chapterNum}`;
+                        await this.createScene({
+                            title,
+                            act: a,
+                            chapter: chapterNum,
+                            sequence: nextSeq++,
+                            status: 'idea' as SceneStatus,
+                        });
+                        scenesCreated++;
+                    }
+                }
+            }
+        }
+
+        // Merge into project
+        const mergedActs = new Set([...this._activeProject.definedActs, ...acts]);
+        this._activeProject.definedActs = Array.from(mergedActs).sort((a, b) => a - b);
+        const mergedChapters = new Set([...this._activeProject.definedChapters, ...chapters]);
+        this._activeProject.definedChapters = Array.from(mergedChapters).sort((a, b) => a - b);
+
+        await this.saveProjectFrontmatter(this._activeProject);
+
+        return { acts: acts.length, chapters: chapters.length, scenes: scenesCreated };
+    }
+
+    // ────────────────────────────────────
+    //  Scene Notes (external files)
+    // ────────────────────────────────────
+
+    /**
+     * Get or create the external notes file path for a scene.
+     * Returns the vault-relative path to the notes .md file.
+     * If the scene doesn't have a notesFile yet, one is created.
+     */
+    async getOrCreateSceneNotesFile(scene: Scene): Promise<string> {
+        if (scene.notesFile) {
+            // Verify the file still exists
+            const existing = this.app.vault.getAbstractFileByPath(scene.notesFile);
+            if (existing && existing instanceof TFile) return scene.notesFile;
+        }
+
+        // Create a new notes file
+        const notesFolder = this.getSceneNotesFolder();
+        await this.ensureFolder(notesFolder);
+
+        // Generate a filename from the scene title
+        const safeTitle = (scene.title || 'Untitled')
+            .replace(/[\\/:*?"<>|]/g, '-')
+            .substring(0, 60);
+        let fileName = `${safeTitle}.md`;
+        let filePath = normalizePath(`${notesFolder}/${fileName}`);
+        let dedupe = 1;
+        while (this.app.vault.getAbstractFileByPath(filePath)) {
+            fileName = `${safeTitle} (${dedupe}).md`;
+            filePath = normalizePath(`${notesFolder}/${fileName}`);
+            dedupe++;
+        }
+
+        // Migrate existing inline notes to the file. Do not add a title
+        // heading here; the Scene Detail sidebar already shows the scene title.
+        const initialContent = scene.notes ? `${scene.notes}\n` : '';
+
+        await this.app.vault.create(filePath, initialContent);
+
+        // Update scene frontmatter with the notesFile path
+        await this.updateScene(scene.filePath, { notesFile: filePath });
+        scene.notesFile = filePath;
+
+        return filePath;
+    }
+
+    /**
+     * Read the content of a scene's external notes file.
+     * Returns the raw markdown content, or undefined if no notes file exists.
+     */
+    async readSceneNotes(scene: Scene): Promise<string | undefined> {
+        if (!scene.notesFile) return scene.notes || undefined;
+        const file = this.app.vault.getAbstractFileByPath(scene.notesFile);
+        if (!file || !(file instanceof TFile)) return scene.notes || undefined;
+        return this.app.vault.read(file);
+    }
+
+    /**
+     * Write content to a scene's external notes file.
+     * Creates the file if it doesn't exist yet.
+     */
+    async writeSceneNotes(scene: Scene, content: string): Promise<void> {
+        const notesPath = await this.getOrCreateSceneNotesFile(scene);
+        const file = this.app.vault.getAbstractFileByPath(notesPath);
+        if (file && file instanceof TFile) {
+            await this.app.vault.modify(file, content);
+        }
+    }
+
+    /**
+     * Open a scene's external notes file in an Obsidian editor tab.
+     * Creates the file if it doesn't exist yet.
+     */
+    async openSceneNotes(scene: Scene): Promise<void> {
+        const notesPath = await this.getOrCreateSceneNotesFile(scene);
+        const file = this.app.vault.getAbstractFileByPath(notesPath);
+        if (file && file instanceof TFile) {
+            await this.app.workspace.getLeaf(false).openFile(file);
+        }
+    }
+
+    /**
+     * Delete a scene's external notes file and clear the notesFile reference.
+     */
+    async deleteSceneNotes(scene: Scene): Promise<void> {
+        if (!scene.notesFile) return;
+        const file = this.app.vault.getAbstractFileByPath(scene.notesFile);
+        if (file && file instanceof TFile) {
+            await this.app.vault.delete(file);
+        }
+        await this.updateScene(scene.filePath, { notesFile: undefined });
+        scene.notesFile = undefined;
     }
 
     // ────────────────────────────────────

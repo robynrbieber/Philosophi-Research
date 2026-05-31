@@ -560,6 +560,8 @@ export interface SceneCardsSettings {
     plotgridAutoNote: boolean;
     colorCoding: ColorCodingMode;
     showWordCounts: boolean;
+    /** Exclude Arc Point scenes from aggregate word counts and stats */
+    excludeArcAnchorFromWordcount: boolean;
     showSceneNumberOnCards: boolean;
     compactCardView: boolean;
     /** What text to show beneath a scene card title: nothing, the synopsis field, or the first lines of the draft body. */
@@ -805,6 +807,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     plotgridAutoNote: true,
     colorCoding: 'status',
     showWordCounts: true,
+    excludeArcAnchorFromWordcount: true,
     showSceneNumberOnCards: true,
     compactCardView: false,
     cardPreviewSource: 'none',
@@ -1175,6 +1178,17 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.showWordCounts = value;
                     await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Exclude Arc Points from word count')
+            .setDesc('When enabled, scenes marked as Arc Points are excluded from aggregate word counts in Stats and the Manuscript footer')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.excludeArcAnchorFromWordcount ?? true)
+                .onChange(async (value) => {
+                    this.plugin.settings.excludeArcAnchorFromWordcount = value;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
                 }));
 
         new Setting(containerEl)
