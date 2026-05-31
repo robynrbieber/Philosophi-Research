@@ -1162,6 +1162,7 @@ Archived scenes stay as regular \`.md\` files and can be reviewed or edited at a
 Click any scene card to open the **Inspector Panel** on the right side. It provides:\r
 \r
 - **Metadata editing** \u2014 title, act, chapter, sequence, status, POV, location, conflict, emotion, intensity. Act and chapter are free-text fields: use plain numbers (\`1\`, \`2\`, \`10\`), hierarchical decimals (\`1.1\`, \`1.2\`, \`2.1\`), or text labels (\`Prologue\`, \`Interlude A\`). Sorting throughout the plugin is numeric-aware. Avoid Windows-illegal characters (\`< > : " / \\ | ? *\`) \u2014 the Inspector will warn you if you type one.\r
+- **Prologue & Epilogue** *(new in 1.10.18)* \u2014 Set act to **0** for Prologue or **99** for Epilogue. Quick-select buttons appear below the Act input. All views display "Prologue" and "Epilogue" instead of "Act 0" / "Act 99".\r
 - **Characters** \u2014 add/remove characters with autocomplete and tag-pill inputs.\r
 - **Codex sections** \u2014 any Codex category enabled for the Inspector (via Codex \u2192 Manage Categories) appears as a tag-pill input below the Location field. Add or remove linked Codex entries with autocomplete from your category\u2019s entries.\r
 - **Tags** \u2014 manage plotline tags with autocomplete, color-coded tag badges when tag colors are configured.\r
@@ -1219,7 +1220,7 @@ Link scenes that set up (foreshadow) and pay off (resolve) each other:\r
 \r
 1. Open a scene in the **Inspector Panel**.\r
 2. Scroll to the **Setup / Payoff** section.\r
-3. Click **+ Add** to link a target scene using the scene picker.\r
+3. Type a scene title in the **Sets up** or **Set up by** input to search and select. Existing links appear as removable pills.\r
 4. Links are bidirectional \u2014 if Scene A "sets up" Scene B, Scene B shows Scene A under "Set up by".\r
 \r
 The Stats View and Plot Hole Detection will warn about:\r
@@ -1322,10 +1323,12 @@ Apply proven story structure templates to quickly scaffold your acts:\r
 \r
 1. Open the **Structure** modal from the Board or Timeline toolbar (the columns icon).\r
 2. Select a **Beat Sheet Template** and click **Apply** \u2014 StoryLine creates the acts and assigns beat labels automatically.\r
-3. **Act labels** appear on column headers (Board View) and timeline dividers (Timeline View).\r
-4. **Edit labels inline** by clicking the label text on any act divider.\r
-5. To **add chapters**, use the "Add chapters" section in the same modal. Enter a range (e.g. "1-10") and click Add.\r
-6. **Seeing chapters**: After adding chapters, switch to Board View \u2192 **Kanban** mode \u2192 set "Group by" to **Chapter**. Chapters will appear as columns. Alternatively, enable the "Create an empty scene per chapter" toggle before adding \u2014 this creates a placeholder scene per chapter so they appear in all views immediately.\r
+3. **Create placeholder scenes** \u2014 toggle "Create placeholder scenes from beats" before applying to auto-create one scene per beat with the correct act, chapter, and synopsis.\r
+4. **Custom Structure** \u2014 use the Custom Structure builder at the bottom of the modal to define your own number of acts, chapters per act, and scenes per chapter.\r
+5. **Act labels** appear on column headers (Board View) and timeline dividers (Timeline View).\r
+6. **Edit labels inline** by clicking the label text on any act divider.\r
+7. To **add chapters**, use the "Add chapters" section in the same modal. Enter a range (e.g. "1-10") and click Add.\r
+8. **Seeing chapters**: After adding chapters, switch to Board View \u2192 **Kanban** mode \u2192 set "Group by" to **Chapter**. Chapters will appear as columns.\r
 \r
 Beat names are stored as \`actLabels\` on the project and persist across sessions.\r
 \r

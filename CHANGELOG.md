@@ -10,9 +10,12 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 ### New Features
 
-- **Arc Points** *([#128](https://github.com/PixeroJan/obsidian-storyline/issues/128))* — Mark key turning points in your story as Arc Points. Toggle the checkbox in the Scene Details panel. Arc Points show a diamond badge on Board cards and appear as filled diamonds (◆) on the StoryLine subway map. Filter the Board and StoryLine views to show All, Scenes only, or Arc Points only.
+- **Arc Points** *([#128](https://github.com/PixeroJan/obsidian-storyline/issues/128))* — Mark key turning points in your story as Arc Points. Toggle the checkbox in the Scene Details panel. Arc Points show a diamond badge on Board cards and appear as filled diamonds (◆) on the StoryLine subway map. Filter the Board and StoryLine views to show All, Scenes only, or Arc Points only. Arc Points are excluded from aggregate word counts by default (toggle in Settings → Scene Cards).
 - **Live Markdown Notes** — The Notes tab in the Scene Details sidebar now renders as a full Obsidian Live Preview editor. Write with markdown formatting, wikilinks, and tags — just like a regular note file.
 - **Research images** — Add image-type research posts with a built-in image picker. Image previews appear inline on expanded research cards.
+- **Prologue & Epilogue support** — Act 0 displays as "Prologue", Act 99 as "Epilogue" across all views. Quick-select buttons in the Inspector let you set these with one click.
+- **Beat sheet scene creation** — Applying a beat sheet template now optionally creates placeholder scenes from each beat, with correct act and chapter assignment. A custom structure builder lets you define your own act/chapter layout.
+- **Setup/Payoff inline picker** — Linking setup and payoff scenes now uses an inline autocomplete dropdown instead of a separate modal. Type a scene title to search and select.
 
 ### Bug Fixes
 

@@ -547,6 +547,7 @@ Archived scenes stay as regular `.md` files and can be reviewed or edited at any
 Click any scene card to open the **Inspector Panel** on the right side. It provides:
 
 - **Metadata editing** — title, act, chapter, sequence, status, POV, location, conflict, emotion, intensity. Act and chapter are free-text fields: use plain numbers (`1`, `2`, `10`), hierarchical decimals (`1.1`, `1.2`, `2.1`), or text labels (`Prologue`, `Interlude A`). Sorting throughout the plugin is numeric-aware. Avoid Windows-illegal characters (`< > : " / \ | ? *`) — the Inspector will warn you if you type one.
+- **Prologue & Epilogue** *(new in 1.10.18)* — Set act to **0** for Prologue or **99** for Epilogue. Quick-select buttons appear below the Act input. All views display "Prologue" and "Epilogue" instead of "Act 0" / "Act 99".
 - **Characters** — add/remove characters with autocomplete and tag-pill inputs.
 - **Codex sections** — any Codex category enabled for the Inspector (via Codex → Manage Categories) appears as a tag-pill input below the Location field. Add or remove linked Codex entries with autocomplete from your category’s entries.
 - **Tags** — manage plotline tags with autocomplete, color-coded tag badges when tag colors are configured.
@@ -604,7 +605,7 @@ Link scenes that set up (foreshadow) and pay off (resolve) each other:
 
 1. Open a scene in the **Inspector Panel**.
 2. Scroll to the **Setup / Payoff** section.
-3. Click **+ Add** to link a target scene using the scene picker.
+3. Type a scene title in the **Sets up** or **Set up by** input to search and select. Existing links appear as removable pills.
 4. Links are bidirectional — if Scene A "sets up" Scene B, Scene B shows Scene A under "Set up by".
 
 The Stats View and Plot Hole Detection will warn about:
@@ -707,10 +708,12 @@ Apply proven story structure templates to quickly scaffold your acts:
 
 1. Open the **Structure** modal from the Board or Timeline toolbar (the columns icon).
 2. Select a **Beat Sheet Template** and click **Apply** — StoryLine creates the acts and assigns beat labels automatically.
-3. **Act labels** appear on column headers (Board View) and timeline dividers (Timeline View).
-4. **Edit labels inline** by clicking the label text on any act divider.
-5. To **add chapters**, use the "Add chapters" section in the same modal. Enter a range (e.g. "1-10") and click Add.
-6. **Seeing chapters**: After adding chapters, switch to Board View → **Kanban** mode → set "Group by" to **Chapter**. Chapters will appear as columns. Alternatively, enable the "Create an empty scene per chapter" toggle before adding — this creates a placeholder scene per chapter so they appear in all views immediately.
+3. **Create placeholder scenes** — toggle "Create placeholder scenes from beats" before applying to auto-create one scene per beat with the correct act, chapter, and synopsis.
+4. **Custom Structure** — use the Custom Structure builder at the bottom of the modal to define your own number of acts, chapters per act, and scenes per chapter.
+5. **Act labels** appear on column headers (Board View) and timeline dividers (Timeline View).
+6. **Edit labels inline** by clicking the label text on any act divider.
+7. To **add chapters**, use the "Add chapters" section in the same modal. Enter a range (e.g. "1-10") and click Add.
+8. **Seeing chapters**: After adding chapters, switch to Board View → **Kanban** mode → set "Group by" to **Chapter**. Chapters will appear as columns.
 
 Beat names are stored as `actLabels` on the project and persist across sessions.
 
