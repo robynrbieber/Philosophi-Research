@@ -6,6 +6,27 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.19
+
+### Changes
+
+- **Timeline remembers your order choice** *([#140](https://github.com/PixeroJan/obsidian-storyline/issues/140))* — The Timeline starts in Reading Order the first time, then keeps the order you choose after that.
+- **Cleaner Plotlines subway map** *([#137](https://github.com/PixeroJan/obsidian-storyline/discussions/137))* — Added a toolbar toggle to hide or show the plotline tag pills beneath scene nodes.
+- **Plot Grid rows can fit their content** — Added a toolbar button that resizes visible row heights so linked scenes, notes, and tags are easier to see without changing column widths.
+- **Project language fallback for word counts** *([#138](https://github.com/PixeroJan/obsidian-storyline/issues/138))* — The global Default Project Language is now pushed into the word-count tokenizer on load/save, so CJK defaults are respected when a project does not define its own language.
+- **Automated style-check cleanup** — Cleaned up sidebar and notes styling so it follows plugin style rules while keeping the views looking and behaving the same.
+
+### Bug Fixes
+
+- **Plot Grid formatting and editing fixes** *([#142](https://github.com/PixeroJan/obsidian-storyline/issues/142), [#146](https://github.com/PixeroJan/obsidian-storyline/issues/146))* — Fixed the empty text-alignment dropdown, made linked-scene cell notes visible above scene previews, kept moved cell content and manual-content state together, prevented arrow keys from leaking out of active text editors, improved live cell updates from the inspector, and changed selection highlighting to an inset border so edge cells are fully outlined.
+- **Plot Grid scene title clipping** *([#142](https://github.com/PixeroJan/obsidian-storyline/issues/142))* — Long linked-scene titles in grid cells now truncate instead of bleeding into adjacent cells.
+- **PDF/HTML heading export** *([#145](https://github.com/PixeroJan/obsidian-storyline/issues/145))* — Manuscript body headings from H1 through H6 are now converted to real HTML/PDF headings instead of leaving H4-H6 as literal Markdown.
+
+### Documentation
+
+- Removed the Help section for project cover images because that UI is not currently available.
+
+---
 ## Version 1.10.18
 
 ### New Features

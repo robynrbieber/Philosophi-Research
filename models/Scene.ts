@@ -210,7 +210,7 @@ export interface FilterPreset {
 /**
  * Sort options
  */
-export type SortField = 'sequence' | 'chronologicalOrder' | 'title' | 'status' | 'act' | 'chapter' | 'wordcount' | 'modified';
+export type SortField = 'sequence' | 'chronologicalOrder' | 'storyDate' | 'title' | 'status' | 'act' | 'chapter' | 'wordcount' | 'modified';
 export type SortDirection = 'asc' | 'desc';
 
 export interface SortConfig {

@@ -68,6 +68,7 @@ export class TimelineView extends ItemView {
 
     async onOpen(): Promise<void> {
         this.plugin.storyLeaf = this.leaf;
+        this.timelineOrder = this.plugin.settings.timelineOrder === 'chronological' ? 'chronological' : 'reading';
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
         container.addClass('story-line-timeline-container');
@@ -146,6 +147,8 @@ export class TimelineView extends ItemView {
         }
         orderSelect.addEventListener('change', () => {
             this.timelineOrder = orderSelect.value as TimelineOrder;
+            this.plugin.settings.timelineOrder = this.timelineOrder;
+            void this.plugin.saveSettings();
             this.refresh();
         });
 
@@ -244,7 +247,7 @@ export class TimelineView extends ItemView {
         if (existing) existing.remove();
 
         const timelineEl = container.createDiv('story-line-timeline');
-        const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
+        const sortField = this.timelineOrder === 'chronological' ? 'storyDate' : 'chapter';
         const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: sortField, direction: 'asc' }
@@ -553,7 +556,7 @@ export class TimelineView extends ItemView {
 
         const timelineEl = container.createDiv('story-line-timeline swimlane-timeline');
         enableDragToPan(timelineEl);
-        const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
+        const sortField = this.timelineOrder === 'chronological' ? 'storyDate' : 'chapter';
         const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: sortField, direction: 'asc' }

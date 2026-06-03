@@ -65,7 +65,6 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Settings](#settings)
 - [Project Management](#project-management)
-- [Novel Covers / Project Art](#novel-covers--project-art)
 - [Series Mode](#series-mode)
 - [File Structure](#file-structure)
 - [Tips & Workflow](#tips--workflow)
@@ -176,6 +175,7 @@ A spreadsheet-like grid for detailed scene planning.
 - **Zoom in/out** for overview or detail.
 - Drag scenes onto cells to link them.
 - Supports custom row/column headers for acts, chapters, plotlines, etc.
+- **Fit row heights to content** — click the scan icon in the toolbar to resize visible row heights so linked scene cards, notes, and entity tags are easier to see without changing column widths.
 - **Act & chapter dividers** — colored bands appear when the act or chapter changes, showing labels from your project structure.
 - **Status color-coding** — scene rows show a colored left border matching their current status.
 - **Click to open** — click a row header to open the linked scene file. Click a column header to open the character or location file.
@@ -1616,24 +1616,6 @@ StoryLine supports **multiple projects** in the same vault.
 Create a copy of an existing project (useful for alternate drafts or backups):
 1. Command palette → **Fork Current StoryLine Project**.
 2. Enter a new title. All scenes are duplicated.
-
----
-
-## Novel Covers / Project Art
-
-Add a cover image to your project by clicking the **cover thumbnail** (or the dashed placeholder icon) in the toolbar, next to the project name. This opens the image picker where you can import an image from your computer, choose one from your vault, or remove the current cover.
-
-Alternatively, set the `coverImage` field manually in the project frontmatter:
-
-```yaml
----
-type: storyline
-title: My Novel
-coverImage: StoryLine/My Novel/cover.jpg
----
-```
-
-The path should be vault-relative. Once set, a small thumbnail (24 × 32 px) appears next to the project name in the toolbar selector. This works with any image format supported by Obsidian (PNG, JPG, WebP, SVG).
 
 ---
 

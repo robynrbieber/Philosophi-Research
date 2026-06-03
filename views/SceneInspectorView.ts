@@ -83,6 +83,7 @@ export class SceneInspectorView extends ItemView {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
         viewContent.addClass('sl-scene-inspector-host');
+        this.containerEl.closest('.workspace-leaf')?.classList.add('sl-scene-inspector-leaf');
 
         // Research and Help are embedded as tabs here, so any standalone
         // leaves of those types in the same sidebar root are redundant and
@@ -221,6 +222,7 @@ export class SceneInspectorView extends ItemView {
     }
 
     async onClose(): Promise<void> {
+        this.containerEl.closest('.workspace-leaf')?.classList.remove('sl-scene-inspector-leaf');
         try { await this.researchView?.onClose(); } catch { /* ignore */ }
         try { await this.helpView?.onClose(); } catch { /* ignore */ }
         this.researchView = null;

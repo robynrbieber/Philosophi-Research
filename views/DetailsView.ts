@@ -43,6 +43,7 @@ export class DetailsView extends ItemView {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
         viewContent.addClass('sl-scene-inspector-host');
+        this.containerEl.closest('.workspace-leaf')?.classList.add('sl-scene-inspector-leaf');
 
         const container = viewContent.createDiv('sl-scene-inspector-sidebar');
         const panelsHost = container.createDiv('sl-inspector-panels');
@@ -122,6 +123,7 @@ export class DetailsView extends ItemView {
     }
 
     async onClose(): Promise<void> {
+        this.containerEl.closest('.workspace-leaf')?.classList.remove('sl-scene-inspector-leaf');
         this.inspectorComponent = null;
     }
 

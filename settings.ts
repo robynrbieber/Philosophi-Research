@@ -554,6 +554,8 @@ export interface SceneCardsSettings {
     lastBoardMode: 'corkboard' | 'kanban';
     /** Remembered kanban groupBy from last session */
     lastBoardGroupBy: string;
+    /** Remembered Timeline order from last session */
+    timelineOrder: 'reading' | 'chronological';
     autoOpenNavigator: boolean;
     showNotesInKanban: boolean;
     showScenesInCorkboard: boolean;
@@ -801,6 +803,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     defaultBoardMode: 'corkboard',
     lastBoardMode: 'corkboard',
     lastBoardGroupBy: 'act',
+    timelineOrder: 'reading',
     autoOpenNavigator: true,
     showNotesInKanban: false,
     showScenesInCorkboard: true,

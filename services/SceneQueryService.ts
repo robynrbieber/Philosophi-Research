@@ -352,6 +352,27 @@ export class SceneQueryService {
                 case 'chronologicalOrder':
                     cmp = (a.chronologicalOrder ?? a.sequence ?? 9999) - (b.chronologicalOrder ?? b.sequence ?? 9999);
                     break;
+                case 'storyDate': {
+                    // Sort by storyDate + storyTime; fall back to chronologicalOrder then sequence
+                    const aDate = a.storyDate?.trim();
+                    const bDate = b.storyDate?.trim();
+                    if (aDate && bDate) {
+                        cmp = aDate.localeCompare(bDate);
+                        if (cmp === 0) {
+                            const aTime = a.storyTime?.trim() || '';
+                            const bTime = b.storyTime?.trim() || '';
+                            cmp = aTime.localeCompare(bTime);
+                        }
+                    } else if (aDate) {
+                        cmp = -1; // scenes with dates come before those without
+                    } else if (bDate) {
+                        cmp = 1;
+                    } else {
+                        // Neither has a date — fall back to chronologicalOrder then sequence
+                        cmp = (a.chronologicalOrder ?? a.sequence ?? 9999) - (b.chronologicalOrder ?? b.sequence ?? 9999);
+                    }
+                    break;
+                }
                 case 'title':
                     cmp = (a.title || '').localeCompare(b.title || '');
                     break;

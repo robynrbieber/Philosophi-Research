@@ -5,7 +5,8 @@ import { asRecord, asString, asNumber, asBool, isRecord } from './utils/narrow';
 import type { FilterPreset } from './models/Scene';
 import { SceneManager } from './services/SceneManager';
 import { registerCustomStatuses } from './models/Scene';
-import { setWriteSceneFieldsAsWikilinks, setWordcountExclusions } from './services/MetadataParser';
+import { setWriteSceneFieldsAsWikilinks, setWordcountExclusions, setWordcountLocale } from './services/MetadataParser';
+import { normalizeStoryLineLocale } from './utils/locale';
 import { setActiveTemplatesProvider, setTopLevelMirrorEnabled, mirrorUniversalFieldsToTopLevel, hydrateUniversalFieldsFromTopLevel, isReservedTopLevelKey, type FieldTemplateChange } from './services/FieldTemplateService';
 import {
     BOARD_VIEW_TYPE,
@@ -831,6 +832,7 @@ export default class SceneCardsPlugin extends Plugin {
             comments: this.settings.excludeCommentsFromWordcount !== false,
             checklists: this.settings.excludeChecklistFromWordcount === true,
         });
+        setWordcountLocale(normalizeStoryLineLocale(this.settings.defaultProjectLanguage));
         // Snapshot the global colour settings so we can restore them when
         // switching to a project that has no per-project overrides.
         this._globalColorDefaults = {
@@ -865,6 +867,7 @@ export default class SceneCardsPlugin extends Plugin {
             comments: this.settings.excludeCommentsFromWordcount !== false,
             checklists: this.settings.excludeChecklistFromWordcount === true,
         });
+        setWordcountLocale(normalizeStoryLineLocale(this.sceneManager?.activeProject?.locale ?? this.settings.defaultProjectLanguage));
         const toSave: Record<string, unknown> = { ...this.settings };
         if (this._systemMigrationDone) {
             // Strip per-project data from the global data.json payload

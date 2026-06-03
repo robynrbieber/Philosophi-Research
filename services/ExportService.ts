@@ -520,6 +520,8 @@ export class ExportService {
     h2 { font-size: 18pt; margin-top: 1.5em; color: #444; }
     h3 { font-size: 14pt; margin-top: 1.2em; color: #555; }
     h4 { font-size: 12pt; margin-top: 1em; font-style: italic; }
+    h5 { font-size: 11pt; margin-top: 0.9em; font-weight: 600; }
+    h6 { font-size: 10pt; margin-top: 0.8em; font-weight: 600; color: #666; }
     hr { border: none; border-top: 1px solid #ccc; margin: 1.5em 0; }
     table { width: 100%; border-collapse: collapse; font-size: 10pt; margin: 1em 0; }
     th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
@@ -578,12 +580,9 @@ ${body}
             }
 
             if (scene.body && scene.body.trim()) {
-                // Convert basic markdown paragraphs to HTML (strip wikilinks + tags, convert formatting)
+                // Convert basic markdown blocks to HTML (strip wikilinks + tags, convert formatting)
                 const cleanBody = this.stripObsidianTags(this.stripWikiLinks(scene.body.trim()));
-                const paragraphs = cleanBody.split(/\n{2,}/);
-                for (const p of paragraphs) {
-                    parts.push(`<p>${this.mdInlineToHtml(p.trim())}</p>`);
-                }
+                parts.push(...this.mdBlocksToHtml(cleanBody));
             } else {
                 parts.push('<p class="no-content">No content yet.</p>');
             }
@@ -833,6 +832,44 @@ ${body}
         // and NOT preceded by & (HTML entities like &#123;)
         // Avoid lookbehind for iOS <16.4 compatibility.
         return text.replace(/(^|\s)#([\w\-\/]+)/gm, '$1$2');
+    }
+
+    /** Convert simple block-level markdown used in manuscript bodies. */
+    private mdBlocksToHtml(text: string): string[] {
+        const parts: string[] = [];
+        const paragraphLines: string[] = [];
+        const flushParagraph = () => {
+            if (paragraphLines.length === 0) return;
+            parts.push(`<p>${this.mdInlineToHtml(paragraphLines.join('\n').trim())}</p>`);
+            paragraphLines.length = 0;
+        };
+
+        for (const rawLine of text.split(/\r?\n/)) {
+            const line = rawLine.trim();
+            if (!line) {
+                flushParagraph();
+                continue;
+            }
+
+            const heading = line.match(/^(#{1,6})\s+(.+)$/);
+            if (heading) {
+                flushParagraph();
+                const level = Math.min(heading[1].length, 6);
+                parts.push(`<h${level}>${this.mdInlineToHtml(heading[2].trim())}</h${level}>`);
+                continue;
+            }
+
+            if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
+                flushParagraph();
+                parts.push('<hr>');
+                continue;
+            }
+
+            paragraphLines.push(rawLine);
+        }
+
+        flushParagraph();
+        return parts;
     }
 
     /**
@@ -1218,6 +1255,8 @@ ${body}
         const h2Size = Math.round(fontSize * 1.6);
         const h3Size = Math.round(fontSize * 1.3);
         const h4Size = Math.round(fontSize * 1.1);
+        const h5Size = Math.max(Math.round(fontSize), 8);
+        const h6Size = Math.max(Math.round(fontSize * 0.9), 8);
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -1242,6 +1281,8 @@ ${body}
     h2 { font-size: ${h2Size}pt; margin-top: 1.5em; color: #444; }
     h3 { font-size: ${h3Size}pt; margin-top: 1.2em; color: #555; }
     h4 { font-size: ${h4Size}pt; margin-top: 1em; font-style: italic; }
+    h5 { font-size: ${h5Size}pt; margin-top: 0.9em; font-weight: 600; }
+    h6 { font-size: ${h6Size}pt; margin-top: 0.8em; font-weight: 600; color: #666; }
     p  { margin: 0 0 0.5em 0; }
     hr { border: none; border-top: 1px solid #ccc; margin: 1.5em 0; }
     table { width: 100%; border-collapse: collapse; font-size: ${Math.round(fontSize * 0.9)}pt; margin: 1em 0; }

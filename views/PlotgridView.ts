@@ -362,6 +362,11 @@ export class PlotgridView extends ItemView {
             this.renderGrid();
         });
 
+        const fitCellsBtn = left.createEl('button', { cls: 'clickable-icon' });
+        obsidian.setIcon(fitCellsBtn, 'scan');
+        attachTooltip(fitCellsBtn, 'Fit row heights to content');
+        fitCellsBtn.addEventListener('click', () => { void this.autosizeCellsToContent(); });
+
         // Auto-Note toggle
         if (this.plugin) {
             const autoNoteLabel = this.plugin.settings.plotgridAutoNote ? 'Auto-Note: On' : 'Auto-Note: Off';
@@ -398,7 +403,12 @@ export class PlotgridView extends ItemView {
         italicBtn.addEventListener('click', () => this.toggleItalicSelected());
 
         const alignSelect = fmtGroup.createEl('select');
+        alignSelect.addClass('dropdown');
         alignSelect.title = 'Alignment for selection';
+        for (const [value, label] of [['left', 'Left'], ['center', 'Center'], ['right', 'Right']] as const) {
+            const option = alignSelect.createEl('option', { text: label });
+            option.value = value;
+        }
         alignSelect.addEventListener('change', () => this.setAlignSelected(alignSelect.value as 'left' | 'center' | 'right'));
         // default to centered
         alignSelect.value = 'center';
@@ -575,6 +585,71 @@ export class PlotgridView extends ItemView {
 
     private computeTotalWidth() {
         return ROW_HEADER_WIDTH + this.data.columns.reduce((s, c) => s + c.width, 0);
+    }
+
+    private async autosizeCellsToContent(): Promise<void> {
+        if (!this.canvasEl || this.data.rows.length === 0 || this.data.columns.length === 0) return;
+
+        await this.waitForPlotGridLayout();
+
+        const minRowHeight = 40;
+        const maxRowHeight = 900;
+
+        let changed = false;
+        for (let pass = 0; pass < 4; pass++) {
+            if (!this.canvasEl) break;
+
+            const requiredRowHeights = new Map<number, number>();
+
+            const cellElements = Array.from(this.canvasEl.querySelectorAll<HTMLElement>('.plot-grid-cell[data-row][data-col]'));
+            for (const cellEl of cellElements) {
+                const rowIndex = Number(cellEl.dataset.row);
+                if (!Number.isInteger(rowIndex)) continue;
+                if (!this.data.rows[rowIndex]) continue;
+
+                const requiredHeight = Math.min(maxRowHeight, Math.max(minRowHeight, this.measureCellHeight(cellEl)));
+                requiredRowHeights.set(rowIndex, Math.max(requiredRowHeights.get(rowIndex) ?? minRowHeight, requiredHeight));
+            }
+
+            let passChanged = false;
+            for (const [rowIndex, requiredHeight] of requiredRowHeights) {
+                const nextHeight = Math.round(requiredHeight);
+                if (this.data.rows[rowIndex].height !== nextHeight) {
+                    this.data.rows[rowIndex].height = nextHeight;
+                    passChanged = true;
+                }
+            }
+
+            if (!passChanged) break;
+            changed = true;
+            this.renderGrid();
+            await this.waitForPlotGridLayout();
+        }
+
+        if (!changed) {
+            new Notice('Plot Grid row heights already fit their content');
+            return;
+        }
+
+        this.scheduleSave();
+        new Notice('Plot Grid row heights resized to fit content');
+    }
+
+    private async waitForPlotGridLayout(): Promise<void> {
+        await new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+        });
+    }
+
+    private measureCellHeight(cellEl: HTMLElement): number {
+        let requiredHeight = cellEl.scrollHeight + 2;
+        const descendants = Array.from(cellEl.querySelectorAll<HTMLElement>('*'));
+        for (const descendant of descendants) {
+            if (descendant.scrollHeight > descendant.clientHeight) {
+                requiredHeight = Math.max(requiredHeight, cellEl.offsetHeight + descendant.scrollHeight - descendant.clientHeight + 2);
+            }
+        }
+        return requiredHeight;
     }
 
     private renderGrid() {
@@ -1104,7 +1179,7 @@ export class PlotgridView extends ItemView {
                 if (cell.italic) cellEl.setCssStyles({ fontStyle: 'italic' });
                 cellEl.setCssStyles({ textAlign: cell.align });
 
-                const contentEl = cellEl.createDiv({ cls: 'markdown-rendered' });
+                const contentEl = cellEl.createDiv({ cls: 'plot-grid-cell-content markdown-rendered' });
                 contentEl.setCssStyles({ flex: '1 1 auto' });
                 if (cell.content) {
                     const cellComp = new Component(); cellComp.load();
@@ -1214,12 +1289,13 @@ export class PlotgridView extends ItemView {
                             void MarkdownRenderer.render(this.app, scene.conflict, metaRow, scene.filePath, metaComp);
                         }
 
-                        // Keep cell content below if there's text
+                        // Keep cell content visible above the scene preview if there's text
                         if (cell.content) {
                             contentEl.setCssStyles({
-                                marginTop: '4px',
+                                order: '-1',
+                                marginBottom: '4px',
                                 fontSize: '11px',
-                                color: 'var(--text-muted)',
+                                color: cell.textColor || 'var(--text-normal)',
                             });
                         } else {
                             contentEl.setCssStyles({ display: 'none' });
@@ -1516,8 +1592,10 @@ export class PlotgridView extends ItemView {
                         if (src && tgt) {
                             tgt.linkedSceneId = src.linkedSceneId;
                             tgt.content = src.content;
+                            tgt.manualContent = src.manualContent;
                             src.linkedSceneId = undefined;
                             src.content = '';
+                            src.manualContent = undefined;
                             this.scheduleSave();
                             this.renderGrid();
                         }
@@ -1581,12 +1659,12 @@ export class PlotgridView extends ItemView {
     private applySelectionVisuals() {
         if (!this.canvasEl) return;
         // clear any previous visual marks
-        this.canvasEl.querySelectorAll('.plot-grid-cell').forEach(n => (n as HTMLElement).setCssStyles({ outline: '' }));
+        this.canvasEl.querySelectorAll('.plot-grid-cell').forEach(n => (n as HTMLElement).setCssStyles({ outline: '', boxShadow: '' }));
         this.canvasEl.querySelectorAll('.plot-grid-row-header, .plot-grid-col-header').forEach(n => (n as HTMLElement).setCssStyles({ boxShadow: '' }));
 
         if (this.selectedRow !== null && this.selectedCol !== null) {
             const el = this.getCellElement(this.selectedRow, this.selectedCol);
-            if (el) el.setCssStyles({ outline: '2px solid var(--interactive-accent)' });
+            if (el) el.setCssStyles({ boxShadow: 'inset 0 0 0 2px var(--interactive-accent)' });
         }
 
         if (this.selectedRow !== null) {
@@ -1611,7 +1689,7 @@ export class PlotgridView extends ItemView {
 
     private selectCell(el: HTMLElement) {
                 const prev = this.canvasEl?.querySelector('.plot-grid-cell.selected');
-                if (prev) { prev.classList.remove('selected'); (prev as HTMLElement).setCssStyles({ outline: '' }); }
+                if (prev) { prev.classList.remove('selected'); (prev as HTMLElement).setCssStyles({ outline: '', boxShadow: '' }); }
                 el.classList.add('selected');
                 const r = el.getAttribute('data-row');
                 const c = el.getAttribute('data-col');
@@ -1620,7 +1698,7 @@ export class PlotgridView extends ItemView {
                 // ensure visible
                 el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
                 // visual
-                el.setCssStyles({ outline: '2px solid var(--interactive-accent)' });
+                el.setCssStyles({ boxShadow: 'inset 0 0 0 2px var(--interactive-accent)' });
                 this.applySelectionVisuals();
     }
 
@@ -2337,6 +2415,7 @@ export class PlotgridView extends ItemView {
         window.requestAnimationFrame(() => { ta.focus(); });
 
         ta.addEventListener('keydown', (e) => {
+            e.stopPropagation();
             if (e.key === 'Escape') {
                 this.renderGrid();
             } else if (e.key === 'Tab') {
@@ -3085,7 +3164,7 @@ export class PlotgridView extends ItemView {
             if (this.selectedRow !== null && this.selectedCol !== null) {
                 const gridCellEl = this.getCellElement(this.selectedRow, this.selectedCol);
                 if (gridCellEl) {
-                    const contentDiv = gridCellEl.querySelector('div') as HTMLElement | null;
+                    const contentDiv = gridCellEl.querySelector('.plot-grid-cell-content') as HTMLElement | null;
                     if (contentDiv) contentDiv.textContent = liveCell.content || '';
                 }
             }

@@ -30,6 +30,8 @@ export class StorylineView extends ItemView {
     private plotlineViewMode: PlotlineViewMode = 'subway';
     /** Set of plotline tag names that are hidden in the subway view */
     private hiddenPlotlines: Set<string> = new Set();
+    /** Whether subway scene nodes show plotline pills under the title. */
+    private showSubwayTagPills = true;
     /** Arc Point filter: 'all' | 'scenes' | 'arcPoints' */
     private arcAnchorFilter: 'all' | 'scenes' | 'arcPoints' = 'all';
     /** Cache key for skip-if-unchanged optimization */
@@ -177,6 +179,17 @@ export class StorylineView extends ItemView {
                     });
                 }
                 menu.showAtPosition({ x: e.clientX, y: e.clientY });
+            });
+
+            const tagToggle = controls.createEl('button', {
+                cls: `clickable-icon${this.showSubwayTagPills ? ' is-active' : ''}`,
+            });
+            const tagIcon = tagToggle.createSpan();
+            obsidian.setIcon(tagIcon, 'tags');
+            attachTooltip(tagToggle, this.showSubwayTagPills ? 'Hide scene tags' : 'Show scene tags');
+            tagToggle.addEventListener('click', () => {
+                this.showSubwayTagPills = !this.showSubwayTagPills;
+                this.refresh();
             });
         }
 
@@ -358,7 +371,7 @@ export class StorylineView extends ItemView {
 
         // Each lane needs room for: the track line + scene label + tag pills below it
         const LANE_TRACK = 30;         // space for the line itself
-        const LANE_INFO = 65;          // space for scene title + tag pills below node
+        const LANE_INFO = this.showSubwayTagPills ? 65 : 36;          // space for scene title + optional tag pills below node
         const LANE_HEIGHT = LANE_TRACK + LANE_INFO;  // total per lane
 
         // ── Build ordered scene columns ──
@@ -665,7 +678,7 @@ export class StorylineView extends ItemView {
                 svg.appendChild(sceneLabel);
 
                 // ── Tag pills below scene title ──
-                if (scene.tags?.length) {
+                if (this.showSubwayTagPills && scene.tags?.length) {
                     const pillY = labelY1 + 14;
                     const pillSpacing = 3;
                     const pillData = scene.tags.map(tag => ({

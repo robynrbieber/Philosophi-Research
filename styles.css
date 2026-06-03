@@ -6588,7 +6588,7 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
 }
 
 /* Selection visuals */
-.plot-grid-cell.selected { outline:2px solid var(--interactive-accent); outline-offset:-2px; }
+.plot-grid-cell.selected { box-shadow: inset 0 0 0 2px var(--interactive-accent); }
 .plot-grid-row-header.selected { box-shadow: inset 4px 0 0 var(--interactive-accent); }
 .plot-grid-col-header.selected { box-shadow: inset 0 4px 0 var(--interactive-accent); }
 
@@ -6628,6 +6628,7 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     align-items: center;
     gap: 4px;
     overflow: hidden;
+    min-width: 0;
 }
 
 .pg-mini-status-icon {
@@ -6643,6 +6644,8 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
 }
 
 .pg-mini-title {
+    flex: 1 1 auto;
+    min-width: 0;
     font-weight: 600;
     font-size: 12px;
     white-space: nowrap;
@@ -9649,7 +9652,7 @@ body.theme-dark .location-field-input.dropdown {
 
 /* Issue #105 — when a scene block is immediately followed by an act or chapter
    divider, drop its bottom padding/margin so we don't compound spacing.
-   Class is applied by ManuscriptView at render time (cheaper than :has()). */
+    Class is applied by ManuscriptView at render time. */
 .sl-manuscript-scene-block.is-before-divider {
     margin-bottom: 8px;
     padding-bottom: 8px;
@@ -9828,22 +9831,22 @@ body.sl-hide-frontmatter-global .sl-manuscript-embedded-split.sl-manuscript-embe
    YAML lines shown in Source mode (.HyperMD-frontmatter in CM6). All rules
    are also gated on body.sl-hide-frontmatter-global so toggling the setting
    OFF reliably restores frontmatter even if the per-leaf class lingers. */
-body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .metadata-container,
-body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .metadata-properties-container,
-body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .metadata-properties-heading,
-body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .cm-line.HyperMD-frontmatter,
-body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter .markdown-source-view .cm-line.HyperMD-frontmatter {
-    display: none !important;
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter.sl-hide-frontmatter .metadata-container.metadata-container,
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter.sl-hide-frontmatter .metadata-properties-container.metadata-properties-container,
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter.sl-hide-frontmatter .metadata-properties-heading.metadata-properties-heading,
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter.sl-hide-frontmatter .cm-line.HyperMD-frontmatter.HyperMD-frontmatter,
+body.sl-hide-frontmatter-global .view-content.sl-hide-frontmatter.sl-hide-frontmatter .markdown-source-view .cm-line.HyperMD-frontmatter.HyperMD-frontmatter {
+    display: none;
 }
 
 /* Frontmatter inside any StoryLine custom view (Board, Manuscript, Scene
    Inspector sidebar, Research, etc.) — those views have no `view.file`, so
    we can't tag them per-leaf. Use the body-class + view data-type instead. */
-body.sl-hide-frontmatter-global .workspace-leaf-content[data-type^="story-line-"] .metadata-container,
-body.sl-hide-frontmatter-global .workspace-leaf-content[data-type^="story-line-"] .metadata-properties-container,
-body.sl-hide-frontmatter-global .workspace-leaf-content[data-type^="story-line-"] .metadata-properties-heading,
-body.sl-hide-frontmatter-global .workspace-leaf-content[data-type^="story-line-"] .cm-line.HyperMD-frontmatter {
-    display: none !important;
+body.sl-hide-frontmatter-global .workspace-leaf-content.workspace-leaf-content[data-type^="story-line-"] .metadata-container.metadata-container,
+body.sl-hide-frontmatter-global .workspace-leaf-content.workspace-leaf-content[data-type^="story-line-"] .metadata-properties-container.metadata-properties-container,
+body.sl-hide-frontmatter-global .workspace-leaf-content.workspace-leaf-content[data-type^="story-line-"] .metadata-properties-heading.metadata-properties-heading,
+body.sl-hide-frontmatter-global .workspace-leaf-content.workspace-leaf-content[data-type^="story-line-"] .cm-line.HyperMD-frontmatter.HyperMD-frontmatter {
+    display: none;
 }
 
 /* Issue #110 — Manuscript view embeds scene editors via detached splits, so
@@ -11113,10 +11116,10 @@ body.sl-focus-active-global .titlebar {
 
 
 /* --- Scene Inspector tabs + Info panel (right sidebar) --- */
-/* Anchor off the host class we add to `.view-content` and use `:has()` to
-   force the workspace-leaf-content ancestor to also claim full height —
-   in the right sidedock Obsidian does NOT give it `flex:1` by default. */
-.workspace-leaf:has(> .workspace-leaf-content > .view-content.sl-scene-inspector-host) > .workspace-leaf-content {
+/* The view marks its Obsidian leaf wrapper with `.sl-scene-inspector-leaf`
+    so the leaf content can claim full height. In the right sidedock Obsidian
+    does NOT give it `flex:1` by default. */
+.workspace-leaf.sl-scene-inspector-leaf > .workspace-leaf-content {
     flex: 9999 1 auto;
     min-height: 0;
     height: 100%;
@@ -11124,8 +11127,8 @@ body.sl-focus-active-global .titlebar {
 /* Orphan leaf-content siblings (stale DOM from previous sessions for the
    embedded views) steal vertical space. Workspace API confirms they aren't
    real leaves, so it's safe to hide them when they appear alongside us. */
-.workspace-leaf:has(> .workspace-leaf-content > .view-content.sl-scene-inspector-host) > .workspace-leaf-content[data-type="story-line-research"],
-.workspace-leaf:has(> .workspace-leaf-content > .view-content.sl-scene-inspector-host) > .workspace-leaf-content[data-type="story-line-help"] {
+.workspace-leaf.sl-scene-inspector-leaf > .workspace-leaf-content[data-type="story-line-research"],
+.workspace-leaf.sl-scene-inspector-leaf > .workspace-leaf-content[data-type="story-line-help"] {
     display: none;
 }
 .view-content.sl-scene-inspector-host {
@@ -11380,22 +11383,24 @@ body.sl-focus-active-global .titlebar {
 .sl-info-notes-embedded-split.sl-info-notes-embedded-split .workspace-leaf-resize-handle {
     display: none;
 }
-.sl-info-notes-embedded-split.sl-info-notes-embedded-split .inline-title {
-    display: none !important;
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .inline-title.inline-title {
+    display: none;
 }
 .sl-info-notes-embedded-split.sl-info-notes-embedded-split .view-content {
     padding: 0;
     overflow: hidden;
 }
-.sl-info-notes-embedded-split.sl-info-notes-embedded-split .cm-scroller {
-    overflow: auto !important;
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .markdown-source-view .cm-scroller.cm-scroller,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .markdown-reading-view .cm-scroller.cm-scroller,
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .cm-editor .cm-scroller.cm-scroller {
+    overflow: auto;
 }
 .sl-info-notes-embedded-split.sl-info-notes-embedded-split .cm-content,
 .sl-info-notes-embedded-split.sl-info-notes-embedded-split .markdown-preview-sizer {
     min-height: 100%;
 }
-.sl-info-notes-embedded-split.sl-info-notes-embedded-split .sl-notes-hidden-heading {
-    display: none !important;
+.sl-info-notes-embedded-split.sl-info-notes-embedded-split .sl-notes-hidden-heading.sl-notes-hidden-heading {
+    display: none;
 }
 .sl-info-notes-live {
     width: 100%;
@@ -11578,8 +11583,10 @@ body.sl-focus-active-global .titlebar {
     padding: 0;
     overflow: hidden;
 }
-.sl-notes-embedded-split.sl-notes-embedded-split .cm-scroller {
-    overflow: auto !important;
+.sl-notes-embedded-split.sl-notes-embedded-split .markdown-source-view .cm-scroller.cm-scroller,
+.sl-notes-embedded-split.sl-notes-embedded-split .markdown-reading-view .cm-scroller.cm-scroller,
+.sl-notes-embedded-split.sl-notes-embedded-split .cm-editor .cm-scroller.cm-scroller {
+    overflow: auto;
 }
 .sl-notes-embedded-split.sl-notes-embedded-split .cm-content,
 .sl-notes-embedded-split.sl-notes-embedded-split .markdown-preview-sizer {
