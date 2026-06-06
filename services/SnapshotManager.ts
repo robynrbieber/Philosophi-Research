@@ -12,7 +12,7 @@
  *   <scene-basename>__<timestamp>__<label>.md
  */
 
-import { App, TFile, TFolder, normalizePath, Notice } from 'obsidian';
+import { App, TFile, TFolder, normalizePath, Notice, type DataAdapter } from 'obsidian';
 import { tokenizeWords, DEFAULT_STORYLINE_LOCALE, type StoryLineLocale } from '../utils/locale';
 
 export interface SceneSnapshot {
@@ -218,7 +218,7 @@ export class SnapshotManager {
     private async migrateLegacySnapshotsFolder(sceneFilePath: string): Promise<void> {
         const legacyDir = this.getLegacySnapshotDir(sceneFilePath);
         const newDir = this.getSnapshotDir(sceneFilePath);
-        const adapter: any = this.app.vault.adapter;
+        const adapter: DataAdapter = this.app.vault.adapter;
         try {
             const exists = await adapter.exists(legacyDir);
             if (!exists) return;

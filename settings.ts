@@ -906,7 +906,15 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    private refreshSettingsView(): void {
+        this.renderSettingsTab();
+    }
+
     display(): void {
+        this.renderSettingsTab();
+    }
+
+    private renderSettingsTab(): void {
         const { containerEl } = this;
         containerEl.empty();
 
@@ -1338,7 +1346,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.plugin.settings.locationDetailPortraitWidth = DEFAULT_SETTINGS.locationDetailPortraitWidth;
                     this.plugin.settings.locationDetailPortraitHeight = DEFAULT_SETTINGS.locationDetailPortraitHeight;
                     await this.plugin.saveSettings();
-                    this.display();
+                    this.refreshSettingsView();
                 }));
 
         // ═══════════════════════════════════════════
@@ -1648,7 +1656,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             this.plugin.settings.focusBlurAmount = 1;
             await this.plugin.saveSettings();
             this.plugin.refreshOpenViews();
-            this.display();
+            this.refreshSettingsView();
         });
 
         // ── Timeline Drag-Scroll Settings (collapsible) ──
@@ -1723,7 +1731,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                         }
                         await this.plugin.saveSettings();
                         this.plugin.refreshOpenViews();
-                        this.display(); // re-render to update swatch previews
+                        this.refreshSettingsView(); // re-render to update swatch previews
                     }));
         }
 
@@ -1962,7 +1970,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             ps.plotlineLightness = 0;
             await this.plugin.saveSettings();
             this.plugin.refreshOpenViews();
-            this.display();
+            this.refreshSettingsView();
         });
 
         // Per-tag overrides summary (compact — only show if there ARE overrides)

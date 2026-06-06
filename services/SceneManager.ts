@@ -1714,7 +1714,7 @@ export class SceneManager implements ISceneStore {
         if (!scene.notesFile) return;
         const file = this.app.vault.getAbstractFileByPath(scene.notesFile);
         if (file && file instanceof TFile) {
-            await this.app.vault.delete(file);
+            await this.app.fileManager.trashFile(file);
         }
         await this.updateScene(scene.filePath, { notesFile: undefined });
         scene.notesFile = undefined;

@@ -465,19 +465,17 @@ export class InspectorComponent {
 
         // ── Arc Point toggle ──
         const arcRow = this.container.createDiv('inspector-section');
-        arcRow.setCssStyles({ display: 'flex', alignItems: 'center', gap: '8px' });
+        arcRow.addClass('inspector-arc-row');
         const arcCheckbox = arcRow.createEl('input', {
             attr: { type: 'checkbox', id: 'arc-anchor-toggle' },
         });
         arcCheckbox.checked = !!scene.arcAnchor;
-        arcCheckbox.style.cursor = 'pointer';
+        arcCheckbox.addClass('inspector-arc-checkbox');
         const arcLabel = arcRow.createEl('label', {
             attr: { for: 'arc-anchor-toggle' },
             text: 'Arc Point',
         });
-        arcLabel.style.cursor = 'pointer';
-        arcLabel.style.fontWeight = '600';
-        arcLabel.style.fontSize = 'var(--font-ui-small)';
+        arcLabel.addClass('inspector-arc-label');
         arcCheckbox.addEventListener('change', async () => {
             const val = arcCheckbox.checked;
             await this.sceneManager.updateScene(scene.filePath, { arcAnchor: val });
@@ -1332,7 +1330,7 @@ export class InspectorComponent {
         this.plugin.register(() => suggest.destroy());
 
         // Auto-focus
-        requestAnimationFrame(() => textarea.focus());
+        window.requestAnimationFrame(() => textarea.focus());
 
         // Save on blur → return to live preview
         textarea.addEventListener('blur', async () => {

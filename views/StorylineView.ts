@@ -1047,7 +1047,7 @@ export class StorylineView extends ItemView {
                 btn.setButtonText('Cancel').onClick(() => modal.close());
             })
             .addButton((btn: ButtonComponent) => {
-                btn.setButtonText('Delete').setWarning().onClick(async () => {
+                btn.setButtonText('Delete').setDestructive().onClick(async () => {
                     const count = await this.sceneManager.deleteTag(plotline);
                     new Notice(`Removed plotline from ${count} scene${count !== 1 ? 's' : ''}`);
                     this.refresh();

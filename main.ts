@@ -2915,7 +2915,7 @@ class SeriesManagementModal extends Modal {
                 text: `Remove "${bookName}" from "${meta.name}"? The shared codex will be copied into the book's local folder.`,
             });
             new Setting(m.contentEl)
-                .addButton((btn: ButtonComponent) => btn.setButtonText('Remove').setWarning().onClick(() => { m.close(); resolve(true); }))
+                .addButton((btn: ButtonComponent) => btn.setButtonText('Remove').setDestructive().onClick(() => { m.close(); resolve(true); }))
                 .addButton((btn: ButtonComponent) => btn.setButtonText('Cancel').onClick(() => { m.close(); resolve(false); }));
             m.open();
         });

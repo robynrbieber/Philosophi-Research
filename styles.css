@@ -2402,6 +2402,26 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     color: var(--sc-text-muted);
 }
 
+.inspector-arc-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inspector-arc-checkbox,
+.inspector-arc-label {
+    cursor: pointer;
+}
+
+.inspector-arc-label {
+    font-weight: 600;
+    font-size: var(--font-ui-small);
+}
+
+.structure-number-input {
+    width: 60px;
+}
+
 /* ────────────────────────────────────────
    Swimlane (multi-lane) timeline mode
    ──────────────────────────────────────── */

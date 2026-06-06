@@ -152,8 +152,8 @@ export class InfoPanelComponent {
             item.createSpan({ text: cfg.label });
             item.addEventListener('click', async () => {
                 menu.setCssStyles({ display: 'none' });
-                await this.sceneManager.updateScene(scene.filePath, { status: s as SceneStatus });
-                scene.status = s as SceneStatus;
+                await this.sceneManager.updateScene(scene.filePath, { status: s });
+                scene.status = s;
                 this.render();
             });
         }
@@ -424,7 +424,7 @@ export class InfoPanelComponent {
         textarea.value = scene.notes || '';
 
         // Auto-focus
-        requestAnimationFrame(() => textarea.focus());
+        window.requestAnimationFrame(() => textarea.focus());
 
         // Save on blur → return to live preview
         textarea.addEventListener('blur', async () => {
@@ -481,4 +481,4 @@ export class InfoPanelComponent {
         );
     }
 }
-/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises */
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises -- end file-wide suppression for Obsidian DOM and event APIs */

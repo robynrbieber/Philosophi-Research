@@ -11,6 +11,7 @@ import { applyMobileClass } from '../components/MobileAdapter';
 import { pickImage as pickImageModal, resolveImagePath } from '../components/ImagePicker';
 import { AddFieldModal } from '../components/AddFieldModal';
 import { attachTooltip } from '../components/Tooltip';
+import { openConfirmModal } from '../components/ConfirmModal';
 import {
     CUSTOM_SECTION_KEY_SEP,
     renderCustomSectionsAtSlot,
@@ -912,7 +913,7 @@ export class CodexView extends ItemView {
             // relative to the viewport even when an ancestor uses `transform`,
             // `filter`, `contain` or other properties that establish a
             // containing block (which made the popup drift off the input).
-            const msDropdown = document.body.createDiv('universal-multi-dropdown');
+            const msDropdown = activeDocument.body.createDiv('universal-multi-dropdown');
             msDropdown.setCssStyles({ display: 'none' });
             this._portaledDropdowns.push(msDropdown);
 
@@ -1139,12 +1140,14 @@ export class CodexView extends ItemView {
                 };
                 if (inTemplate) {
                     // Confirm whether to remove from template (all entries) or just this entry
-                    const choice = window.confirm(
-                        `"${fieldName}" is a template field for this category.\n\n` +
-                        `OK = remove from ALL entries in this category (remove template).\n` +
-                        `Cancel = remove from this entry only (will reappear on reload).`
-                    );
-                    doRemove(choice);
+                    openConfirmModal(this.app, {
+                        title: 'Remove Template Field',
+                        message: `"${fieldName}" is a template field for this category. Remove it from all entries in this category, or cancel to remove it from this entry only?`,
+                        confirmLabel: 'Remove from all entries',
+                        cancelLabel: 'This entry only',
+                        onConfirm: () => doRemove(true),
+                        onCancel: () => doRemove(false),
+                    });
                 } else {
                     doRemove(false);
                 }
@@ -1513,7 +1516,7 @@ export class CodexView extends ItemView {
         new Setting(modal.contentEl)
             .addButton(btn => btn
                 .setButtonText('Delete')
-                .setWarning()
+                .setDestructive()
                 .onClick(async () => {
                     modal.close();
                     try {

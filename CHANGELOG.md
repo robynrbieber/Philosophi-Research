@@ -12,12 +12,8 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 - **Timeline swimlanes by character and plotline** *([#154](https://github.com/PixeroJan/obsidian-storyline/issues/154))* — Swimlane mode can now group by scene characters or plotlines, and scenes with multiple values appear in each matching lane. This is scene-based, using existing scene character and tag fields.
 
----
-## Version 1.10.20
-
-### Changes
-
 - **Richer Plotlines subway popups** *([#148](https://github.com/PixeroJan/obsidian-storyline/issues/148))* — Hovering a subway-map scene now shows subtitle, synopsis, Arc Point status, plotlines, and story date/time when available.
+
 - **More flexible custom sections** *([#151](https://github.com/PixeroJan/obsidian-storyline/issues/151))* — Custom-section fields can now use folder-sourced dropdown/multi-select options, move between user-created sections, and respect selected field placement more consistently.
 
 ---

@@ -164,6 +164,7 @@ export class TimelineView extends ItemView {
                 { value: 'character', label: 'By Character' },
                 { value: 'location', label: 'By Location' },
                 { value: 'plotline', label: 'By Plotline' },
+                { value: 'tag', label: 'By Tag' },
             ];
             for (const opt of options) {
                 const el = groupSelect.createEl('option', { text: opt.label });
@@ -704,7 +705,7 @@ export class TimelineView extends ItemView {
             case 'plotline':
             case 'tag':
                 if (scene.tags && scene.tags.length > 0) return this.cleanLaneKeys(scene.tags);
-                return ['(no plotline)'];
+                return [this.swimlaneGroupBy === 'tag' ? '(no tag)' : '(no plotline)'];
             default:
                 return ['(none)'];
         }

@@ -2986,7 +2986,7 @@ export class BoardView extends ItemView {
             .addText(text => {
                 text.setValue('3');
                 text.inputEl.type = 'number';
-                text.inputEl.style.width = '60px';
+                text.inputEl.addClass('structure-number-input');
                 text.onChange(v => { customActs = parseInt(v) || 3; });
             });
         new Setting(customRow)
@@ -2994,7 +2994,7 @@ export class BoardView extends ItemView {
             .addText(text => {
                 text.setValue('5');
                 text.inputEl.type = 'number';
-                text.inputEl.style.width = '60px';
+                text.inputEl.addClass('structure-number-input');
                 text.onChange(v => { customChaptersPerAct = parseInt(v) || 5; });
             });
         new Setting(customRow)
@@ -3003,7 +3003,7 @@ export class BoardView extends ItemView {
             .addText(text => {
                 text.setValue('1');
                 text.inputEl.type = 'number';
-                text.inputEl.style.width = '60px';
+                text.inputEl.addClass('structure-number-input');
                 text.onChange(v => { customScenesPerChapter = parseInt(v) || 0; });
             });
         new Setting(customRow)

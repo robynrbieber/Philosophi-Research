@@ -157,8 +157,8 @@ export class NotesView extends ItemView {
 
     private refreshCurrentScene(): void {
         if (!this.currentScenePath) return;
-        const activeLeaf = this.app.workspace.activeLeaf;
-        if (activeLeaf && activeLeaf === this.editorLeaf) return;
+        const activeMarkdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (activeMarkdownView && activeMarkdownView === this.editorLeaf?.view) return;
         const fresh = this.sceneManager.getScene(this.currentScenePath);
         if (fresh) this.showScene(fresh.filePath);
     }

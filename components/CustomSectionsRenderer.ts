@@ -14,6 +14,7 @@
 
 import { App, Menu, Modal, Notice, Setting, setIcon } from 'obsidian';
 import { attachTooltip } from './Tooltip';
+import { openConfirmModal } from './ConfirmModal';
 
 /** Composite-key separator used to namespace fields inside custom sections. */
 export const CUSTOM_SECTION_KEY_SEP = ' :: ';
@@ -195,7 +196,7 @@ function bucketBySlot<T extends { custom?: Record<string, string> }>(
  * Move a section one step earlier in the interleaved order (slot+slot-internal).
  * Returns true if the move was applied.
  */
-function moveSectionUp(sec: CustomSection, host: CustomSectionsHost<any>): boolean {
+function moveSectionUp<T extends { custom?: Record<string, string> }>(sec: CustomSection, host: CustomSectionsHost<T>): boolean {
     const builtinCount = host.builtinSectionCount;
     const buckets = bucketBySlot(host);
     const slot = effectivePosition(sec, builtinCount);
@@ -222,7 +223,7 @@ function moveSectionUp(sec: CustomSection, host: CustomSectionsHost<any>): boole
 /**
  * Move a section one step later. Returns true if applied.
  */
-function moveSectionDown(sec: CustomSection, host: CustomSectionsHost<any>): boolean {
+function moveSectionDown<T extends { custom?: Record<string, string> }>(sec: CustomSection, host: CustomSectionsHost<T>): boolean {
     const builtinCount = host.builtinSectionCount;
     const buckets = bucketBySlot(host);
     const slot = effectivePosition(sec, builtinCount);
@@ -244,7 +245,7 @@ function moveSectionDown(sec: CustomSection, host: CustomSectionsHost<any>): boo
 }
 
 /** True if `sec` is the very first section in interleaved order. */
-function isFirstSection(sec: CustomSection, host: CustomSectionsHost<any>): boolean {
+function isFirstSection<T extends { custom?: Record<string, string> }>(sec: CustomSection, host: CustomSectionsHost<T>): boolean {
     if (effectivePosition(sec, host.builtinSectionCount) !== 0) return false;
     // Slot 0 — only first iff host has zero built-ins AND sec is index 0 of slot 0.
     if (host.builtinSectionCount > 0) return false;
@@ -253,7 +254,7 @@ function isFirstSection(sec: CustomSection, host: CustomSectionsHost<any>): bool
 }
 
 /** True if `sec` is the very last section in interleaved order. */
-function isLastSection(sec: CustomSection, host: CustomSectionsHost<any>): boolean {
+function isLastSection<T extends { custom?: Record<string, string> }>(sec: CustomSection, host: CustomSectionsHost<T>): boolean {
     const builtinCount = host.builtinSectionCount;
     if (effectivePosition(sec, builtinCount) !== builtinCount) return false;
     const buckets = bucketBySlot(host);
@@ -454,23 +455,24 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
         attachTooltip(deleteBtn, 'Remove section');
         deleteBtn.addEventListener('click', (e) => {
             stop(e);
-            const choice = window.confirm(
-                `Remove section "${sec.title}"?\n\n` +
-                `OK = remove from ALL entries that share this section list.\n` +
-                `Cancel = keep section.`
-            );
-            if (!choice) return;
-            if (draft.custom) {
-                for (const entry of sec.fields) {
-                    delete draft.custom[compositeKey(sec.title, fieldName(entry))];
-                }
-                if (Object.keys(draft.custom).length === 0) draft.custom = undefined;
-            }
-            const idx = sections.indexOf(sec);
-            if (idx >= 0) sections.splice(idx, 1);
-            host.persistSections();
-            host.scheduleSave(draft);
-            host.requestRerender();
+            openConfirmModal(app, {
+                title: 'Remove Section',
+                message: `Remove "${sec.title}" from all entries that share this section list?`,
+                confirmLabel: 'Remove section',
+                onConfirm: () => {
+                    if (draft.custom) {
+                        for (const entry of sec.fields) {
+                            delete draft.custom[compositeKey(sec.title, fieldName(entry))];
+                        }
+                        if (Object.keys(draft.custom).length === 0) draft.custom = undefined;
+                    }
+                    const idx = sections.indexOf(sec);
+                    if (idx >= 0) sections.splice(idx, 1);
+                    host.persistSections();
+                    host.scheduleSave(draft);
+                    host.requestRerender();
+                },
+            });
         });
 
         header.addEventListener('click', () => {
@@ -721,7 +723,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                             host.requestRerender();
                         }));
                 }
-                menu.showAtMouseEvent(e as MouseEvent);
+                menu.showAtMouseEvent(e);
             });
 
             const removeBtn = row.createSpan({
@@ -730,17 +732,18 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
             });
             setIcon(removeBtn, 'x');
             removeBtn.addEventListener('click', () => {
-                const choice = window.confirm(
-                    `Remove "${fname}" from section "${sec.title}"?\n\n` +
-                    `OK = remove from ALL entries that share this section list.\n` +
-                    `Cancel = keep field.`
-                );
-                if (!choice) return;
-                sec.fields = sec.fields.filter(f => fieldName(f) !== fname);
-                if (draft.custom) delete draft.custom[key];
-                host.persistSections();
-                host.scheduleSave(draft);
-                host.requestRerender();
+                openConfirmModal(app, {
+                    title: 'Remove Field',
+                    message: `Remove "${fname}" from section "${sec.title}" for all entries that share this section list?`,
+                    confirmLabel: 'Remove field',
+                    onConfirm: () => {
+                        sec.fields = sec.fields.filter(f => fieldName(f) !== fname);
+                        if (draft.custom) delete draft.custom[key];
+                        host.persistSections();
+                        host.scheduleSave(draft);
+                        host.requestRerender();
+                    },
+                });
             });
         }
 
@@ -937,8 +940,6 @@ export class AddSectionFieldModal extends Modal {
                 .setCta()
                 .onClick(() => this.submit()));
 
-        // Keep a closure-stable reference for submit()
-        const self = this;
         function buildResult(): CustomFieldDef | null {
             const finalName = (nameInput?.value || name).trim();
             if (!finalName) return null;
@@ -960,12 +961,12 @@ export class AddSectionFieldModal extends Modal {
                 new Notice('Please enter a field name.');
                 return;
             }
-            self.close();
-            self.callback(result);
+            this.close();
+            this.callback(result);
         };
     }
 
-    /** Replaced inside onOpen with a closure that captures the working state. */
+    /** Replaced inside onOpen to capture modal form state at submit time. */
     private submit: () => void = () => {};
 }
-/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises */
+/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises -- end file-wide suppression for Obsidian DOM event handlers */

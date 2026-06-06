@@ -1070,7 +1070,7 @@ export class LocationView extends ItemView {
             });
             // Issue #102 — portal dropdown to <body> so position:fixed coords are
             // viewport-relative even when an ancestor uses transform/contain.
-            const msDropdown = document.body.createDiv('universal-multi-dropdown');
+            const msDropdown = activeDocument.body.createDiv('universal-multi-dropdown');
             msDropdown.setCssStyles({ display: 'none' });
             this._portaledDropdowns.push(msDropdown);
 
@@ -1794,7 +1794,7 @@ export class LocationView extends ItemView {
 
         new Setting(modal.contentEl)
             .addButton(btn => {
-                btn.setButtonText('Delete').setWarning().onClick(async () => {
+                btn.setButtonText('Delete').setDestructive().onClick(async () => {
                     // Record undo before deleting
                     const undoMgr = this.plugin.sceneManager?.undoManager;
                     if (undoMgr) {
