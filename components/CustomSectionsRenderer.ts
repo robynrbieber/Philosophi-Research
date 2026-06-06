@@ -12,7 +12,7 @@
  * so the flat custom-fields list can filter them out.
  */
 
-import { App, Modal, Notice, Setting, setIcon } from 'obsidian';
+import { App, Menu, Modal, Notice, Setting, setIcon } from 'obsidian';
 import { attachTooltip } from './Tooltip';
 
 /** Composite-key separator used to namespace fields inside custom sections. */
@@ -39,6 +39,8 @@ export interface CustomFieldDef {
     placeholder?: string;
     /** Selectable options for dropdown / multi-select types. */
     options?: string[];
+    /** Optional vault folder path whose note names are used as selectable options. */
+    folderSource?: string;
 }
 
 /**
@@ -70,6 +72,7 @@ export function normalizeField(entry: CustomFieldEntry): CustomFieldDef {
         type: entry.type ?? 'text',
         placeholder: entry.placeholder,
         options: entry.options,
+        folderSource: entry.folderSource,
     };
 }
 
@@ -124,6 +127,28 @@ function effectivePosition(sec: CustomSection, builtinCount: number): number {
 
 function compositeKey(sectionTitle: string, fieldName: string): string {
     return `${sectionTitle}${CUSTOM_SECTION_KEY_SEP}${fieldName}`;
+}
+
+function folderOptionNames(app: App, folderSource?: string): string[] {
+    const normalized = (folderSource || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+    if (!normalized) return [];
+    const prefix = normalized + '/';
+    const names = new Set<string>();
+    for (const file of app.vault.getMarkdownFiles()) {
+        const path = file.path.replace(/\\/g, '/');
+        if (path.startsWith(prefix)) names.add(file.basename);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+function selectableOptions(app: App, def: CustomFieldDef): string[] {
+    const options = new Set<string>();
+    for (const opt of def.options ?? []) {
+        const trimmed = opt.trim();
+        if (trimmed) options.add(trimmed);
+    }
+    for (const opt of folderOptionNames(app, def.folderSource)) options.add(opt);
+    return Array.from(options).sort((a, b) => a.localeCompare(b));
 }
 
 /** True for any key that belongs to a custom section (so callers can skip it
@@ -491,7 +516,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                 case 'dropdown': {
                     const sel = row.createEl('select', { cls: `${fieldInputLabel} dropdown` });
                     sel.createEl('option', { text: placeholderHint, value: '' });
-                    const opts = def.options ?? [];
+                    const opts = selectableOptions(app, def);
                     for (const opt of opts) {
                         const o = sel.createEl('option', { text: opt, value: opt });
                         if (currentValue === opt) o.selected = true;
@@ -523,7 +548,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                     let values = currentValue
                         ? currentValue.split(',').map(v => v.trim()).filter(Boolean)
                         : [];
-                    const allowed = def.options ?? [];
+                    const allowed = selectableOptions(app, def);
                     const renderPills = () => {
                         pills.empty();
                         for (let i = 0; i < values.length; i++) {
@@ -622,6 +647,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                         type: result.type ?? 'text',
                         placeholder: result.placeholder,
                         options: result.options,
+                        folderSource: result.folderSource,
                     };
                     host.persistSections();
                     host.scheduleSave(draft);
@@ -660,6 +686,42 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                 sec.fields[fIdx] = tmp;
                 host.persistSections();
                 host.requestRerender();
+            });
+
+            const moveSectionBtn = row.createSpan({
+                cls: customRemoveLabel,
+                attr: { 'aria-label': 'Move field to another section', role: 'button' },
+            });
+            setIcon(moveSectionBtn, 'move-right');
+            attachTooltip(moveSectionBtn, 'Move field to section');
+            const targets = sections.filter(target => target !== sec);
+            if (targets.length === 0) moveSectionBtn.setAttr('data-disabled', 'true');
+            moveSectionBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (moveSectionBtn.hasAttribute('data-disabled')) return;
+                const menu = new Menu();
+                for (const target of targets) {
+                    menu.addItem(item => item
+                        .setTitle(target.title)
+                        .setIcon('layout-grid')
+                        .onClick(() => {
+                            if (target.fields.some(f => fieldName(f) === fname)) {
+                                new Notice(`Field "${fname}" already exists in section "${target.title}".`);
+                                return;
+                            }
+                            const [moved] = sec.fields.splice(fIdx, 1);
+                            target.fields.push(moved);
+                            if (!draft.custom) draft.custom = {};
+                            const oldKey = compositeKey(sec.title, fname);
+                            const newKey = compositeKey(target.title, fname);
+                            draft.custom[newKey] = draft.custom[oldKey] ?? '';
+                            delete draft.custom[oldKey];
+                            host.persistSections();
+                            host.scheduleSave(draft);
+                            host.requestRerender();
+                        }));
+                }
+                menu.showAtMouseEvent(e as MouseEvent);
             });
 
             const removeBtn = row.createSpan({
@@ -702,6 +764,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                     type: result.type ?? 'text',
                     placeholder: result.placeholder,
                     options: result.options,
+                    folderSource: result.folderSource,
                 });
                 if (!draft.custom) draft.custom = {};
                 draft.custom[compositeKey(sec.title, trimmed)] = '';
@@ -797,6 +860,7 @@ export class AddSectionFieldModal extends Modal {
         let type: CustomFieldType = this.existing?.type ?? 'text';
         let placeholder = this.existing?.placeholder ?? '';
         let optionsCsv = (this.existing?.options ?? []).join(', ');
+        let folderSource = this.existing?.folderSource ?? '';
         let nameInput: HTMLInputElement | null = null;
 
         new Setting(this.contentEl)
@@ -856,6 +920,14 @@ export class AddSectionFieldModal extends Modal {
                     ta.onChange(v => { optionsCsv = v; });
                     ta.inputEl.rows = 2;
                 });
+            new Setting(optionsContainer)
+                .setName('Folder source (optional)')
+                .setDesc('Vault folder path whose note names become selectable options.')
+                .addText(text => {
+                    text.setPlaceholder('e.g. World/Traits');
+                    text.setValue(folderSource);
+                    text.onChange(v => { folderSource = v.trim(); });
+                });
         };
         refreshOptionsRow();
 
@@ -873,11 +945,13 @@ export class AddSectionFieldModal extends Modal {
             const opts = (type === 'dropdown' || type === 'multi-select')
                 ? optionsCsv.split(',').map(o => o.trim()).filter(Boolean)
                 : undefined;
+            const source = (type === 'dropdown' || type === 'multi-select') ? folderSource.trim() : '';
             return {
                 name: finalName,
                 type,
                 placeholder: placeholder.trim() || undefined,
                 options: opts && opts.length > 0 ? opts : undefined,
+                folderSource: source || undefined,
             };
         }
         this.submit = () => {

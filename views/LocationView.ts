@@ -732,19 +732,26 @@ export class LocationView extends ItemView {
             const isWorld = draft.type === 'world';
             const categories = isWorld ? WORLD_CATEGORIES : LOCATION_CATEGORIES;
             const sectionNames = categories.map(c => c.title);
+            const existingSiblings = this.plugin.fieldTemplates
+                .getBySection(category.title, 'location')
+                .map(t => ({ id: t.id, label: t.label }));
             const modal = new AddFieldModal(
                 this.app,
                 category.title,
                 null,
-                async (template) => {
+                async (template, positionAfterId) => {
                     template.category = 'location';
                     await this.plugin.fieldTemplates.add(template);
+                    if (positionAfterId !== undefined) {
+                        await this.plugin.fieldTemplates.moveAfter(template.id, positionAfterId);
+                    }
                     if (this.rootContainer) {
                         this.renderDetail(this.rootContainer);
                     }
                 },
                 undefined,
                 sectionNames,
+                existingSiblings,
             );
             modal.open();
         });
@@ -984,13 +991,19 @@ export class LocationView extends ItemView {
             const isWorld = draft.type === 'world';
             const categories = isWorld ? WORLD_CATEGORIES : LOCATION_CATEGORIES;
             const sectionNames = categories.map(c => c.title);
+            const siblings = this.plugin.fieldTemplates
+                .getBySection(tpl.section, tpl.category)
+                .map(t => ({ id: t.id, label: t.label }));
             const modal = new AddFieldModal(
                 this.app,
                 tpl.section,
                 tpl,
-                async (updated) => {
+                async (updated, positionAfterId) => {
                     updated.category = 'location';
                     await this.plugin.fieldTemplates.update(tpl.id, updated);
+                    if (positionAfterId !== undefined) {
+                        await this.plugin.fieldTemplates.moveAfter(tpl.id, positionAfterId);
+                    }
                     if (this.rootContainer) this.renderDetail(this.rootContainer);
                 },
                 async () => {
@@ -998,6 +1011,7 @@ export class LocationView extends ItemView {
                     if (this.rootContainer) this.renderDetail(this.rootContainer);
                 },
                 sectionNames,
+                siblings,
             );
             modal.open();
         });

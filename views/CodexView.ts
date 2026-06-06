@@ -838,8 +838,11 @@ export class CodexView extends ItemView {
                 this.app,
                 tpl.section,
                 tpl,
-                async (updated) => {
+                async (updated, positionAfterId) => {
                     await this.plugin.fieldTemplates.update(tpl.id, updated);
+                    if (positionAfterId !== undefined) {
+                        await this.plugin.fieldTemplates.moveAfter(tpl.id, positionAfterId);
+                    }
                     if (this.rootContainer) this.renderView(this.rootContainer);
                 },
                 async () => {

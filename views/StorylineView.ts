@@ -639,13 +639,7 @@ export class StorylineView extends ItemView {
                 const titleEl = activeDocument.createElementNS(svgNS, 'title');
                 const actStr = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
                 const seqStr = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
-                let tip = `[${actStr}-${seqStr}] ${scene.title || 'Untitled'}`;
-                if (isArcPoint) tip += ' ★ Arc Point';
-                tip += `\nPlotlines: ${(scene.tags || []).join(', ')}`;
-                if (scene.storyDate) tip += `\nDate: ${scene.storyDate}`;
-                if (scene.storyTime) tip += `\nTime: ${scene.storyTime}`;
-                tip += '\nClick to open';
-                titleEl.textContent = tip;
+                titleEl.textContent = this.buildSubwayTooltip(scene, isArcPoint, actStr, seqStr);
                 nodeEl.appendChild(titleEl);
 
                 // Story time above node (small)
@@ -714,6 +708,24 @@ export class StorylineView extends ItemView {
                 }
             }
         }
+    }
+
+    private buildSubwayTooltip(scene: Scene, isArcPoint: boolean, actStr: string, seqStr: string): string {
+        const lines: string[] = [`[${actStr}-${seqStr}] ${scene.title || 'Untitled'}`];
+        if (scene.subtitle?.trim()) lines.push(scene.subtitle.trim());
+        if (scene.synopsis?.trim()) lines.push(`Synopsis: ${this.compactTooltipText(scene.synopsis, 220)}`);
+        if (isArcPoint) lines.push('Arc Point');
+        lines.push(`Plotlines: ${(scene.tags && scene.tags.length > 0) ? scene.tags.join(', ') : 'none'}`);
+        if (scene.storyDate) lines.push(`Date: ${scene.storyDate}`);
+        if (scene.storyTime) lines.push(`Time: ${scene.storyTime}`);
+        lines.push('Click to open');
+        return lines.join('\n');
+    }
+
+    private compactTooltipText(text: string, maxLength: number): string {
+        const singleLine = text.replace(/\s+/g, ' ').trim();
+        if (singleLine.length <= maxLength) return singleLine;
+        return singleLine.slice(0, Math.max(0, maxLength - 1)).trimEnd() + '…';
     }
 
     private renderPlotline(

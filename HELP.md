@@ -212,6 +212,7 @@ Track your story's plotlines (tags) across the narrative. Two view modes are ava
 - **Gradient connectors** link shared scenes across plotlines, colored by the source tag.
 - **Act dividers** show vertical lines with act labels for structural context.
 - **Scene labels & tag pills** display below each node for quick identification.
+- **Hover details** show title, subtitle, synopsis, Arc Point status, plotlines, and story date/time when available.
 - **Drag to pan** — click and drag the map to navigate large stories.
 - **Per-tag color picker** — click the palette (🎨) icon next to any plotline header to assign a custom color. Right-click a header for "Change color" / "Reset color".
 
@@ -755,7 +756,7 @@ Open the Scene Details sidebar and check the **Arc Point** checkbox on the Detai
 
 - **Board cards** — an orange "◆ Arc Point" badge is shown below the title.
 - **StoryLine subway map** — Arc Points render as filled diamonds (◆) instead of hollow circles, making them stand out at a glance.
-- **Tooltip** — hovering a subway-map node shows "★ Arc Point" in the tooltip.
+- **Tooltip** — hovering a subway-map node includes Arc Point status along with the scene's available subtitle, synopsis, plotlines, and story date/time.
 
 ### Filtering
 
@@ -1488,6 +1489,8 @@ The multi-select type is ideal for traits, themes, categories, or any field wher
 - **Storage** — Values are saved as a YAML list in frontmatter (`universalFields`), making them queryable from Obsidian Bases and Dataview.
 
 Custom field data is stored in the entity's frontmatter under the `universalFields` key. For scenes, custom fields appear in the Inspector between the intensity slider and setup/payoff sections.
+
+Custom sections on Characters, Locations, and Codex entries use the same basic field types. Fields inside those user-created sections can be edited in place, reordered with the chevrons, moved to another custom section with the move icon, and configured with a folder source for dropdown or multi-select choices.
 
 ---
 
