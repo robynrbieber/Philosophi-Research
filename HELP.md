@@ -996,12 +996,13 @@ The Timeline View supports a **Swimlane Mode** that organizes scenes into vertic
 | Group By | Behavior |
 |----------|----------|
 | **POV** | One swimlane column per POV character |
+| **Character** | One swimlane per character listed on a scene |
 | **Location** | One swimlane per location |
-| **Tag** | One swimlane per tag/plotline |
+| **Plotline** | One swimlane per plotline/tag |
 
 ### How It Works
 
-- Scenes are placed in a **CSS grid** layout with swimlane columns.
+- Scenes are placed in a **CSS grid** layout with swimlane columns. For multi-value groups like Character and Plotline, a scene appears in every lane it belongs to.
 - Each column has a **header** showing the group name and scene count.
 - Scenes without a value for the grouping field appear in an "Ungrouped" column.
 - Swimlanes combine with the reading/chronological order toggle — scenes are sorted within each column by the active order.

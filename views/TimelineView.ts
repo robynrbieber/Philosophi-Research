@@ -24,7 +24,7 @@ type TimelineOrder = 'reading' | 'chronological';
 /**
  * Swimlane grouping options
  */
-type SwimlaneGroupBy = 'pov' | 'location' | 'tag';
+type SwimlaneGroupBy = 'pov' | 'character' | 'location' | 'plotline' | 'tag';
 
 /**
  * Timeline View - shows scenes in chronological order with optional swimlanes
@@ -161,8 +161,9 @@ export class TimelineView extends ItemView {
             groupSelect.addEventListener('keydown', (e: KeyboardEvent) => e.stopPropagation());
             const options: { value: SwimlaneGroupBy; label: string }[] = [
                 { value: 'pov', label: 'By POV' },
+                { value: 'character', label: 'By Character' },
                 { value: 'location', label: 'By Location' },
-                { value: 'tag', label: 'By Tag' },
+                { value: 'plotline', label: 'By Plotline' },
             ];
             for (const opt of options) {
                 const el = groupSelect.createEl('option', { text: opt.label });
@@ -670,17 +671,17 @@ export class TimelineView extends ItemView {
                 this.openTimeEditModal(scene);
             });
 
-            // Determine which lane this scene belongs to
+            // Determine which lane(s) this scene belongs to
             const sceneKeys = this.getSceneLaneKeys(scene);
-            const primaryLane = sceneKeys[0] || '(none)';
+            const sceneKeySet = new Set(sceneKeys);
 
             // Render one cell per lane
             for (let laneIdx = 0; laneIdx < laneKeys.length; laneIdx++) {
                 const lane = laneKeys[laneIdx];
                 const cell = grid.createDiv('swimlane-lane-cell');
 
-                if (lane === primaryLane) {
-                    // This lane gets the scene card
+                if (sceneKeySet.has(lane)) {
+                    // Multi-value groups (characters / plotlines) render the scene in every matching lane.
                     this.renderSwimlaneCard(cell, scene);
                 }
                 // else: empty cell — visual gap
@@ -695,14 +696,27 @@ export class TimelineView extends ItemView {
         switch (this.swimlaneGroupBy) {
             case 'pov':
                 return [scene.pov || '(no POV)'];
+            case 'character':
+                if (scene.characters && scene.characters.length > 0) return this.cleanLaneKeys(scene.characters);
+                return ['(no character)'];
             case 'location':
                 return [scene.location || '(no location)'];
+            case 'plotline':
             case 'tag':
-                if (scene.tags && scene.tags.length > 0) return [scene.tags[0]];
-                return ['(no tag)'];
+                if (scene.tags && scene.tags.length > 0) return this.cleanLaneKeys(scene.tags);
+                return ['(no plotline)'];
             default:
                 return ['(none)'];
         }
+    }
+
+    private cleanLaneKeys(values: string[]): string[] {
+        const seen = new Set<string>();
+        for (const value of values) {
+            const trimmed = String(value || '').trim();
+            if (trimmed) seen.add(trimmed);
+        }
+        return Array.from(seen);
     }
 
     /**
@@ -741,12 +755,15 @@ export class TimelineView extends ItemView {
         if (this.swimlaneGroupBy !== 'pov' && scene.pov) {
             meta.createSpan({ cls: 'timeline-card-pov', text: `POV: ${scene.pov}` });
         }
+        if (this.swimlaneGroupBy !== 'character' && scene.characters?.length) {
+            meta.createSpan({ cls: 'timeline-card-pov', text: scene.characters.join(', ') });
+        }
         if (this.swimlaneGroupBy !== 'location' && scene.location) {
             const locSpan = meta.createSpan({ cls: 'timeline-card-location' });
             obsidian.setIcon(locSpan, 'map-pin');
             locSpan.appendText(' ' + scene.location);
         }
-        if (this.swimlaneGroupBy !== 'tag' && scene.tags?.length) {
+        if (this.swimlaneGroupBy !== 'plotline' && this.swimlaneGroupBy !== 'tag' && scene.tags?.length) {
             meta.createSpan({ cls: 'timeline-card-pov', text: scene.tags.join(', ') });
         }
 

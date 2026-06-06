@@ -6,6 +6,13 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.21
+
+### Changes
+
+- **Timeline swimlanes by character and plotline** *([#154](https://github.com/PixeroJan/obsidian-storyline/issues/154))* — Swimlane mode can now group by scene characters or plotlines, and scenes with multiple values appear in each matching lane. This is scene-based, using existing scene character and tag fields.
+
+---
 ## Version 1.10.20
 
 ### Changes

@@ -56,7 +56,7 @@ Act and chapter divider bands show where story sections begin and end. Scene row
 
 ### Timeline View
 
-Chronological scene timeline with visual markers for intensity, status, and duration. Supports swimlane grouping by act, chapter, POV, or location.
+Chronological scene timeline with visual markers for intensity, status, and duration. Supports swimlane grouping by POV, character, location, or plotline.
 
 ![Timeline View — Overview](screenshots/03.Timeline.jpg)
 
