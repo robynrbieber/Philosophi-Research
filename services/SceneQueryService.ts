@@ -350,7 +350,7 @@ export class SceneQueryService {
                     if (cmp === 0) cmp = (a.sequence ?? 9999) - (b.sequence ?? 9999);
                     break;
                 case 'chronologicalOrder':
-                    cmp = (a.chronologicalOrder ?? a.sequence ?? 9999) - (b.chronologicalOrder ?? b.sequence ?? 9999);
+                    cmp = this.compareChronological(a, b);
                     break;
                 case 'storyDate': {
                     // Sort by storyDate + storyTime; fall back to chronologicalOrder then sequence
@@ -400,6 +400,35 @@ export class SceneQueryService {
             }
             return cmp * dir;
         });
+    }
+
+    private compareChronological(a: Scene, b: Scene): number {
+        if (a.chronologicalOrder != null || b.chronologicalOrder != null) {
+            const cmp = (a.chronologicalOrder ?? Number.MAX_SAFE_INTEGER) - (b.chronologicalOrder ?? Number.MAX_SAFE_INTEGER);
+            if (cmp !== 0) return cmp;
+        }
+
+        const aDate = this.getStoryDateKey(a);
+        const bDate = this.getStoryDateKey(b);
+        if (aDate || bDate) {
+            if (!aDate) return 1;
+            if (!bDate) return -1;
+            const cmp = aDate.localeCompare(bDate);
+            if (cmp !== 0) return cmp;
+        }
+
+        const actCmp = compareActChapter(a.act, b.act);
+        if (actCmp !== 0) return actCmp;
+        const chapterCmp = compareActChapter(a.chapter, b.chapter);
+        if (chapterCmp !== 0) return chapterCmp;
+        return (a.sequence ?? 9999) - (b.sequence ?? 9999);
+    }
+
+    private getStoryDateKey(scene: Scene): string {
+        const date = (scene.storyDate || scene.timeline || '').trim();
+        const time = (scene.storyTime || '').trim();
+        if (!date && !time) return '';
+        return `${date} ${time}`.trim();
     }
 }
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- end of file-wide suppression block opened at line 1 */

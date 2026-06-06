@@ -249,7 +249,7 @@ export class TimelineView extends ItemView {
         if (existing) existing.remove();
 
         const timelineEl = container.createDiv('story-line-timeline');
-        const sortField = this.timelineOrder === 'chronological' ? 'storyDate' : 'chapter';
+        const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
         const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: sortField, direction: 'asc' }
@@ -558,7 +558,7 @@ export class TimelineView extends ItemView {
 
         const timelineEl = container.createDiv('story-line-timeline swimlane-timeline');
         enableDragToPan(timelineEl);
-        const sortField = this.timelineOrder === 'chronological' ? 'storyDate' : 'chapter';
+        const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
         const scenes = this.sceneManager.queryService.getFilteredScenes(
             undefined,
             { field: sortField, direction: 'asc' }

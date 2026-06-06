@@ -14,6 +14,8 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 - **Obsidian community scanner cleanup** — Raised the declared minimum Obsidian version for the supported destructive-button API and removed an unused scene-status import flagged by the scanner.
 
+- **Timeline chronological ordering follow-up** *([#136](https://github.com/PixeroJan/obsidian-storyline/issues/136))* — Chronological Order now respects manual C-number ordering first, then Story Date/Time, then reading order, so drag-reordering and date edits both affect the Timeline view predictably.
+
 ---
 ## Version 1.10.22
 
