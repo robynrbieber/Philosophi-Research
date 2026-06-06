@@ -6,13 +6,21 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.24
+
+### Bug Fixes
+
+- This update prepares StoryLine for Obsidian community plugin review, with cleaner compatibility checks and a small Timeline ordering follow-up.
+
+---
+
 ## Version 1.10.23
 
 ### Bug Fixes
 
 - **CJK word-count fallback follow-up** *([#138](https://github.com/PixeroJan/obsidian-storyline/issues/138))* — Default Project Language now keeps projects without a `language:` field on the global fallback, updates active projects that still used the previous default, and applies Auto-detect from the actual scene body when recounting scene-card word counts.
 
-- **Obsidian community scanner cleanup** — Raised the declared minimum Obsidian version for the supported destructive-button API and removed an unused scene-status import flagged by the scanner.
+- **Obsidian community scanner cleanup** — Raised the declared minimum Obsidian version to 1.13.0 for the supported destructive-button API and removed an unused scene-status import flagged by the scanner.
 
 - **Timeline chronological ordering follow-up** *([#136](https://github.com/PixeroJan/obsidian-storyline/issues/136))* — Chronological Order now respects manual C-number ordering first, then Story Date/Time, then reading order, so drag-reordering and date edits both affect the Timeline view predictably.
 
