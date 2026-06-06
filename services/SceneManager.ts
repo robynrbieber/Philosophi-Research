@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { StoryLineProject, deriveProjectFolders, deriveProjectFoldersFromFilePath } from '../models/StoryLineProject';
 import { MetadataParser, setWordcountLocale } from './MetadataParser';
-import { normalizeStoryLineLocale, resolveLocale, DEFAULT_STORYLINE_LOCALE, AUTO_DETECT_LOCALE } from '../utils/locale';
+import { normalizeStoryLineLocale, resolveLocale, DEFAULT_STORYLINE_LOCALE, AUTO_DETECT_LOCALE, type StoryLineLocale } from '../utils/locale';
 import { UndoManager } from './UndoManager';
 import { SceneQueryService, ISceneStore } from './SceneQueryService';
 import { formatActChapterPrefix, sanitizeActChapterForPath, compareActChapter } from '../utils/actChapter';
@@ -311,18 +311,22 @@ export class SceneManager implements ISceneStore {
      * `MetadataParser.countWords` tokenises with the right script profile.
      * Falls back to the global default-language setting, then English.
      */
-    private applyActiveProjectLocale(): void {
+    public getEffectiveLocale(sampleText = ''): StoryLineLocale {
         const projectLocale = this._activeProject?.locale;
         const settingsDefault = (this.plugin.settings as { defaultProjectLanguage?: string }).defaultProjectLanguage;
         const stored = projectLocale ?? settingsDefault ?? DEFAULT_STORYLINE_LOCALE;
         if (stored === AUTO_DETECT_LOCALE) {
-            // Sample a chunk of the project description; deeper scene-text
-            // sampling happens lazily once scenes are indexed.
-            const sample = this._activeProject?.description ?? '';
-            setWordcountLocale(resolveLocale(stored, sample, DEFAULT_STORYLINE_LOCALE));
-        } else {
-            setWordcountLocale(normalizeStoryLineLocale(stored));
+            const sample = sampleText || this._activeProject?.description || '';
+            return sample ? resolveLocale(stored, sample, DEFAULT_STORYLINE_LOCALE) : AUTO_DETECT_LOCALE;
         }
+        return normalizeStoryLineLocale(stored);
+    }
+
+    private applyActiveProjectLocale(): void {
+        const projectLocale = this._activeProject?.locale;
+        const settingsDefault = (this.plugin.settings as { defaultProjectLanguage?: string }).defaultProjectLanguage;
+        const stored = projectLocale ?? settingsDefault ?? DEFAULT_STORYLINE_LOCALE;
+        setWordcountLocale(normalizeStoryLineLocale(stored));
     }
 
     /**
@@ -593,7 +597,9 @@ export class SceneManager implements ISceneStore {
                 description: content.slice(fmMatch[0].length).trim(),
                 // Issue: multi-language support — accept both `language:` (preferred)
                 // and `storyline-locale:` (community PR #90 spelling) for forward/back compat.
-                locale: normalizeStoryLineLocale(fm.language ?? fm['storyline-locale'] ?? ''),
+                locale: (fm.language || fm['storyline-locale'])
+                    ? normalizeStoryLineLocale(fm.language ?? fm['storyline-locale'])
+                    : undefined,
                 ...folders,
                 definedActs: Array.isArray(fm.acts) ? fm.acts.map(Number).filter((n: number) => !isNaN(n)) : [],
                 definedChapters: Array.isArray(fm.chapters) ? fm.chapters.map(Number).filter((n: number) => !isNaN(n)) : [],

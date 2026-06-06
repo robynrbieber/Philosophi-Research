@@ -135,7 +135,7 @@ export class SplitSceneModal extends Modal {
 
         const partA = body.substring(0, this.splitOffset).trim();
         const partB = body.substring(this.splitOffset).trim();
-        const splitLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const splitLocale = this.plugin.sceneManager?.getEffectiveLocale(body) ?? DEFAULT_STORYLINE_LOCALE;
         const wordCountA = partA ? tokenizeWords(partA, splitLocale).length : 0;
         const wordCountB = partB ? tokenizeWords(partB, splitLocale).length : 0;
 

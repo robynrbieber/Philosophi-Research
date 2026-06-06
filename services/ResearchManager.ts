@@ -146,7 +146,7 @@ export class ResearchManager {
         }
 
         if (query.trim()) {
-            const locale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+            const locale = this.plugin.sceneManager?.getEffectiveLocale(query) ?? DEFAULT_STORYLINE_LOCALE;
             const terms = tokenizeWords(query.toLowerCase(), locale).filter(Boolean);
             results = results.filter(post => {
                 const haystack = `${post.title} ${post.body} ${post.tags.join(' ')}`.toLowerCase();

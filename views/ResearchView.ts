@@ -450,7 +450,7 @@ export class ResearchView extends ItemView {
         // Title words — locale-aware tokenisation. For scriptio-continua
         // scripts (CJK, Thai) a 2-char minimum is more meaningful than 3.
         if (scene.title) {
-            const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+            const locale: StoryLineLocale = this.plugin.sceneManager?.getEffectiveLocale(scene.title) ?? DEFAULT_STORYLINE_LOCALE;
             const minLen = isScriptioContinuaLocale(locale) ? 2 : 3;
             tokenizeWords(scene.title, locale).filter(w => w.length >= minLen).forEach(w => keywords.push(w));
         }

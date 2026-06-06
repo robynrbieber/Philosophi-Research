@@ -100,7 +100,7 @@ export default class SceneCardsPlugin extends Plugin {
         this.codexManager = new CodexManager(this.app);
         this.snapshotManager = new SnapshotManager(
             this.app,
-            () => this.sceneManager?.activeProject?.locale
+            () => this.sceneManager?.getEffectiveLocale()
                 ?? this.settings.defaultProjectLanguage
                 ?? 'en',
         );
@@ -867,7 +867,7 @@ export default class SceneCardsPlugin extends Plugin {
             comments: this.settings.excludeCommentsFromWordcount !== false,
             checklists: this.settings.excludeChecklistFromWordcount === true,
         });
-        setWordcountLocale(normalizeStoryLineLocale(this.sceneManager?.activeProject?.locale ?? this.settings.defaultProjectLanguage));
+        setWordcountLocale(normalizeStoryLineLocale(this.sceneManager?.getEffectiveLocale() ?? this.settings.defaultProjectLanguage));
         const toSave: Record<string, unknown> = { ...this.settings };
         if (this._systemMigrationDone) {
             // Strip per-project data from the global data.json payload

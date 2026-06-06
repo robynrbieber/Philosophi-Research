@@ -3,7 +3,7 @@ import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } f
 import { App, TFile, parseYaml, stringifyYaml } from 'obsidian';
 import { Scene, SceneStatus, TIMELINE_MODES, TimelineMode } from '../models/Scene';
 import { coerceString } from '../utils/narrow';
-import { tokenizeWords, DEFAULT_STORYLINE_LOCALE, type StoryLineLocale } from '../utils/locale';
+import { tokenizeWords, DEFAULT_STORYLINE_LOCALE, resolveLocale, type StoryLineLocale } from '../utils/locale';
 
 /**
  * Issue #73 — frontmatter scene fields that point at other entities (scenes,
@@ -459,7 +459,7 @@ export class MetadataParser {
             .replace(/[*_~`]/g, '')
             .trim();
         if (!cleaned) return 0;
-        return tokenizeWords(cleaned, _wordcountLocale).length;
+        return tokenizeWords(cleaned, resolveLocale(_wordcountLocale, cleaned, DEFAULT_STORYLINE_LOCALE)).length;
     }
 
     /**

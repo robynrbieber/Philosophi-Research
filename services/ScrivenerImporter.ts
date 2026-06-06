@@ -1466,7 +1466,7 @@ export class ScrivenerImporter {
             fm.compile = false;
         }
 
-        const importLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const importLocale = this.plugin.sceneManager?.getEffectiveLocale() ?? DEFAULT_STORYLINE_LOCALE;
         const wordcount = body ? tokenizeWords(body, importLocale).length : 0;
         fm.wordcount = wordcount;
 

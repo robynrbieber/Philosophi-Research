@@ -7,7 +7,7 @@ import type { UniversalFieldTemplate } from './services/FieldTemplateService';
 import { ColorCodingMode, CustomStatusDef, SceneStatus, SceneTemplate, ViewType, getStatusConfig, getStatusOrder, registerCustomStatuses } from './models/Scene';
 import { App, Modal, Notice, PluginSettingTab, Setting, TFolder, TextAreaComponent, AbstractInputSuggest } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { SUPPORTED_STORYLINE_LOCALES } from './utils/locale';
+import { SUPPORTED_STORYLINE_LOCALES, normalizeStoryLineLocale } from './utils/locale';
 
 // ═══════════════════════════════════════════════════════
 //  COLOR PALETTES — Catppuccin + Mood-based
@@ -1519,7 +1519,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         // ── Multi-language support — default project language ──
         new Setting(containerEl)
             .setName('Default project language')
-            .setDesc('BCP-47 tag used for word counting, reading time, dialogue %, stop-word filtering and PDF line wrapping. Choose Auto-detect to infer the script from manuscript text. Existing projects keep whatever `language:` value is in their frontmatter; set per-project by editing that key.')
+            .setDesc('BCP-47 tag used for word counting, reading time, dialogue %, stop-word filtering and PDF line wrapping. Choose Auto-detect to infer the script from manuscript text. Existing projects that still use the old default are updated too; otherwise set per-project by editing `language:` in the project frontmatter.')
             .addDropdown(dropdown => {
                 dropdown.addOption('auto', 'Auto-detect from text');
                 for (const { code, label } of SUPPORTED_STORYLINE_LOCALES) {
@@ -1527,18 +1527,30 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 }
                 dropdown.setValue(this.plugin.settings.defaultProjectLanguage ?? 'en');
                 dropdown.onChange(async (value) => {
+                    const previousDefault = this.plugin.settings.defaultProjectLanguage ?? 'en';
                     this.plugin.settings.defaultProjectLanguage = value;
-                    await this.plugin.saveSettings();
-                    // If no project is active yet, push the chosen locale to the
-                    // module-level word-count tokeniser so brand-new scenes count
-                    // correctly. When a project IS active, its own `language:`
-                    // wins — don't override it here.
-                    if (!this.plugin.sceneManager?.activeProject) {
+                    const activeProject = this.plugin.sceneManager?.activeProject;
+                    let reindexScenes = false;
+
+                    if (activeProject) {
+                        const projectLocale = activeProject.locale ? normalizeStoryLineLocale(activeProject.locale) : '';
+                        const previousLocale = normalizeStoryLineLocale(previousDefault);
+                        if (!projectLocale || projectLocale === previousLocale) {
+                            activeProject.locale = value;
+                            await this.plugin.sceneManager.saveProjectFrontmatter(activeProject);
+                            reindexScenes = true;
+                        }
+                    } else {
                         try {
-                            const { normalizeStoryLineLocale } = await import('./utils/locale');
                             const { setWordcountLocale } = await import('./services/MetadataParser');
                             setWordcountLocale(normalizeStoryLineLocale(value));
                         } catch { /* non-fatal */ }
+                    }
+
+                    await this.plugin.saveSettings();
+                    if (reindexScenes) {
+                        await this.plugin.sceneManager.initialize();
+                        this.plugin.refreshOpenViews();
                     }
                 });
             });

@@ -168,7 +168,7 @@ export class StatsView extends ItemView {
 
         // Estimated reading time — multi-language aware. Latin/Cyrillic
         // scripts use words/min; CJK/Thai use characters/min for sanity.
-        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const locale: StoryLineLocale = this.plugin.sceneManager?.getEffectiveLocale() ?? DEFAULT_STORYLINE_LOCALE;
         const wpm = getReadingWordsPerMinute(locale);
         const cpm = getReadingCharactersPerMinute(locale);
         let readMinutes: number;
@@ -1066,7 +1066,7 @@ export class StatsView extends ItemView {
         const withBody = allScenes.filter(s => s.body && s.body.trim().length > 0);
         if (withBody.length === 0) return;
 
-        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const locale: StoryLineLocale = this.plugin.sceneManager?.getEffectiveLocale() ?? DEFAULT_STORYLINE_LOCALE;
         let totalDlg = 0;
         let totalAll = 0;
         const actDlg: Record<string, { dialogue: number; total: number }> = {};
@@ -1161,7 +1161,7 @@ export class StatsView extends ItemView {
         // Flesch metrics are English-specific. For non-Latin scripts the
         // computeReadability path returns 0 — show "N/A" instead of a
         // misleading numeric grade.
-        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const locale: StoryLineLocale = this.plugin.sceneManager?.getEffectiveLocale() ?? DEFAULT_STORYLINE_LOCALE;
         const fkSupported = supportsSyllableMetrics(locale);
         this.createStatCard(row, 'graduation-cap', 'FK Grade', fkSupported ? String(readability.fleschKincaidGrade) : 'N/A');
         this.createStatCard(row, 'book', 'Reading Ease', fkSupported ? String(readability.fleschReadingEase) : 'N/A');
@@ -1213,7 +1213,7 @@ export class StatsView extends ItemView {
     // ── Readability helpers ────────────────────────────
 
     private computeReadability(text: string): ReadabilityResult {
-        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const locale: StoryLineLocale = this.plugin.sceneManager?.getEffectiveLocale() ?? DEFAULT_STORYLINE_LOCALE;
         const clean = text
             .replace(/^---[\s\S]*?---/gm, '')
             .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
@@ -1270,7 +1270,7 @@ export class StatsView extends ItemView {
     }
 
     private computeWordFrequency(text: string): [string, number][] {
-        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const locale: StoryLineLocale = this.plugin.sceneManager?.getEffectiveLocale() ?? DEFAULT_STORYLINE_LOCALE;
         const clean = text
             .replace(/^---[\s\S]*?---/gm, '')
             .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
@@ -1316,7 +1316,7 @@ export class StatsView extends ItemView {
     }
 
     private computeEchoes(scenes: Scene[]): { echoes: EchoCluster[]; perScene: SceneEchoReport[] } {
-        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const locale: StoryLineLocale = this.plugin.sceneManager?.getEffectiveLocale() ?? DEFAULT_STORYLINE_LOCALE;
         const stop = getStopWords(locale);
 
         const echoes: EchoCluster[] = [];
@@ -1409,7 +1409,7 @@ export class StatsView extends ItemView {
     }
 
     private extractWords(text: string): string[] {
-        const locale: StoryLineLocale = this.plugin.sceneManager?.activeProject?.locale ?? DEFAULT_STORYLINE_LOCALE;
+        const locale: StoryLineLocale = this.plugin.sceneManager?.getEffectiveLocale() ?? DEFAULT_STORYLINE_LOCALE;
         const clean = text
             .replace(/^---[\s\S]*?---/gm, '')
             .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
