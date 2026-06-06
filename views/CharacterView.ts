@@ -2505,7 +2505,7 @@ export class CharacterView extends ItemView {
         new Setting(modal.contentEl)
             .addButton(btn => {
                 btn.setButtonText('Delete')
-                    .setDestructive()
+                    .setClass('mod-warning')
                     .onClick(async () => {
                         // Record undo before deleting
                         const undoMgr = this.plugin.sceneManager?.undoManager;

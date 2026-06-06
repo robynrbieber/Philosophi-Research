@@ -52,7 +52,7 @@ export function openConfirmModal(app: App, opts: ConfirmModalOptions): void {
             if (opts.confirmClass === 'mod-cta') {
                 b.setCta();
             } else {
-                b.setDestructive();
+                b.setClass(opts.confirmClass ?? 'mod-warning');
             }
             b.onClick(async () => {
                 modal.close();

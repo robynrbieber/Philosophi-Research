@@ -1794,7 +1794,7 @@ export class LocationView extends ItemView {
 
         new Setting(modal.contentEl)
             .addButton(btn => {
-                btn.setButtonText('Delete').setDestructive().onClick(async () => {
+                btn.setButtonText('Delete').setClass('mod-warning').onClick(async () => {
                     // Record undo before deleting
                     const undoMgr = this.plugin.sceneManager?.undoManager;
                     if (undoMgr) {

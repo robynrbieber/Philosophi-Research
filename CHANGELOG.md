@@ -6,6 +6,14 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.26
+
+### Bug Fixes
+
+- **Mobile compatibility** — Restored compatibility with the current public iOS App Store version of Obsidian while keeping scanner-safe warning buttons for delete/remove actions.
+
+---
+
 ## Version 1.10.25
 
 ### Bug Fixes

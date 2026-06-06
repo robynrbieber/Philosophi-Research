@@ -1516,7 +1516,7 @@ export class CodexView extends ItemView {
         new Setting(modal.contentEl)
             .addButton(btn => btn
                 .setButtonText('Delete')
-                .setDestructive()
+                .setClass('mod-warning')
                 .onClick(async () => {
                     modal.close();
                     try {
