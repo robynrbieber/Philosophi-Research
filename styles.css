@@ -2041,9 +2041,6 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     font-style: italic;
     text-align: center;
 }
-.inspector-notes-live.is-editing {
-    /* editor mode — textarea fills this */
-}
 
 /* --- Snapshots --- */
 .inspector-snapshots { margin-top: 10px; }
@@ -8968,6 +8965,7 @@ body /* Clamp title on mobile too, in case it's very long */
     padding: 2px 8px 6px;
     line-height: 1.35;
     display: -webkit-box;
+    line-clamp: 4;
     -webkit-line-clamp: 4;
     -webkit-box-orient: vertical;
     overflow: hidden;
@@ -11110,10 +11108,8 @@ body /* ── Plain-text mode: hide link/tag decorations ───────�
 }
 
 /* -- ManuscriptView focus mode (CSS variables driven from settings) -- */
-body.sl-focus-active-global {
-    /* CSS variables --sl-focus-opacity, --sl-focus-darken-filter, --sl-focus-blur-filter, --sl-focus-bg
-       are set programmatically on the body element when focus mode is active. */
-}
+/* CSS variables --sl-focus-opacity, --sl-focus-darken-filter, --sl-focus-blur-filter, --sl-focus-bg
+    are set programmatically on the body element when focus mode is active. */
 
 
 /* StoryLine focus-mode static rules; values driven from CSS custom properties set in JS. */
@@ -11459,9 +11455,6 @@ body.sl-focus-active-global .titlebar {
     color: var(--text-muted);
     font-style: italic;
     text-align: center;
-}
-.sl-info-notes-live.is-editing {
-    /* editor mode — textarea fills this */
 }
 
 /* Dedicated Synopsis / Notes inspector tabs: full-width, full-height,
