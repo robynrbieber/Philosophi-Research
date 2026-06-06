@@ -496,7 +496,7 @@ Each scene is a Markdown file with YAML frontmatter. StoryLine manages these fie
 | `setup_scenes` | Scenes this sets up | `["path/to/scene.md"]` |
 | `payoff_scenes` | Scenes that pay off this one | `["path/to/scene.md"]` |
 
-**Status progression:** `idea` → `outlined` → `draft` → `written` → `revised` → `final`
+**Status progression:** `idea` → `outlined` → `draft` → `written` → `revised` → `final`. Custom statuses can be added in Settings. Enable **Counts as written** on a custom status if it should be included in character writing-progress bars.
 
 **References as wikilinks** *(since 1.9.6)* — `pov`, `location`, `characters`, `setup_scenes` and `payoff_scenes` are written as Obsidian `[[wikilinks]]` by default so they auto-update when you rename a character or scene. Plain-text values still work — readers accept either form. Toggle the writer at **Settings → Write scene references as wikilinks**.
 
@@ -552,7 +552,7 @@ Click any scene card to open the **Inspector Panel** on the right side. It provi
 - **Characters** — add/remove characters with autocomplete and tag-pill inputs.
 - **Codex sections** — any Codex category enabled for the Inspector (via Codex → Manage Categories) appears as a tag-pill input below the Location field. Add or remove linked Codex entries with autocomplete from your category’s entries.
 - **Tags** — manage plotline tags with autocomplete, color-coded tag badges when tag colors are configured.
-- **Notes** — editorial notes field for author comments and reminders. Type `[[` to get an inline wikilink autocomplete *(new in 1.9.9)* — pick a note with **↑/↓ + Enter** (or click) to drop a `[[Note Name]]` link straight into your comment.
+- **Notes** — editorial notes for author comments and reminders. StoryLine stores scene notes in a separate notes file named `Scene Title - Notes.md` and links it from the scene frontmatter with `notesFile`. Type `[[` to get an inline wikilink autocomplete *(new in 1.9.9)* — pick a note with **↑/↓ + Enter** (or click) to drop a `[[Note Name]]` link straight into your comment.
 - **Custom Fields** — values for any [Custom Scene Fields](#custom-scene-fields) you've defined for the project. Click the **+** button on the section header to create a new field on the fly, or the pencil button next to a field to edit / delete it.
 - **Snapshots** — save and restore point-in-time versions of the scene.
 - **Word count** — current vs. target with progress indicator.
@@ -733,9 +733,11 @@ In the Navigator, Timeline, and Plotlines views you can toggle between **Reading
 
 ## Scene Notes
 
-Each scene has an optional **notes** field for editorial comments, reminders, and revision notes:
+Each scene can have an external **notes file** for editorial comments, reminders, and revision notes:
 
 - Edit notes in the **Inspector Panel** under the Notes section.
+- StoryLine creates the notes file when you first edit notes for a scene. New notes files are named `Scene Title - Notes.md` and saved in the project's scene notes folder.
+- The scene stores a `notesFile` link in frontmatter so StoryLine can reopen the same notes file later. Older inline `notes` frontmatter is still read as a fallback.
 - Notes are separate from the scene body — they're for author-facing comments that won't appear in the manuscript.
 - Notes are included in **outline exports** (Markdown, JSON, CSV) so you can share them with editors.
 - Type `[[` *(new in 1.9.9)* to get inline wikilink autocomplete — link to characters, locations, research notes, or anything else in your vault directly from the comments field.

@@ -1060,6 +1060,18 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 });
 
+                const writtenLabel = row.createEl('label');
+                writtenLabel.setCssStyles({ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', whiteSpace: 'nowrap' });
+                const writtenCheckbox = writtenLabel.createEl('input', { type: 'checkbox' });
+                writtenCheckbox.checked = def.countsAsWritten === true;
+                writtenLabel.createSpan({ text: 'Counts as written' });
+                writtenCheckbox.addEventListener('change', async () => {
+                    def.countsAsWritten = writtenCheckbox.checked;
+                    registerCustomStatuses(this.plugin.settings.customStatuses);
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
+                });
+
                 const removeBtn = row.createEl('button', { text: '×', cls: 'clickable-icon' });
                 removeBtn.addEventListener('click', async () => {
                     defs.splice(i, 1);
@@ -1096,6 +1108,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                         label: name,
                         color: '#607D8B',
                         icon: 'circle',
+                        countsAsWritten: false,
                     });
                     registerCustomStatuses(this.plugin.settings.customStatuses);
                     await this.plugin.saveSettings();

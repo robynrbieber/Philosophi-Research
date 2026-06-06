@@ -6,6 +6,18 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.25
+
+### Bug Fixes
+
+- **Custom scene statuses in writing progress** *([#156](https://github.com/PixeroJan/obsidian-storyline/issues/156))* — Custom statuses can now be marked as counting as written, so profile progress bars include statuses such as Published or Live when you choose.
+
+- **Safer scene notes files** *([#157](https://github.com/PixeroJan/obsidian-storyline/issues/157))* — Scene notes are now created as separate notes files when edited and use a clearer `Scene Title - Notes.md` filename to avoid conflicts with scene files and block references.
+
+- **Scene title and filename sync** *([#155](https://github.com/PixeroJan/obsidian-storyline/issues/155))* — Renaming scene titles and scene files now stays better aligned, while setup/payoff references are updated when a manual scene filename rename changes the scene title.
+
+---
+
 ## Version 1.10.24
 
 ### Bug Fixes

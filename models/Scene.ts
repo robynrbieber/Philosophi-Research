@@ -15,6 +15,7 @@ export interface CustomStatusDef {
     label: string;
     color: string;
     icon: string;
+    countsAsWritten?: boolean;
 }
 
 /**
@@ -741,5 +742,12 @@ export function getStatusOrder(): SceneStatus[] {
 export function resolveStatusCfg(status: string): { label: string; color: string; icon: string } {
     const cfg = getStatusConfig();
     return cfg[status] ?? { label: status.charAt(0).toUpperCase() + status.slice(1), color: DEFAULT_STATUS_CFG.color, icon: DEFAULT_STATUS_CFG.icon };
+}
+
+/** Return true when a status should count as written for progress summaries. */
+export function isWrittenLikeStatus(status: string | undefined): boolean {
+    if (!status) return false;
+    if (status === 'written' || status === 'revised' || status === 'final') return true;
+    return _customStatuses.some(cs => cs.id === status && cs.countsAsWritten === true);
 }
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- end of file-wide suppression block opened at line 1 */

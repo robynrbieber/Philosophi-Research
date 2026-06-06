@@ -170,15 +170,8 @@ export class InspectorComponent {
             const val = titleInput.value.trim();
             if (val && val !== scene.title) {
                 const oldTitle = scene.title;
-                // Rename the file to match the new title
                 const oldPath = scene.filePath;
-                const dir = oldPath.substring(0, oldPath.lastIndexOf('/'));
-                const newPath = `${dir}/${val}.md`;
-                const file = this.plugin.app.vault.getAbstractFileByPath(oldPath);
-                if (file) {
-                    await this.plugin.app.fileManager.renameFile(file, newPath);
-                }
-                await this.sceneManager.updateScene(newPath, { title: val });
+                const newPath = await this.sceneManager.updateScene(oldPath, { title: val }) || oldPath;
                 scene.title = val;
                 scene.filePath = newPath;
 

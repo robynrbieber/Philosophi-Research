@@ -25,7 +25,7 @@ import { renderCodexCategoryTabs } from '../components/CodexCategoryTabs';
 import { ItemView, Modal, Notice, Setting, TFile, WorkspaceLeaf } from 'obsidian';
 import { CHARACTER_CATEGORIES, CHARACTER_ROLES, Character, CharacterFieldDef, CharacterRelation, CharacterRelationCategory, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, RoleEntry, TagType, computeReciprocalUpdates, extractCharacterLocationTags, extractCharacterProps, getPrimaryRole, getRoleDisplay, getRoleList, normalizeCharacterRelations } from '../models/Character';
 import { CHARACTER_VIEW_TYPE } from '../constants';
-import { Scene, resolveStatusCfg } from '../models/Scene';
+import { Scene, isWrittenLikeStatus, resolveStatusCfg } from '../models/Scene';
 import { coerceString } from '../utils/narrow';
 
 /**
@@ -2142,7 +2142,7 @@ export class CharacterView extends ItemView {
         // Writing progress
         const totalScenes = allCharScenes.length;
         const completedScenes = allCharScenes
-            .filter(s => s.status === 'written' || s.status === 'revised' || s.status === 'final')
+            .filter(s => isWrittenLikeStatus(s.status))
             .length;
 
         if (totalScenes > 0) {

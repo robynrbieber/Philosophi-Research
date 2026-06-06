@@ -827,7 +827,7 @@ export class SceneManager implements ISceneStore {
     /**
      * Update an existing scene's metadata
      */
-    async updateScene(filePath: string, updates: Partial<Scene>): Promise<void> {
+    async updateScene(filePath: string, updates: Partial<Scene>): Promise<string | void> {
         const file = this.app.vault.getAbstractFileByPath(filePath);
         if (!file || !(file instanceof TFile)) {
             new Notice('Scene file not found');
@@ -850,11 +850,23 @@ export class SceneManager implements ISceneStore {
             this.bumpVersion(filePath);
         }
 
+        let currentPath = filePath;
+
         // If the act changed, relocate the file to the correct Act folder and
         // update the act prefix in the filename.
         if (updates.act !== undefined && oldSnap && updates.act !== oldSnap.act) {
-            await this.relocateSceneForAct(filePath, updates.act);
+            currentPath = await this.relocateSceneForAct(filePath, updates.act);
         }
+
+        if (
+            updates.title !== undefined ||
+            updates.sequence !== undefined ||
+            (updates.act !== undefined && oldSnap && updates.act !== oldSnap.act)
+        ) {
+            currentPath = await this.syncSceneFileName(currentPath);
+        }
+
+        return currentPath;
     }
 
     /**
@@ -915,6 +927,64 @@ export class SceneManager implements ISceneStore {
         }
         this.bumpVersion(newPath);
 
+        return newPath;
+    }
+
+    private getSceneSafeTitle(title: string | undefined): string {
+        return (title || 'Untitled')
+            .replace(/[\\/:*?"<>|]/g, '-')
+            .substring(0, 60)
+            .trim() || 'Untitled';
+    }
+
+    private getSceneFileNameForMetadata(scene: Scene, currentFile: TFile): string {
+        const safeTitle = this.getSceneSafeTitle(scene.title);
+        const hasPrefix = /^([^\s/-]+)-(\d{2})\s/.test(currentFile.name);
+        if (hasPrefix || scene.sequence !== undefined || scene.act !== undefined) {
+            const actStr = formatActChapterPrefix(scene.act, '00');
+            const seqStr = scene.sequence !== undefined
+                ? String(scene.sequence).padStart(2, '0')
+                : '00';
+            return `${actStr}-${seqStr} ${safeTitle}.md`;
+        }
+        return `${safeTitle}.md`;
+    }
+
+    private getUniquePathInFolder(folder: string, fileName: string, currentPath: string): string {
+        const dot = fileName.lastIndexOf('.');
+        const base = dot >= 0 ? fileName.slice(0, dot) : fileName;
+        const ext = dot >= 0 ? fileName.slice(dot) : '';
+        const current = normalizePath(currentPath);
+        let candidate = normalizePath(`${folder}/${fileName}`);
+        let dedupe = 1;
+        while (this.app.vault.getAbstractFileByPath(candidate) && normalizePath(candidate) !== current) {
+            candidate = normalizePath(`${folder}/${base} (${dedupe})${ext}`);
+            dedupe++;
+        }
+        return candidate;
+    }
+
+    private async syncSceneFileName(filePath: string): Promise<string> {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!file || !(file instanceof TFile)) return filePath;
+        const scene = this.scenes.get(filePath) ?? await MetadataParser.parseFile(this.app, file);
+        if (!scene || scene.corkboardNote) return filePath;
+        const sceneFolder = normalizePath(this.getSceneFolder());
+        if (!normalizePath(file.path).startsWith(`${sceneFolder}/`)) return filePath;
+
+        const folder = file.parent?.path ? normalizePath(file.parent.path) : sceneFolder;
+        const newName = this.getSceneFileNameForMetadata(scene, file);
+        const newPath = this.getUniquePathInFolder(folder, newName, file.path);
+        if (normalizePath(file.path) === normalizePath(newPath)) return file.path;
+
+        this.scenes.delete(file.path);
+        await this.app.fileManager.renameFile(file, newPath);
+        const movedFile = this.app.vault.getAbstractFileByPath(newPath);
+        if (movedFile instanceof TFile) {
+            const updated = await MetadataParser.parseFile(this.app, movedFile);
+            if (updated) this.scenes.set(newPath, updated);
+        }
+        this.bumpVersion(newPath);
         return newPath;
     }
 
@@ -1253,9 +1323,41 @@ export class SceneManager implements ISceneStore {
             const scene = await MetadataParser.parseFile(this.app, file);
             if (scene) {
                 this.scenes.set(file.path, scene);
+                const sceneFolder = normalizePath(this.getSceneFolder());
+                if (!scene.corkboardNote && normalizePath(file.path).startsWith(`${sceneFolder}/`)) {
+                    const titleFromFile = this.getTitleFromSceneFileName(file);
+                    if (titleFromFile && titleFromFile !== scene.title) {
+                        const oldTitle = scene.title;
+                        const newPath = await this.updateScene(file.path, { title: titleFromFile }) || file.path;
+                        if (oldTitle) await this.updateSceneTitleReferences(oldTitle, titleFromFile);
+                    }
+                }
             }
         }
         this.bumpVersion(file.path);
+    }
+
+    private getTitleFromSceneFileName(file: TFile): string | undefined {
+        let title = file.basename.trim();
+        title = title.replace(/^[^\s/-]+-\d{2}\s+/, '').trim();
+        return title || undefined;
+    }
+
+    private async updateSceneTitleReferences(oldTitle: string, newTitle: string): Promise<void> {
+        if (!oldTitle || oldTitle === newTitle) return;
+        const scenes = Array.from(this.scenes.values());
+        for (const scene of scenes) {
+            const updates: Partial<Scene> = {};
+            if (scene.setup_scenes?.includes(oldTitle)) {
+                updates.setup_scenes = scene.setup_scenes.map(title => title === oldTitle ? newTitle : title);
+            }
+            if (scene.payoff_scenes?.includes(oldTitle)) {
+                updates.payoff_scenes = scene.payoff_scenes.map(title => title === oldTitle ? newTitle : title);
+            }
+            if (Object.keys(updates).length > 0) {
+                await this.updateScene(scene.filePath, updates);
+            }
+        }
     }
 
     /**
@@ -1645,25 +1747,16 @@ export class SceneManager implements ISceneStore {
         if (scene.notesFile) {
             // Verify the file still exists
             const existing = this.app.vault.getAbstractFileByPath(scene.notesFile);
-            if (existing && existing instanceof TFile) return scene.notesFile;
+            if (existing && existing instanceof TFile) {
+                return this.migrateLegacySceneNotesName(scene, existing);
+            }
         }
 
         // Create a new notes file
         const notesFolder = this.getSceneNotesFolder();
         await this.ensureFolder(notesFolder);
 
-        // Generate a filename from the scene title
-        const safeTitle = (scene.title || 'Untitled')
-            .replace(/[\\/:*?"<>|]/g, '-')
-            .substring(0, 60);
-        let fileName = `${safeTitle}.md`;
-        let filePath = normalizePath(`${notesFolder}/${fileName}`);
-        let dedupe = 1;
-        while (this.app.vault.getAbstractFileByPath(filePath)) {
-            fileName = `${safeTitle} (${dedupe}).md`;
-            filePath = normalizePath(`${notesFolder}/${fileName}`);
-            dedupe++;
-        }
+        const filePath = this.getUniqueSceneNotesPath(scene);
 
         // Migrate existing inline notes to the file. Do not add a title
         // heading here; the Scene Detail sidebar already shows the scene title.
@@ -1676,6 +1769,53 @@ export class SceneManager implements ISceneStore {
         scene.notesFile = filePath;
 
         return filePath;
+    }
+
+    private getSceneNotesBaseName(scene: Scene): string {
+        const safeTitle = (scene.title || 'Untitled')
+            .replace(/[\\/:*?"<>|]/g, '-')
+            .substring(0, 52)
+            .trim() || 'Untitled';
+        return `${safeTitle} - Notes`;
+    }
+
+    private getLegacySceneNotesBaseName(scene: Scene): string {
+        return (scene.title || 'Untitled')
+            .replace(/[\\/:*?"<>|]/g, '-')
+            .substring(0, 60)
+            .trim() || 'Untitled';
+    }
+
+    private getUniqueSceneNotesPath(scene: Scene, currentPath?: string): string {
+        const notesFolder = this.getSceneNotesFolder();
+        const baseName = this.getSceneNotesBaseName(scene);
+        const current = currentPath ? normalizePath(currentPath) : '';
+        let filePath = normalizePath(`${notesFolder}/${baseName}.md`);
+        let dedupe = 1;
+        while (this.app.vault.getAbstractFileByPath(filePath) && normalizePath(filePath) !== current) {
+            filePath = normalizePath(`${notesFolder}/${baseName} (${dedupe}).md`);
+            dedupe++;
+        }
+        return filePath;
+    }
+
+    private isLegacySceneNotesName(scene: Scene, file: TFile): boolean {
+        const notesFolder = normalizePath(this.getSceneNotesFolder());
+        if (!normalizePath(file.path).startsWith(`${notesFolder}/`)) return false;
+        const legacyBase = this.getLegacySceneNotesBaseName(scene);
+        if (file.basename === legacyBase) return true;
+        const escaped = legacyBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`^${escaped} \\(\\d+\\)$`).test(file.basename);
+    }
+
+    private async migrateLegacySceneNotesName(scene: Scene, file: TFile): Promise<string> {
+        if (!this.isLegacySceneNotesName(scene, file)) return file.path;
+        const targetPath = this.getUniqueSceneNotesPath(scene, file.path);
+        if (normalizePath(targetPath) === normalizePath(file.path)) return file.path;
+        await this.app.fileManager.renameFile(file, targetPath);
+        await this.updateScene(scene.filePath, { notesFile: targetPath });
+        scene.notesFile = targetPath;
+        return targetPath;
     }
 
     /**

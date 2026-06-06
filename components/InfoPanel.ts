@@ -404,9 +404,7 @@ export class InfoPanelComponent {
                     const newNotes = lines.join('\n');
                     await this.sceneManager.updateScene(scene.filePath, { notes: newNotes });
                     scene.notes = newNotes;
-                    if (scene.notesFile) {
-                        await this.sceneManager.writeSceneNotes(scene, `# Notes: ${scene.title || 'Untitled'}\n\n${newNotes}\n`);
-                    }
+                    await this.sceneManager.writeSceneNotes(scene, newNotes ? `${newNotes}\n` : '');
                     this.renderNotesLive(container, scene);
                 }
             });
@@ -432,9 +430,7 @@ export class InfoPanelComponent {
             const trimmed = val.trim();
             await this.sceneManager.updateScene(scene.filePath, { notes: trimmed || undefined });
             scene.notes = trimmed || undefined;
-            if (scene.notesFile) {
-                await this.sceneManager.writeSceneNotes(scene, `# Notes: ${scene.title || 'Untitled'}\n\n${trimmed}\n`);
-            }
+            await this.sceneManager.writeSceneNotes(scene, trimmed ? `${trimmed}\n` : '');
             this.renderNotesLive(container, scene);
         });
 
