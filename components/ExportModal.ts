@@ -18,6 +18,7 @@ export class ExportModal extends Modal {
     private includeSceneTitles = true;
     private numberScenesOnExport = false;
     private includeCorkboardNotes = false;
+    private includeInactiveScenes = false;
 
     constructor(plugin: SceneCardsPlugin) {
         super(plugin.app);
@@ -94,12 +95,21 @@ export class ExportModal extends Modal {
         // Actions
         const actions = contentEl.createDiv({ cls: 'storyline-export-actions' });
 
-        // Manuscript-only options (scene titles / numbering / corkboard notes).
+        // Export options. Scene titles / numbering / corkboard notes are manuscript-only.
         // Issues #85 and #87.
         const manuscriptOptions = contentEl.createDiv({ cls: 'storyline-export-options' });
 
         renderManuscriptOptions = () => {
             manuscriptOptions.empty();
+
+            new Setting(manuscriptOptions)
+                .setName('Include inactive scenes')
+                .setDesc('Include parked scenes marked inactive. Off by default.')
+                .addToggle(t => {
+                    t.setValue(this.includeInactiveScenes);
+                    t.onChange(v => { this.includeInactiveScenes = v; });
+                });
+
             if (this.exportScope !== 'manuscript') return;
 
             let titlesToggle: ToggleComponent | undefined;
@@ -142,6 +152,7 @@ export class ExportModal extends Modal {
                     t.setValue(this.includeCorkboardNotes);
                     t.onChange(v => { this.includeCorkboardNotes = v; });
                 });
+
         };
         renderManuscriptOptions();
 
@@ -155,6 +166,7 @@ export class ExportModal extends Modal {
                     includeSceneTitles: this.includeSceneTitles,
                     numberScenesOnExport: this.numberScenesOnExport,
                     includeCorkboardNotes: this.includeCorkboardNotes,
+                    includeInactiveScenes: this.includeInactiveScenes,
                 });
                 await this.exportService.export(this.format, this.exportScope);
                 this.close();

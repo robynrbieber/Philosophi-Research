@@ -237,7 +237,7 @@ export class NavigatorView extends ItemView {
 
             // Scene count for this plotline
             const count = this.sceneManager.getAllScenes()
-                .filter(s => !s.corkboardNote && s.tags?.includes(tag)).length;
+                .filter(s => !s.corkboardNote && !s.inactive && s.tags?.includes(tag)).length;
             row.createSpan({ text: String(count), cls: 'sl-nav-plotline-count' });
 
             row.addEventListener('click', () => {
@@ -256,7 +256,7 @@ export class NavigatorView extends ItemView {
         if (!this.listEl) return;
         this.listEl.empty();
 
-        let scenes = this.sceneManager.getAllScenes().filter(s => !s.corkboardNote);
+        let scenes = this.sceneManager.getAllScenes().filter(s => !s.corkboardNote && !s.inactive);
 
         // Plotline filter
         if (this.plotlineFilter) {
@@ -588,7 +588,7 @@ export class NavigatorView extends ItemView {
         } else {
             const fill = this.progressBar.querySelector('.sl-nav-progress-fill') as HTMLElement;
             if (fill) fill.setCssStyles({ width: '0%' });
-            const totalScenes = this.sceneManager.getAllScenes().filter(s => !s.corkboardNote).length;
+            const totalScenes = this.sceneManager.getAllScenes().filter(s => !s.corkboardNote && !s.inactive).length;
             this.progressLabel.textContent = `${this.formatWords(totalWords)} words · ${totalScenes} scenes`;
         }
     }

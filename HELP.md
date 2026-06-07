@@ -27,6 +27,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Scene Cards](#scene-cards)
 - [Scene Subtitles](#scene-subtitles)
 - [Scene Archive](#scene-archive)
+- [Inactive Scenes](#inactive-scenes)
 - [Inspector Panel](#inspector-panel)
 - [Filtering & Presets](#filtering--presets)
 - [Multi-Select & Bulk Edit](#multi-select--bulk-edit)
@@ -543,6 +544,18 @@ Archived scenes stay as regular `.md` files and can be reviewed or edited at any
 
 ---
 
+## Inactive Scenes
+
+Mark a scene inactive when you want to park it without moving it to the Archive. Inactive scenes stay in the project and keep their metadata, notes, links, and position, but they are hidden from Manuscript, exports, Navigator, and aggregate stats by default.
+
+- **Mark inactive** — open the scene in the Inspector and enable **Inactive scene**, or right-click a scene in the Board and choose **Mark Inactive**.
+- **Show parked scenes** — use the **Active / All / Inactive** control in the shared filter bar to switch between normal scenes, every scene, or inactive scenes only.
+- **Export inactive scenes** — exports exclude inactive scenes unless you enable **Include inactive scenes** in the export dialog.
+
+Inactive status is stored as `inactive: true` in scene frontmatter. Use Archive when you want to move a scene out of the active project folder entirely; use inactive when the scene still belongs in your planning space.
+
+---
+
 ## Inspector Panel
 
 Click any scene card to open the **Inspector Panel** on the right side. It provides:
@@ -566,6 +579,7 @@ Click any scene card to open the **Inspector Panel** on the right side. It provi
 
 All views support filtering by:
 
+- **Active state** — show active scenes, all scenes, or inactive scenes only
 - **Status** (idea, outlined, draft, written, revised, final)
 - **Characters** — filter by character presence
 - **Locations** — filter by location
@@ -1383,7 +1397,9 @@ Export your project in six formats. Access via the **Export** button in the view
 
 ### Manuscript Options *(new in 1.9.9)*
 
-When **Manuscript** is selected the dialog reveals three extra toggles:
+The export dialog also includes **Include inactive scenes** *(default: off)*. Parked scenes marked inactive are normally hidden from exports; switch this on when you want to include them in a review copy or outline export.
+
+When **Manuscript** is selected the dialog reveals three more toggles:
 
 - **Include scene titles** *(default: on)* — turn off to omit the `## Scene Title` headings between scenes. Produces a clean continuous prose document, ideal for publisher/agent submissions where working titles shouldn't be visible.
 - **Number scenes (Scene 1, Scene 2…)** *(default: off)* — replaces titles with simple running numbered headings. Mutually exclusive with *Include scene titles*.

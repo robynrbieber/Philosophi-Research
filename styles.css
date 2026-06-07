@@ -592,7 +592,8 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
 }
 
 /* Arc Points filter toggle (All / Scenes / Arc Points) */
-.story-line-arc-filter {
+.story-line-arc-filter,
+.story-line-active-filter {
     display: inline-flex;
     align-items: center;
     gap: 0;
@@ -600,7 +601,8 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     border-radius: var(--sc-radius);
     overflow: hidden;
 }
-.story-line-arc-filter-btn {
+.story-line-arc-filter-btn,
+.story-line-active-filter-btn {
     background: transparent;
     border: none;
     padding: 3px 10px;
@@ -610,10 +612,12 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     cursor: pointer;
     transition: background 0.15s, color 0.15s;
 }
-.story-line-arc-filter-btn:hover {
+.story-line-arc-filter-btn:hover,
+.story-line-active-filter-btn:hover {
     background: var(--background-secondary);
 }
-.story-line-arc-filter-btn.is-active {
+.story-line-arc-filter-btn.is-active,
+.story-line-active-filter-btn.is-active {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
 }
@@ -1285,6 +1289,30 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     transform: translateY(-1px);
 }
 
+.scene-card.scene-card-inactive {
+    opacity: 0.68;
+    border-style: dashed;
+}
+
+.scene-card.scene-card-inactive:hover {
+    opacity: 0.9;
+}
+
+.scene-card-inactive-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-muted);
+    background: var(--background-secondary);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
 /* Custom scene color (background fill, independent of border-left edge color) */
 .scene-card.scene-card.sl-scene-colored,
 .timeline-card.timeline-card.sl-scene-colored {
@@ -1862,6 +1890,26 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     font-weight: 600;
     font-size: 0.85em;
     color: var(--sc-text-muted);
+}
+
+.inspector-checkbox-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+    color: var(--sc-text);
+    cursor: pointer;
+}
+
+.inspector-checkbox-row input[type="checkbox"] {
+    margin: 0;
+}
+
+.inspector-help-text {
+    margin-top: 4px;
+    font-size: 0.78em;
+    color: var(--text-muted);
+    line-height: 1.35;
 }
 
 /* ─── Prologue / Epilogue quick-select buttons ─── */

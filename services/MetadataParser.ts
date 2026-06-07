@@ -121,6 +121,7 @@ export class MetadataParser {
             setup_scenes: this.parseStringArray(frontmatter.setup_scenes),
             payoff_scenes: this.parseStringArray(frontmatter.payoff_scenes),
             ignored_detections: this.parseStringArray(frontmatter.ignored_detections),
+            inactive: this.parseBooleanFlag(frontmatter.inactive),
             created: frontmatter.created,
             modified: frontmatter.modified,
             body,
@@ -196,6 +197,7 @@ export class MetadataParser {
             if (key === 'color' && !value) { delete frontmatter[key]; continue; }
             if (key === 'beatsheet' && !value) { delete frontmatter[key]; continue; }
             if (key === 'arcAnchor' && !value) { delete frontmatter[key]; continue; }
+            if (key === 'inactive' && !value) { delete frontmatter[key]; continue; }
             if (key === 'ignored_detections') {
                 if (Array.isArray(value) && value.length > 0) frontmatter[key] = value;
                 else delete frontmatter[key];
@@ -295,6 +297,7 @@ export class MetadataParser {
         if (scene.color) fm.color = scene.color;
         if (scene.beatsheet) fm.beatsheet = scene.beatsheet;
         if (scene.arcAnchor) fm.arcAnchor = true;
+        if (scene.inactive) fm.inactive = true;
         if (scene.codexLinks && Object.keys(scene.codexLinks).some(k => scene.codexLinks![k]?.length)) {
             fm.codexLinks = scene.codexLinks;
         }

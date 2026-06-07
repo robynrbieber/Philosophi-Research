@@ -900,14 +900,14 @@ export class SceneManager implements ISceneStore {
         // Match either NN-NN<space>... (legacy numeric) or <anything>-NN<space>...
         // where the act portion may contain dots or letters but no whitespace
         // and no second dash before the sequence.
-        const prefixMatch = file.name.match(/^([^\s/-]+)-(\d{2})\s/);
+        const prefixMatch = file.name.match(/^([^\s/-]+)-(\d+(?:\.\d+)?)\s/);
         if (prefixMatch) {
             // Read the updated sequence from the freshly-written YAML
             const updatedScene = this.scenes.get(filePath);
             const seqStr = updatedScene?.sequence !== undefined
                 ? String(updatedScene.sequence).padStart(2, '0')
                 : prefixMatch[2];  // keep existing if unknown
-            newName = file.name.replace(/^[^\s/-]+-\d{2}(\s)/, `${actStr}-${seqStr}$1`);
+            newName = file.name.replace(/^[^\s/-]+-\d+(?:\.\d+)?(\s)/, `${actStr}-${seqStr}$1`);
         }
 
         const newPath = normalizePath(`${targetFolder}/${newName}`);
@@ -939,7 +939,7 @@ export class SceneManager implements ISceneStore {
 
     private getSceneFileNameForMetadata(scene: Scene, currentFile: TFile): string {
         const safeTitle = this.getSceneSafeTitle(scene.title);
-        const hasPrefix = /^([^\s/-]+)-(\d{2})\s/.test(currentFile.name);
+        const hasPrefix = /^([^\s/-]+)-(\d+(?:\.\d+)?)\s/.test(currentFile.name);
         if (hasPrefix || scene.sequence !== undefined || scene.act !== undefined) {
             const actStr = formatActChapterPrefix(scene.act, '00');
             const seqStr = scene.sequence !== undefined
@@ -1339,7 +1339,7 @@ export class SceneManager implements ISceneStore {
 
     private getTitleFromSceneFileName(file: TFile): string | undefined {
         let title = file.basename.trim();
-        title = title.replace(/^[^\s/-]+-\d{2}\s+/, '').trim();
+        title = title.replace(/^[^\s/-]+-\d+(?:\.\d+)?\s+/, '').trim();
         return title || undefined;
     }
 

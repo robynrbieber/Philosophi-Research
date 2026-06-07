@@ -211,7 +211,7 @@ export class LocationView extends ItemView {
 
         const allWorlds = this.locationManager.getAllWorlds();
         const allOrphans = this.locationManager.getOrphanLocations();
-        const scenes = this.sceneManager.getAllScenes();
+        const scenes = this.sceneManager.getAllScenes().filter(scene => !scene.inactive);
 
         // Filter worlds: show a world if its name OR any child location name matches
         let worlds = q ? allWorlds.filter(w => {
@@ -1355,7 +1355,7 @@ export class LocationView extends ItemView {
 
     private renderWorldSidePanel(container: HTMLElement, world: StoryWorld): void {
         const locations = this.locationManager.getLocationsForWorld(world.name);
-        const scenes = this.sceneManager.getAllScenes();
+        const scenes = this.sceneManager.getAllScenes().filter(scene => !scene.inactive);
 
         // Location count
         const statsBox = container.createDiv('location-side-stats');

@@ -46,9 +46,8 @@ export class SceneQueryService {
 
         let scenes = this.sceneStore.getAllScenes();
 
-        if (filter) {
-            scenes = scenes.filter(scene => this.matchesFilter(scene, filter));
-        }
+        const effectiveFilter = filter ?? {};
+        scenes = scenes.filter(scene => this.matchesFilter(scene, effectiveFilter));
 
         if (sort) {
             scenes = this.sortScenes(scenes, sort);
@@ -219,7 +218,8 @@ export class SceneQueryService {
      */
     getStatistics(excludeArcAnchor = false) {
         const scenes = this.sceneStore.getAllScenes();
-        const totalScenes = scenes.length;
+        const activeScenes = scenes.filter(scene => !scene.inactive);
+        const totalScenes = activeScenes.length;
         const statusCounts: Record<string, number> = {};
         let totalWords = 0;
         let totalTargetWords = 0;
@@ -228,7 +228,7 @@ export class SceneQueryService {
         const locationCounts: Record<string, number> = {};
         let orphanedScenes = 0;
 
-        for (const scene of scenes) {
+        for (const scene of activeScenes) {
             // Skip Arc Point scenes from word totals when setting is enabled
             const skipWords = excludeArcAnchor && scene.arcAnchor;
 
@@ -277,6 +277,13 @@ export class SceneQueryService {
     // ── Private helpers ────────────────────────────────────
 
     private matchesFilter(scene: Scene, filter: SceneFilter): boolean {
+        const activeState = filter.activeState ?? 'active';
+        if (activeState === 'active' && scene.inactive) {
+            return false;
+        }
+        if (activeState === 'inactive' && !scene.inactive) {
+            return false;
+        }
         if (filter.status?.length && (!scene.status || !filter.status.includes(scene.status))) {
             return false;
         }

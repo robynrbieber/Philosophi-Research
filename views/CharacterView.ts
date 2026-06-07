@@ -284,7 +284,7 @@ export class CharacterView extends ItemView {
 
         let fileCharacters = this.characterManager.getAllCharacters();
         const sceneCharNames = this.sceneManager.queryService.getAllCharacters();
-        const scenes = this.sceneManager.getAllScenes();
+        const scenes = this.sceneManager.getAllScenes().filter(scene => !scene.inactive);
 
         // Build alias map: lowered alias → canonical name
         const aliasMap = this.characterManager.buildAliasMap(this.plugin.settings.characterAliases);
@@ -747,7 +747,7 @@ export class CharacterView extends ItemView {
         container.empty();
         container.createEl('h3', { text: 'Story Graph' });
 
-        const scenes = this.sceneManager.getAllScenes();
+        const scenes = this.sceneManager.getAllScenes().filter(scene => !scene.inactive);
         const characters = this.characterManager.getAllCharacters();
         const scanner = this.plugin.linkScanner;
         // Ensure scan results are up to date

@@ -119,6 +119,26 @@ export class FiltersComponent {
             });
         }
 
+        // Active-state filter toggle (Active / All / Inactive)
+        const activeFilterContainer = topBar.createDiv('story-line-active-filter');
+        const activeModes: { value: 'active' | 'all' | 'inactive'; label: string }[] = [
+            { value: 'active', label: 'Active' },
+            { value: 'all', label: 'All' },
+            { value: 'inactive', label: 'Inactive' },
+        ];
+        for (const mode of activeModes) {
+            const btn = activeFilterContainer.createEl('button', {
+                cls: `story-line-active-filter-btn${(this.currentFilter.activeState || 'active') === mode.value ? ' is-active' : ''}`,
+                text: mode.label,
+            });
+            btn.addEventListener('click', () => {
+                this.currentFilter.activeState = mode.value === 'active' ? undefined : mode.value;
+                activeFilterContainer.querySelectorAll('.story-line-active-filter-btn').forEach(b => b.removeClass('is-active'));
+                btn.addClass('is-active');
+                this.emitChange();
+            });
+        }
+
         // Filter toggle button (Lucide icon)
         const toggleBtn = topBar.createEl('button', {
             cls: 'story-line-filter-toggle clickable-icon',

@@ -348,6 +348,23 @@ export class InspectorComponent {
             window.setTimeout(() => activeDocument.addEventListener('click', closeMenu), 0);
         });
 
+        // ── Active / inactive ──
+        const inactiveSection = this.container.createDiv('inspector-section inspector-inactive-section');
+        const inactiveLabel = inactiveSection.createEl('label', { cls: 'inspector-checkbox-row' });
+        const inactiveCheckbox = inactiveLabel.createEl('input', { type: 'checkbox' });
+        inactiveCheckbox.checked = !!scene.inactive;
+        inactiveLabel.createSpan({ text: 'Inactive scene' });
+        inactiveSection.createDiv({
+            cls: 'inspector-help-text',
+            text: 'Inactive scenes stay in the project but are hidden from Manuscript and exports by default.',
+        });
+        inactiveCheckbox.addEventListener('change', async () => {
+            const inactive = inactiveCheckbox.checked;
+            await this.sceneManager.updateScene(scene.filePath, { inactive });
+            scene.inactive = inactive;
+            this.onRefresh();
+        });
+
         // ── POV (autocomplete input) ──
         const povSection = this.container.createDiv('inspector-section');
         povSection.createSpan({ cls: 'inspector-label', text: 'POV: ' });

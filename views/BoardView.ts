@@ -2261,6 +2261,17 @@ export class BoardView extends ItemView {
         menu.addSeparator();
 
         menu.addItem(item => {
+            item.setTitle(scene.inactive ? 'Mark Active' : 'Mark Inactive')
+                .setIcon(scene.inactive ? 'eye' : 'eye-off')
+                .onClick(async () => {
+                    await this.sceneManager.updateScene(scene.filePath, { inactive: !scene.inactive });
+                    this.refreshBoard();
+                });
+        });
+
+        menu.addSeparator();
+
+        menu.addItem(item => {
             item.setTitle('Archive Scene')
                 .setIcon('archive')
                 .onClick(async () => {

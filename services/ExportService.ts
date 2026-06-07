@@ -22,6 +22,8 @@ export interface ExportOptions {
     numberScenesOnExport?: boolean;
     /** Include corkboard / sticky notes in the export (default false). */
     includeCorkboardNotes?: boolean;
+    /** Include inactive / parked scenes in the export (default false). */
+    includeInactiveScenes?: boolean;
 }
 
 /**
@@ -40,6 +42,7 @@ export class ExportService {
         includeSceneTitles: true,
         numberScenesOnExport: false,
         includeCorkboardNotes: false,
+        includeInactiveScenes: false,
     };
 
     constructor(app: App, sceneManager: SceneManager, characterManager: CharacterManager, locationManager: LocationManager) {
@@ -116,7 +119,7 @@ export class ExportService {
     private getSortedScenes(): Scene[] {
         // Spread into a new array so we don't mutate the memoized cache
         let scenes = [...this.sceneManager.queryService.getFilteredScenes(
-            undefined,
+            { activeState: this.exportOptions.includeInactiveScenes ? 'all' : 'active' },
             { field: 'sequence', direction: 'asc' }
         )];
         // Issue #87: corkboard / sticky notes should not appear in manuscript

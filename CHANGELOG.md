@@ -6,6 +6,18 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.27
+
+### New Features
+
+- **Inactive scenes** *([#158](https://github.com/PixeroJan/obsidian-storyline/issues/158))* — Scenes can now be marked inactive from the Inspector or Board context menu. Inactive scenes stay in the project for planning, but are hidden from manuscript views, exports, Navigator, and stats by default, with Active / All / Inactive filters and an export opt-in when needed.
+
+### Bug Fixes
+
+- **Decimal scene order filename sync** *([#159](https://github.com/PixeroJan/obsidian-storyline/issues/159))* — Scene filename/title sync now recognizes decimal sequence prefixes such as `00-1.5`, preventing the prefix from being copied repeatedly into the generated title.
+
+---
+
 ## Version 1.10.26
 
 ### Bug Fixes

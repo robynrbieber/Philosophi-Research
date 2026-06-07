@@ -171,6 +171,8 @@ export interface Scene {
     ignored_detections?: string[];
     /** Issue #128 — marks this scene as an Arc Point (key turning point in the story) */
     arcAnchor?: boolean;
+    /** Marks this scene as parked/out of manuscript flow without archiving it */
+    inactive?: boolean;
 }
 
 /**
@@ -198,6 +200,8 @@ export interface SceneFilter {
     customFields?: Record<string, string[]>;
     /** Arc Point filter: 'all' (default) | 'scenes' (non-arc-point only) | 'arcPoints' (arc points only) */
     arcAnchorFilter?: 'all' | 'scenes' | 'arcPoints';
+    /** Active-state filter: 'active' (default) | 'all' | 'inactive' */
+    activeState?: 'active' | 'all' | 'inactive';
 }
 
 /**

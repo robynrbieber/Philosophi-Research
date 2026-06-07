@@ -37,6 +37,10 @@ export class SceneCardComponent {
                 draggable: options?.draggable !== false ? 'true' : 'false',
             }
         });
+        if (scene.inactive) {
+            card.addClass('scene-card-inactive');
+            card.setAttribute('aria-label', `${scene.title || 'Untitled'} inactive scene`);
+        }
 
         // Corkboard notes get sticky-note styling instead of the scene look
         if (scene.corkboardNote) {
@@ -72,10 +76,13 @@ export class SceneCardComponent {
 
         // Title
         const displayTitle = this.getDisplayTitle(scene);
-        card.createDiv({
+        const titleEl = card.createDiv({
             cls: 'scene-card-title',
             text: displayTitle
         });
+        if (scene.inactive) {
+            titleEl.createSpan({ cls: 'scene-card-inactive-badge', text: 'Inactive' });
+        }
 
         // Subtitle (optional, shown below title)
         if (scene.subtitle) {
