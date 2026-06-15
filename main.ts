@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { App, ButtonComponent, DropdownComponent, FuzzySuggestModal, Modal, Notice, Platform, Plugin, Setting, TFile, TextComponent, ToggleComponent, WorkspaceLeaf, normalizePath, parseYaml, setIcon } from 'obsidian';
+import { App, ButtonComponent, DropdownComponent, FuzzySuggestModal, ItemView, Modal, Notice, Platform, Plugin, Setting, TFile, TextComponent, ToggleComponent, WorkspaceLeaf, normalizePath, parseYaml, setIcon } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { asRecord, asString, asNumber, asBool, isRecord } from './utils/narrow';
 import type { FilterPreset } from './models/Scene';
@@ -363,24 +363,24 @@ export default class SceneCardsPlugin extends Plugin {
         // Register a global keydown handler so Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y
         // route to StoryLine's undo/redo when a StoryLine view is active and
         // the focus is not inside a text input, textarea, or contentEditable.
-        this.registerDomEvent(document, 'keydown', (evt: KeyboardEvent) => {
+        this.registerDomEvent(activeDocument, 'keydown', (evt: KeyboardEvent) => {
             const isUndo = (evt.ctrlKey || evt.metaKey) && !evt.shiftKey && evt.key === 'z';
             const isRedo = ((evt.ctrlKey || evt.metaKey) && evt.shiftKey && evt.key === 'Z')
                 || ((evt.ctrlKey || evt.metaKey) && evt.key === 'y');
             if (!isUndo && !isRedo) return;
 
             // Don't intercept if focus is in a text field
-            const active = document.activeElement;
+            const active = activeDocument.activeElement;
             if (active && (
-                active instanceof HTMLInputElement ||
-                active instanceof HTMLTextAreaElement ||
+                active.instanceOf(HTMLInputElement) ||
+                active.instanceOf(HTMLTextAreaElement) ||
                 (active as HTMLElement).isContentEditable
             )) return;
 
-            // Check if a StoryLine view leaf is active
-            const leaf = this.app.workspace.activeLeaf;
-            if (!leaf) return;
-            const viewType = (leaf.view as unknown as Record<string, unknown>)?.getViewType?.();
+            // Check if a StoryLine view is active
+            const view = this.app.workspace.getActiveViewOfType(ItemView);
+            if (!view) return;
+            const viewType = (view as unknown as Record<string, unknown>)?.getViewType?.();
             if (typeof viewType !== 'string') return;
             const slViewTypes = [
                 BOARD_VIEW_TYPE, PLOTGRID_VIEW_TYPE, TIMELINE_VIEW_TYPE,

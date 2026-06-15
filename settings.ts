@@ -1708,7 +1708,6 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             .addSlider(slider => slider
                 .setLimits(1, 30, 1)
                 .setValue(this.plugin.settings.timelineDragScrollSpeed)
-                .setDynamicTooltip()
                 .onChange(async (value) => {
                     this.plugin.settings.timelineDragScrollSpeed = value;
                     await this.plugin.saveSettings();
@@ -1721,7 +1720,6 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             .addSlider(slider => slider
                 .setLimits(20, 200, 10)
                 .setValue(this.plugin.settings.timelineDragScrollZone)
-                .setDynamicTooltip()
                 .onChange(async (value) => {
                     this.plugin.settings.timelineDragScrollZone = value;
                     await this.plugin.saveSettings();

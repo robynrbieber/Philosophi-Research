@@ -6,6 +6,12 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.29
+
+- Updated to use the latest Obsidian API conventions (replaced deprecated `document`, `instanceof`, `activeLeaf`, and `setDynamicTooltip` calls) for better compatibility with popout windows and future Obsidian versions.
+
+---
+
 ## Version 1.10.28
 
 ### New Features
