@@ -556,6 +556,14 @@ export interface SceneCardsSettings {
     lastBoardGroupBy: string;
     /** Remembered Timeline order from last session */
     timelineOrder: 'reading' | 'chronological';
+    /** Remembered Timeline swimlane mode from last session */
+    timelineSwimlaneMode: boolean;
+    /** Remembered Timeline swimlane group-by from last session */
+    timelineSwimlaneGroupBy: string;
+    /** Remembered Research view active tag filter */
+    researchActiveTag: string | null;
+    /** Remembered Research view active type filter */
+    researchActiveType: string | null;
     autoOpenNavigator: boolean;
     showNotesInKanban: boolean;
     showScenesInCorkboard: boolean;
@@ -804,6 +812,10 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     lastBoardMode: 'corkboard',
     lastBoardGroupBy: 'act',
     timelineOrder: 'reading',
+    timelineSwimlaneMode: false,
+    timelineSwimlaneGroupBy: 'pov',
+    researchActiveTag: null,
+    researchActiveType: null,
     autoOpenNavigator: true,
     showNotesInKanban: false,
     showScenesInCorkboard: true,

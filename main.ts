@@ -360,6 +360,47 @@ export default class SceneCardsPlugin extends Plugin {
             },
         });
 
+        // Register a global keydown handler so Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y
+        // route to StoryLine's undo/redo when a StoryLine view is active and
+        // the focus is not inside a text input, textarea, or contentEditable.
+        this.registerDomEvent(document, 'keydown', (evt: KeyboardEvent) => {
+            const isUndo = (evt.ctrlKey || evt.metaKey) && !evt.shiftKey && evt.key === 'z';
+            const isRedo = ((evt.ctrlKey || evt.metaKey) && evt.shiftKey && evt.key === 'Z')
+                || ((evt.ctrlKey || evt.metaKey) && evt.key === 'y');
+            if (!isUndo && !isRedo) return;
+
+            // Don't intercept if focus is in a text field
+            const active = document.activeElement;
+            if (active && (
+                active instanceof HTMLInputElement ||
+                active instanceof HTMLTextAreaElement ||
+                (active as HTMLElement).isContentEditable
+            )) return;
+
+            // Check if a StoryLine view leaf is active
+            const leaf = this.app.workspace.activeLeaf;
+            if (!leaf) return;
+            const viewType = (leaf.view as unknown as Record<string, unknown>)?.getViewType?.();
+            if (typeof viewType !== 'string') return;
+            const slViewTypes = [
+                BOARD_VIEW_TYPE, PLOTGRID_VIEW_TYPE, TIMELINE_VIEW_TYPE,
+                STORYLINE_VIEW_TYPE, CHARACTER_VIEW_TYPE, STATS_VIEW_TYPE,
+                LOCATION_VIEW_TYPE, CODEX_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE,
+                NOTES_VIEW_TYPE, SYNOPSIS_VIEW_TYPE, DETAILS_VIEW_TYPE,
+                MANUSCRIPT_VIEW_TYPE, RESEARCH_VIEW_TYPE, HELP_VIEW_TYPE,
+                NAVIGATOR_VIEW_TYPE,
+            ];
+            if (!slViewTypes.includes(viewType)) return;
+
+            evt.preventDefault();
+            evt.stopPropagation();
+            if (isUndo) {
+                void this.sceneManager.undoManager.undo();
+            } else {
+                void this.sceneManager.undoManager.redo();
+            }
+        });
+
         this.addCommand({
             id: 'export-project',
             name: 'Export project',            callback: () => {
