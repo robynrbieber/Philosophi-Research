@@ -554,6 +554,14 @@ export interface SceneCardsSettings {
     lastBoardMode: 'corkboard' | 'kanban';
     /** Remembered kanban groupBy from last session */
     lastBoardGroupBy: string;
+    /** Remembered Storyline (Plotlines) view mode from last session */
+    lastStorylineViewMode: 'list' | 'subway';
+    /** Remembered Storyline view sort mode from last session */
+    lastStorylineSortMode: 'alpha' | 'scenes-desc' | 'scenes-asc' | 'reading-order';
+    /** Remembered Storyline view Arc Point filter from last session */
+    lastStorylineArcFilter: 'all' | 'scenes' | 'arcPoints';
+    /** Remembered Storyline subway tag-pill visibility from last session */
+    lastStorylineShowTagPills: boolean;
     /** Remembered Timeline order from last session */
     timelineOrder: 'reading' | 'chronological';
     /** Remembered Timeline swimlane mode from last session */
@@ -811,6 +819,10 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     defaultBoardMode: 'corkboard',
     lastBoardMode: 'corkboard',
     lastBoardGroupBy: 'act',
+    lastStorylineViewMode: 'subway',
+    lastStorylineSortMode: 'reading-order',
+    lastStorylineArcFilter: 'all',
+    lastStorylineShowTagPills: true,
     timelineOrder: 'reading',
     timelineSwimlaneMode: false,
     timelineSwimlaneGroupBy: 'pov',
