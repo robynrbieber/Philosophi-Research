@@ -723,7 +723,7 @@ Apply proven story structure templates to quickly scaffold your acts:
 | **Hero's Journey** | 12 stages | Joseph Campbell's monomyth (Ordinary World, Call to Adventure, Refusal of the Call, Meeting the Mentor, Crossing the Threshold, Tests Allies Enemies, Approach to the Inmost Cave, The Ordeal, Reward, The Road Back, Resurrection, Return with the Elixir) |
 | **Seven-Point Story Structure** | 7 beats | Dan Wells' structure (Hook, Plot Turn 1, Pinch Point 1, Midpoint, Pinch Point 2, Plot Turn 2, Resolution) |
 | **Story Circle** | 8 beats | Dan Harmon's story circle (You, Need, Go, Search, Find, Take, Return, Change) |
-| **Romancing the Beat** | 16 beats | Gwen Hayes' romance structure (Setup, Meet Cute, No Way, Pulling Focus, First Barrier, Deepening Desire, Inkling of Connection, Midpoint, Retreat, Grand Gesture, Dark Moment Setup, Dark Moment, Wake-Up Call, Recommitment, Climax, HEA/Resolution) |
+| **Romancing the Beat** | 20 beats | Gwen Hayes' four-phase romance structure (Phase 1 Setup: Introduce Hero 1, Introduce Hero 2, Meet Cute, No Way #1, Adhesion; Phase 2 Falling in Love: No Way #2, The Inkling, Deepening Desire, Maybe This Could Work, Midpoint of Love; Phase 3 Retreating from Love: Inkling of Doubt, Deepening Doubt, Retreat, Shields Up, Break Up; Phase 4 Fighting for Love: Dark Night of the Soul, Wake Up, Grand Gesture, Whole-Hearted, Epilogue) |
 | **27 Chapter Method** | 27 beats | Kat O'Keeffe's fractal 3×3×3 structure — 3 Acts → 9 Parts → 27 Chapters, each following a setup–conflict–resolution pattern |
 
 ### How to Use
@@ -1549,7 +1549,9 @@ Images are saved into the `<Project>/Images/` folder, with automatic deduplicati
 
 ## Additional Source Folders
 
-By default, StoryLine only scans files inside your project's folder structure (Scenes, Codex/Characters, Codex/Locations, etc.). The **Additional Source Folders** feature lets you point StoryLine at any other folder in your vault so it can pick up entities stored elsewhere.
+By default, StoryLine only scans files inside your project's folder structure (Scenes, Codex/Characters, Codex/Locations, etc.). The **Additional Source Folders** feature lets you point StoryLine at any other folder **inside your vault** so it can pick up entities stored elsewhere — for example, a `Shared Universe/Characters` folder that sits outside a specific project but should still appear in the Codex.
+
+> **Folders must be inside your Obsidian vault.** Obsidian's plugin API is sandboxed to the vault: it can only read files that live inside the vault folder. A folder on your desktop or in `C:\Users\…\Documents` (outside the vault) cannot be scanned. If you want to use notes from outside the vault, move or copy them into the vault first.
 
 ### How It Works
 
@@ -1566,13 +1568,14 @@ By default, StoryLine only scans files inside your project's folder structure (S
 | `world` | Location Manager (as a world) |
 | Any codex category id | Codex Manager |
 
-5. Entities from additional folders appear alongside your project’s own entities in all views.
+5. Entities from additional folders appear alongside your project's own entities in all views.
 
 ### Important Notes
 
 - ⚠ **Experimental** — back up your files before linking external folders. Files in linked folders may be modified when you edit entities in StoryLine views.
-- Works with **any folder structure** — files don’t need to be organized by type. StoryLine reads the `type:` field in each file’s frontmatter to determine what it is.
-- Folder paths are **vault-relative** (e.g., `Shared Universe/Characters` or `Book 2/Scenes`). Leading/trailing slashes and Windows backslashes are normalized automatically.
+- **Folders must be inside the vault** — Obsidian cannot access files outside the vault. If you enter an absolute OS path (e.g. `C:\Users\…\MyFolder` on Windows or `/Users/…/MyFolder` on macOS), StoryLine automatically converts it to a vault-relative path on save. If the path doesn't resolve to a folder inside the vault, the scan is silently skipped.
+- Works with **any folder structure** — files don't need to be organized by type. StoryLine reads the `type:` field in each file's frontmatter to determine what it is.
+- Folder paths are stored as **vault-relative** (e.g., `Shared Universe/Characters` or `Book 2/Scenes`). Leading/trailing slashes and Windows backslashes are normalized automatically.
 - The folder browser provides **autocomplete** — start typing and it suggests matching vault folders.
 - Adding or removing a folder triggers an **immediate re-scan** and view refresh, so newly linked entities appear right away (no project switch or reload needed).
 - Remove a folder by clicking the × button next to it in the settings.

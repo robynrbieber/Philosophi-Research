@@ -86,13 +86,12 @@ export class CodexView extends ItemView {
 
         await this.sceneManager.initialize();
 
-        // Load codex data
-        const codexFolder = this.sceneManager.getCodexFolder();
+        // Load codex data (project folder + external source folders)
         this.codexManager.initCategories(
             this.plugin.settings.codexEnabledCategories,
             this.resolveCustomDefs(),
         );
-        await this.codexManager.loadAll(codexFolder);
+        await this.plugin.reloadEntities();
 
         // Reset to hub state — no category pre-selected
         this.activeCategory = '';
@@ -121,12 +120,11 @@ export class CodexView extends ItemView {
      * Navigate directly to a codex entry's detail view by file path.
      */
     async navigateToEntry(filePath: string): Promise<void> {
-        const codexFolder = this.sceneManager.getCodexFolder();
         this.codexManager.initCategories(
             this.plugin.settings.codexEnabledCategories,
             this.resolveCustomDefs(),
         );
-        await this.codexManager.loadAll(codexFolder);
+        await this.plugin.reloadEntities();
         const entry = this.codexManager.getEntry(filePath);
         if (!entry) {
             new Notice('Codex entry not found in the active project.');
@@ -143,16 +141,18 @@ export class CodexView extends ItemView {
     async refresh(): Promise<void> {
         // Grace period — skip re-render if we just saved ourselves
         if (this.selectedEntry && (Date.now() - this._lastSaveTime) < CodexView.SAVE_REFRESH_GRACE_MS) {
-            const codexFolder = this.sceneManager.getCodexFolder();
-            await this.codexManager.loadAll(codexFolder);
+            this.codexManager.initCategories(
+                this.plugin.settings.codexEnabledCategories,
+                this.resolveCustomDefs(),
+            );
+            await this.plugin.reloadEntities();
             return;
         }
-        const codexFolder = this.sceneManager.getCodexFolder();
         this.codexManager.initCategories(
             this.plugin.settings.codexEnabledCategories,
             this.resolveCustomDefs(),
         );
-        await this.codexManager.loadAll(codexFolder);
+        await this.plugin.reloadEntities();
         if (this.rootContainer) this.renderView(this.rootContainer);
     }
 
@@ -1782,8 +1782,7 @@ export class CodexView extends ItemView {
                         this.plugin.settings.codexEnabledCategories,
                         this.resolveCustomDefs(),
                     );
-                    const codexFolder = this.sceneManager.getCodexFolder();
-                    await this.codexManager.loadAll(codexFolder);
+                    await this.plugin.reloadEntities();
                     // Reset to first available category if current is disabled
                     const cats = this.codexManager.getCategories();
                     if (!cats.find(c => c.id === this.activeCategory) && cats.length > 0) {

@@ -84,7 +84,12 @@ export class CharacterView extends ItemView {
         super(leaf);
         this.plugin = plugin;
         this.sceneManager = sceneManager;
-        this.characterManager = new CharacterManager(this.app);
+        // Use the plugin's shared CharacterManager so entries scanned from
+        // Additional Source Folders (which are added to the plugin-level
+        // manager) are visible here too. Previously each view created its
+        // own instance and re-loaded only from the project Characters
+        // folder on every refresh, wiping out externally-scanned entries.
+        this.characterManager = plugin.characterManager;
     }
 
     getViewType(): string {
@@ -109,7 +114,9 @@ export class CharacterView extends ItemView {
         this.rootContainer = container;
 
         await this.sceneManager.initialize();
-        await this.characterManager.loadCharacters(this.sceneManager.getCharacterFolder());
+        // Load project characters, then re-apply external source folders so
+        // entries stored outside the project Codex are included.
+        await this.plugin.reloadEntities();
         this.renderView(container);
     }
 
@@ -2732,7 +2739,7 @@ export class CharacterView extends ItemView {
      * jump from the character's freeform note back to the details panel.
      */
     async navigateToCharacter(filePath: string): Promise<void> {
-        await this.characterManager.loadCharacters(this.sceneManager.getCharacterFolder());
+        await this.plugin.reloadEntities();
         const char = this.characterManager.getCharacter(filePath);
         if (!char) {
             new Notice('Character not found in the active project.');
@@ -2755,10 +2762,10 @@ export class CharacterView extends ItemView {
             Date.now() - this._lastSaveTime < CharacterView.SAVE_REFRESH_GRACE_MS
         ) {
             // Our own save triggered this — silently reload data but don't re-render
-            await this.characterManager.loadCharacters(this.sceneManager.getCharacterFolder());
+            await this.plugin.reloadEntities();
             return;
         }
-        await this.characterManager.loadCharacters(this.sceneManager.getCharacterFolder());
+        await this.plugin.reloadEntities();
         if (this.rootContainer) {
             this.renderView(this.rootContainer);
         }

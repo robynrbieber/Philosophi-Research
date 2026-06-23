@@ -78,7 +78,9 @@ export class LocationView extends ItemView {
         super(leaf);
         this.plugin = plugin;
         this.sceneManager = sceneManager;
-        this.locationManager = new LocationManager(this.app);
+        // Use the plugin's shared LocationManager so entries scanned from
+        // Additional Source Folders survive view refreshes.
+        this.locationManager = plugin.locationManager;
     }
 
     getViewType(): string { return LOCATION_VIEW_TYPE; }
@@ -99,7 +101,7 @@ export class LocationView extends ItemView {
         this.rootContainer = container;
 
         await this.sceneManager.initialize();
-        await this.locationManager.loadAll(this.sceneManager.getLocationFolder());
+        await this.plugin.reloadEntities();
         this.renderView(container);
     }
 
@@ -1880,7 +1882,7 @@ export class LocationView extends ItemView {
      * Navigate directly to a location/world detail view by file path.
      */
     async navigateToItem(filePath: string): Promise<void> {
-        await this.locationManager.loadAll(this.sceneManager.getLocationFolder());
+        await this.plugin.reloadEntities();
         const item = this.locationManager.getItem(filePath);
         if (!item) {
             new Notice('Location not found in the active project.');
@@ -1897,10 +1899,10 @@ export class LocationView extends ItemView {
             this.selectedItem &&
             Date.now() - this._lastSaveTime < LocationView.SAVE_REFRESH_GRACE_MS
         ) {
-            await this.locationManager.loadAll(this.sceneManager.getLocationFolder());
+            await this.plugin.reloadEntities();
             return;
         }
-        await this.locationManager.loadAll(this.sceneManager.getLocationFolder());
+        await this.plugin.reloadEntities();
         if (this.rootContainer) {
             this.renderView(this.rootContainer);
         }

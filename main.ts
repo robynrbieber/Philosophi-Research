@@ -874,6 +874,15 @@ export default class SceneCardsPlugin extends Plugin {
             checklists: this.settings.excludeChecklistFromWordcount === true,
         });
         setWordcountLocale(normalizeStoryLineLocale(this.settings.defaultProjectLanguage));
+        // Migrate any absolute OS paths in extraFolders to vault-relative
+        // paths so the vault adapter can find them. Cross-platform safe.
+        if (Array.isArray(this.settings.extraFolders) && this.settings.extraFolders.length > 0) {
+            const migrated = this.settings.extraFolders.map(f => this.toVaultRelativePath(f)).filter(Boolean);
+            if (migrated.join('|') !== this.settings.extraFolders.join('|')) {
+                this.settings.extraFolders = migrated;
+                await this.saveSettings();
+            }
+        }
         // Snapshot the global colour settings so we can restore them when
         // switching to a project that has no per-project overrides.
         this._globalColorDefaults = {
@@ -1702,6 +1711,42 @@ export default class SceneCardsPlugin extends Plugin {
      * ones. The series scan wins on file-path collisions because
      * `addFile()` skips paths that are already loaded.
      */
+    /**
+     * Reload all entity managers from the project folders AND re-apply
+     * Additional Source Folders. This is the single entry point views
+     * should call on open/refresh so that externally-scanned entries
+     * (characters/locations/codex stored outside the project Codex)
+     * survive view reloads.
+     *
+     * `loadActiveProjectEntities()` clears each manager and reloads from
+     * the project folders; `scanExtraFolders()` then re-adds entries from
+     * user-configured external folders. Calling both keeps the two in sync.
+     */
+    async reloadEntities(): Promise<void> {
+        await this.loadActiveProjectEntities();
+        await this.scanExtraFolders();
+        // Re-load codex entries from the project Codex folder, then re-apply
+        // external folders so codex-type entries are included.
+        const codexFolder = this.sceneManager.getCodexFolder();
+        if (codexFolder) {
+            const customDefs = (this.settings.codexCustomCategories || []).map(
+                (cc: { id: string; label: string; icon: string }) => makeCustomCodexCategory(cc.id, cc.label, cc.icon)
+            );
+            this.codexManager.initCategories(this.settings.codexEnabledCategories || [], customDefs);
+            await this.codexManager.loadAll(codexFolder);
+            await this.scanExtraFolders();
+        }
+    }
+
+    /**
+     * Reload characters and locations from the active project's Codex
+     * folders, then scan series-local Codex folders if applicable. Used by
+     * `reloadEntities()` and the bootstrap path.
+     *
+     * `loadCharacters`/`loadAll` clear the manager first, so callers that
+     * also want external Additional Source Folder entries must run
+     * `scanExtraFolders()` afterwards.
+     */
     async loadActiveProjectEntities(): Promise<void> {
         const adapter = this.app.vault.adapter;
 
@@ -1757,12 +1802,40 @@ export default class SceneCardsPlugin extends Plugin {
         if (!folders || folders.length === 0) return;
 
         const adapter = this.app.vault.adapter;
+        // Resolve the vault root once so we can convert absolute OS paths
+        // (e.g. "C:/Users/.../MyFolder" on Windows or "/Users/.../MyFolder"
+        // on macOS/Linux) into vault-relative paths that the adapter
+        // understands. On mobile the adapter basePath may be empty, in
+        // which case we fall back to using the path as-is.
+        let vaultRoot = '';
+        try {
+            if (typeof (adapter as unknown as { getBasePath?: () => string }).getBasePath === 'function') {
+                vaultRoot = (adapter as unknown as { getBasePath: () => string }).getBasePath();
+            }
+        } catch { /* mobile / unsupported — leave vaultRoot empty */ }
+
+        const toVaultRelative = (p: string): string => {
+            if (!vaultRoot) return normalizePath(p);
+            // Normalise separators so the comparison works cross-platform.
+            const normRoot = vaultRoot.replace(/\\/g, '/').replace(/\/+$/, '');
+            const normPath = p.replace(/\\/g, '/').replace(/^\/+/, '');
+            if (normPath.toLowerCase().startsWith(normRoot.toLowerCase() + '/')) {
+                return normalizePath(normPath.slice(normRoot.length + 1));
+            }
+            if (normPath.toLowerCase() === normRoot.toLowerCase()) {
+                return '';
+            }
+            // Already vault-relative (or an unknown absolute path) — normalise
+            // and let adapter.exists decide.
+            return normalizePath(p);
+        };
+
         const scan = async (folderPath: string): Promise<void> => {
-            // Normalize the folder path (strips leading/trailing slashes,
-            // converts backslashes on Windows) so adapter.exists() doesn't
-            // silently fail on paths like "/Test" or "Test\".
-            const normalized = normalizePath(folderPath);
-            if (!await adapter.exists(normalized)) return;
+            // Convert absolute OS paths to vault-relative, then normalise
+            // (strips leading/trailing slashes, converts backslashes) so
+            // adapter.exists() doesn't silently fail.
+            const normalized = toVaultRelative(folderPath);
+            if (!normalized || !await adapter.exists(normalized)) return;
             const listing = await adapter.list(normalized);
             for (const f of listing.files) {
                 if (!f.endsWith('.md')) continue;
@@ -1797,6 +1870,33 @@ export default class SceneCardsPlugin extends Plugin {
         for (const folder of folders) {
             if (folder) await scan(folder);
         }
+    }
+
+    /**
+     * Convert an absolute OS filesystem path to a vault-relative path that
+     * Obsidian's vault adapter understands. Works cross-platform (Windows,
+     * macOS, Linux). If the path is already vault-relative (or the vault
+     * root cannot be determined, e.g. on mobile), the path is normalised
+     * and returned as-is.
+     */
+    toVaultRelativePath(p: string): string {
+        const adapter = this.app.vault.adapter;
+        let vaultRoot = '';
+        try {
+            if (typeof (adapter as unknown as { getBasePath?: () => string }).getBasePath === 'function') {
+                vaultRoot = (adapter as unknown as { getBasePath: () => string }).getBasePath();
+            }
+        } catch { /* mobile / unsupported */ }
+        if (!vaultRoot) return normalizePath(p);
+        const normRoot = vaultRoot.replace(/\\/g, '/').replace(/\/+$/, '');
+        const normPath = p.replace(/\\/g, '/').replace(/^\/+/, '');
+        if (normPath.toLowerCase().startsWith(normRoot.toLowerCase() + '/')) {
+            return normalizePath(normPath.slice(normRoot.length + 1));
+        }
+        if (normPath.toLowerCase() === normRoot.toLowerCase()) {
+            return '';
+        }
+        return normalizePath(p);
     }
 
     /**

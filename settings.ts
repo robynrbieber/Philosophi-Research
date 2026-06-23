@@ -2311,9 +2311,11 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         addBtn.addEventListener('click', async () => {
             const raw = folderInput.value.trim();
             if (!raw) return;
-            // Normalize so paths like "/Test" or "Test\" are stored
-            // consistently and match what scanExtraFolders expects.
-            const val = obsidian.normalizePath(raw);
+            // Convert absolute OS paths (e.g. "C:/Users/.../Folder" on
+            // Windows or "/Users/.../Folder" on macOS) to vault-relative
+            // paths that the vault adapter understands, then normalise.
+            const val = this.plugin.toVaultRelativePath(raw);
+            if (!val) return;
             if (!this.plugin.settings.extraFolders) this.plugin.settings.extraFolders = [];
             if (!this.plugin.settings.extraFolders.includes(val)) {
                 this.plugin.settings.extraFolders.push(val);
