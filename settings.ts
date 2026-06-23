@@ -775,6 +775,8 @@ export interface SceneCardsSettings {
      * from scene bodies before counting words. Defaults to true so that
      * `wordcount` reflects what the reader will actually see.
      */
+    /** Count unit for scene length displays: 'words' (default) or 'chars'. */
+    countUnit?: 'words' | 'chars';
     excludeCommentsFromWordcount?: boolean;
 
     /**
@@ -1532,6 +1534,21 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     }
                 }));
 
+        // ── Count unit (words vs characters) ──
+        new Setting(containerEl)
+            .setName('Count unit for scene lengths')
+            .setDesc('Choose whether scene cards, the Timeline, and the Inspector display scene length in words or characters. Useful for prose writers who track length in characters (e.g. Russian, Chinese, Japanese).')
+            .addDropdown(dropdown => {
+                dropdown.addOption('words', 'Words');
+                dropdown.addOption('chars', 'Characters');
+                dropdown.setValue(this.plugin.settings.countUnit === 'chars' ? 'chars' : 'words');
+                dropdown.onChange(async (value) => {
+                    this.plugin.settings.countUnit = value as 'words' | 'chars';
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
+                });
+            });
+
         // ── Issue #78 — Wordcount exclusions ──
         new Setting(containerEl)
             .setName('Exclude `%%comments%%` from wordcount')
@@ -2261,6 +2278,12 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 removeBtn.addEventListener('click', async () => {
                     this.plugin.settings.extraFolders.splice(i, 1);
                     await this.plugin.saveSettings();
+                    // Refresh views so entries from the removed folder clear.
+                    try {
+                        await this.plugin.refreshOpenViews();
+                    } catch {
+                        // best-effort
+                    }
                     renderFolderList();
                 });
             }
@@ -2286,12 +2309,22 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const addBtn = addRow.createEl('button', { text: 'Add', cls: 'mod-cta' });
         addBtn.setCssStyles({ flexShrink: '0' });
         addBtn.addEventListener('click', async () => {
-            const val = folderInput.value.trim();
-            if (!val) return;
+            const raw = folderInput.value.trim();
+            if (!raw) return;
+            // Normalize so paths like "/Test" or "Test\" are stored
+            // consistently and match what scanExtraFolders expects.
+            const val = obsidian.normalizePath(raw);
             if (!this.plugin.settings.extraFolders) this.plugin.settings.extraFolders = [];
             if (!this.plugin.settings.extraFolders.includes(val)) {
                 this.plugin.settings.extraFolders.push(val);
                 await this.plugin.saveSettings();
+                // Force an immediate re-scan + view refresh so newly linked
+                // folders appear without requiring a project switch or reload.
+                try {
+                    await this.plugin.refreshOpenViews();
+                } catch {
+                    // refreshOpenViews is best-effort; ignore failures.
+                }
             }
             folderInput.value = '';
             renderFolderList();

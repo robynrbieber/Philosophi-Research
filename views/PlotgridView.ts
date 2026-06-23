@@ -846,7 +846,19 @@ export class PlotgridView extends ItemView {
                         cancel.addEventListener('click', () => this.close());
                     }
                 }
-                const modal = new ConfirmModal(this.app, () => { this.data = { rows: [], columns: [], cells: {}, zoom: 1 }; this.scheduleSave(); this.renderGrid(); });
+                const modal = new ConfirmModal(this.app, () => {
+                    // Cancel any in-flight debounced save BEFORE clearing the
+                    // grid. Otherwise the pending save (holding the pre-reset
+                    // state) fires after the reset and resurrects the grid —
+                    // the "grid disappears then reappears on its own" bug.
+                    if (this.saveDebounce) {
+                        window.clearTimeout(this.saveDebounce);
+                        this.saveDebounce = null;
+                    }
+                    this.data = { rows: [], columns: [], cells: {}, zoom: 1 };
+                    this.scheduleSave();
+                    this.renderGrid();
+                });
                 modal.open();
             }));
             menu.showAtMouseEvent(evt);

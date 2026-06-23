@@ -17,6 +17,12 @@ type SortMode = 'alpha' | 'scenes-desc' | 'scenes-asc' | 'reading-order';
 type PlotlineViewMode = 'list' | 'subway';
 
 /**
+ * Corkboard sticky notes are stored as Scene objects with `corkboardNote: true`.
+ * They are layout/brainstorming aids, not story scenes, so the plotline view
+ * excludes them from grouping and the "Unassigned" bucket.
+ */
+
+/**
  * Plotlines View — shows scenes grouped by plotline tags.
  * Each plotline can be renamed, deleted, and scenes can be
  * assigned or removed via click menus.
@@ -253,10 +259,14 @@ export class StorylineView extends ItemView {
         const content = container.createDiv('story-line-storyline-content');
 
         const arcFilter = this.arcAnchorFilter === 'all' ? undefined : { arcAnchorFilter: this.arcAnchorFilter };
-        const scenes = this.sceneManager.queryService.getFilteredScenes(
+        const allScenes = this.sceneManager.queryService.getFilteredScenes(
             arcFilter,
             { field: 'sequence', direction: 'asc' }
         );
+        // Corkboard sticky notes are not story scenes — exclude them from
+        // plotline grouping and the "Unassigned" bucket so they don't pollute
+        // the plotline view or steal sequence slots in the display.
+        const scenes = allScenes.filter(s => !this.isCorkboardNoteScene(s));
 
         // Group scenes by plotline tags
         const plotlines = this.groupByPlotline(scenes);
@@ -1215,6 +1225,20 @@ export class StorylineView extends ItemView {
     }
 
     // ── Helpers ────────────────────────────────────────────
+
+    /**
+     * Returns true for corkboard sticky notes (Scene objects with
+     * `corkboardNote: true`). These are brainstorming/layout aids, not story
+     * scenes, and are excluded from plotline grouping.
+     */
+    private isCorkboardNoteScene(scene: Scene): boolean {
+        const value: unknown = (scene as Scene & { corkboardNote?: unknown }).corkboardNote;
+        if (value === true) return true;
+        if (value === false || value === undefined || value === null) return false;
+        if (typeof value === 'string') return value.trim().toLowerCase() === 'true';
+        if (typeof value === 'number') return value === 1;
+        return false;
+    }
 
     private groupByPlotline(scenes: Scene[]): Map<string, Scene[]> {
         const groups = new Map<string, Scene[]>();

@@ -8534,9 +8534,12 @@ body /* Clamp title on mobile too, in case it's very long */
     font-size: 0.88em;
     cursor: pointer;
     color: var(--text-normal);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Allow long hierarchical labels (e.g. "Forest > Old House > Scary Room")
+       to wrap instead of being clipped, so sibling locations that share a
+       short name under different parents stay distinguishable. A title
+       attribute is also set in JS for hover. */
+    white-space: normal;
+    word-break: break-word;
 }
 
 .sl-suggest-item:hover,

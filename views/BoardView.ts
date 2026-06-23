@@ -625,6 +625,14 @@ export class BoardView extends ItemView {
         });
         textarea.value = scene.body || '';
 
+        // Track the last known committed body so we can detect a suspicious
+        // empty write caused by the textarea being cleared/detached mid-edit
+        // (the root cause of disappearing corkboard notes — issue: notes lost
+        // text while images survived). We never overwrite a non-empty body
+        // with an empty value from a detached/stale textarea.
+        let lastCommittedBody = scene.body || '';
+        let editorAttached = true;
+
         const preview = editorWrap.createDiv('story-line-corkboard-note-preview markdown-rendered');
         let isEditing = false;
         let commitInProgress = false;
@@ -634,6 +642,12 @@ export class BoardView extends ItemView {
             if (!outsidePointerHandler) return;
             activeDocument.removeEventListener('pointerdown', outsidePointerHandler, true);
             outsidePointerHandler = null;
+        };
+
+        /** Mark the editor as torn down so saveBody() refuses to write a stale value. */
+        const markDetached = () => {
+            editorAttached = false;
+            detachOutsideClose();
         };
 
         const renderPreview = async () => {
@@ -718,10 +732,22 @@ export class BoardView extends ItemView {
         autoGrow();
 
         const saveBody = async () => {
+            // If the editor DOM has been detached (e.g. by a refreshBoard
+            // rebuild), the textarea may report a stale/empty value. Guard
+            // against destroying a non-empty note body in that case.
+            if (!editorAttached || !textarea.isConnected) return;
             const next = textarea.value;
-            if ((scene.body || '') === next) return;
+            // Never overwrite a non-empty body with an empty value unless the
+            // user explicitly cleared it within the same editing session —
+            // protects against the disappearing-notes race.
+            if (!next && lastCommittedBody) {
+                // Treat as a no-op save; the in-memory body is preserved.
+                return;
+            }
+            if (lastCommittedBody === next) return;
             await this.sceneManager.updateScene(scene.filePath, { body: next });
             scene.body = next;
+            lastCommittedBody = next;
         };
 
         const commitAndClose = async () => {
@@ -770,6 +796,27 @@ export class BoardView extends ItemView {
             await renderPreview();
             setEditing(false);
         })();
+
+        // Watch for the card being removed from the DOM (happens on every
+        // refreshBoard rebuild). When that occurs, flush any in-flight edit
+        // synchronously and mark the editor detached so a later blur/pointer
+        // handler cannot write a stale empty body over the real note content.
+        const detachObserver = new MutationObserver(() => {
+            if (!cardEl.isConnected) {
+                detachObserver.disconnect();
+                // Best-effort flush of the current textarea value before we
+                // mark detached — but only if it still holds meaningful text.
+                if (isEditing && textarea.isConnected && textarea.value && textarea.value !== lastCommittedBody) {
+                    void (async () => {
+                        await saveBody();
+                        markDetached();
+                    })();
+                } else {
+                    markDetached();
+                }
+            }
+        });
+        detachObserver.observe(cardEl.ownerDocument.body, { childList: true, subtree: true });
 
         const footer = editorWrap.createDiv('story-line-corkboard-note-actions');
         const convertBtn = footer.createEl('button', {

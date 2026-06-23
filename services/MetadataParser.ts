@@ -116,6 +116,7 @@ export class MetadataParser {
             emotion: frontmatter.emotion,
             intensity: frontmatter.intensity,
             wordcount: this.countWords(body),
+            charcount: this.countChars(body),
             target_wordcount: frontmatter.target_wordcount,
             tags: frontmatter.tags || [],
             setup_scenes: this.parseStringArray(frontmatter.setup_scenes),
@@ -253,6 +254,7 @@ export class MetadataParser {
         // Always recount words from the final body text
         const finalBody = updates.body ?? body;
         frontmatter.wordcount = this.countWords(finalBody);
+        frontmatter.charcount = this.countChars(finalBody);
 
         // Issue #71 — mirror universal fields to top-level YAML keys
         mirrorUniversalFieldsToTopLevel(frontmatter, frontmatter.universalFields as Record<string, unknown> | undefined);
@@ -319,6 +321,7 @@ export class MetadataParser {
         // Issue #71 — mirror universal fields to top-level YAML keys
         mirrorUniversalFieldsToTopLevel(fm, scene.universalFields);
         fm.wordcount = scene.body ? this.countWords(scene.body) : 0;
+        fm.charcount = scene.body ? this.countChars(scene.body) : 0;
         fm.created = new Date().toISOString().split('T')[0];
         fm.modified = new Date().toISOString().split('T')[0];
 
@@ -475,6 +478,30 @@ export class MetadataParser {
             .trim();
         if (!cleaned) return 0;
         return tokenizeWords(cleaned, resolveLocale(_wordcountLocale, cleaned, DEFAULT_STORYLINE_LOCALE)).length;
+    }
+
+    /**
+     * Count characters in the scene body, applying the same exclusions as
+     * `countWords` (comments, checklists, markdown markup) so the two counts
+     * stay aligned. Whitespace is collapsed but not stripped, so the count
+     * reflects the readable prose length.
+     */
+    private static countChars(text: string): number {
+        if (!text) return 0;
+        let working = text;
+        if (_excludeCommentsFromWordcount) {
+            working = working.replace(/%%[\s\S]*?%%/g, '');
+        }
+        if (_excludeChecklistFromWordcount) {
+            working = working.replace(/^[ \t]*[-*+]\s*\[[ xX]\]\s.*$/gm, '');
+        }
+        const cleaned = working
+            .replace(/^#+\s+.*/gm, '')
+            .replace(/\[\[.*?\]\]/g, '')
+            .replace(/[*_~`]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+        return cleaned.length;
     }
 
     /**

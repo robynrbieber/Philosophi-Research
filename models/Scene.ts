@@ -123,6 +123,8 @@ export interface Scene {
     intensity?: number;
     /** Actual word count */
     wordcount?: number;
+    /** Actual character count (excludes markdown markup, comments, etc.) */
+    charcount?: number;
     /** Target word count */
     target_wordcount?: number;
     /** Tags for plotlines, themes, etc. */
@@ -227,6 +229,26 @@ export interface SortConfig {
  * Available view types
  */
 export type ViewType = 'board' | 'timeline' | 'storyline' | 'character' | 'stats' | 'plotgrid' | 'manuscript' | 'codex' | 'location';
+
+/**
+ * Build the human-readable length label for a scene, honouring the user's
+ * `countUnit` setting ('words' or 'chars'). Returns e.g. `"1234 words"` or
+ * `"5678 chars"`. When a target word count is supplied and the unit is words,
+ * the label reads `"1234 / 800 words"`; for chars the target is omitted
+ * (targets are word-based).
+ */
+export function formatSceneLength(
+    scene: Pick<Scene, 'wordcount' | 'charcount' | 'target_wordcount'>,
+    unit: 'words' | 'chars' = 'words',
+): string {
+    if (unit === 'chars') {
+        const chars = scene.charcount ?? 0;
+        return `${chars} chars`;
+    }
+    const wc = scene.wordcount ?? 0;
+    const target = scene.target_wordcount;
+    return target ? `${wc} / ${target} words` : `${wc} words`;
+}
 
 /**
  * A reusable scene template with pre-filled defaults and body text

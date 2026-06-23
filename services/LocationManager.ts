@@ -209,14 +209,40 @@ export class LocationManager {
     }
 
     /**
-     * Build a display-name map: plain location name → "Parent > Child" label.
-     * Only locations that have a parent get the hierarchical prefix.
+     * Build a display-name map: plain location name → full ancestry label
+     * (e.g. "Forest > Old House > Scary Room"). Walks the full parent chain
+     * so deeply nested locations are distinguishable in dropdowns, which is
+     * critical when sibling locations share a name under different parents.
      */
     getDisplayNameMap(): Map<string, string> {
         const map = new Map<string, string>();
+        // Index locations by lowercase name for parent lookups.
+        const byNameLower = new Map<string, StoryLocation>();
+        for (const loc of this.getAllLocations()) {
+            byNameLower.set(loc.name.toLowerCase(), loc);
+        }
+
+        const buildAncestry = (loc: StoryLocation): string => {
+            const parts: string[] = [loc.name];
+            let current = loc.parent;
+            const seen = new Set<string>([loc.name.toLowerCase()]);
+            let guard = 0;
+            while (current && guard < 32) {
+                guard++;
+                const parentLower = current.toLowerCase();
+                if (seen.has(parentLower)) break; // cycle guard
+                seen.add(parentLower);
+                parts.unshift(current);
+                const parentLoc = byNameLower.get(parentLower);
+                if (!parentLoc) break;
+                current = parentLoc.parent;
+            }
+            return parts.join(' > ');
+        };
+
         for (const loc of this.getAllLocations()) {
             if (loc.parent) {
-                map.set(loc.name, `${loc.parent} > ${loc.name}`);
+                map.set(loc.name, buildAncestry(loc));
             } else {
                 map.set(loc.name, loc.name);
             }

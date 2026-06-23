@@ -13,7 +13,7 @@ import { applyMobileClass } from '../components/MobileAdapter';
 import { attachTooltip } from '../components/Tooltip';
 import { ButtonComponent, DropdownComponent, ItemView, Menu, Modal, Notice, Setting, TFile, TextComponent, WorkspaceLeaf } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { BUILTIN_BEAT_SHEETS, Scene, SceneStatus, TIMELINE_MODES, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+import { BUILTIN_BEAT_SHEETS, Scene, SceneStatus, TIMELINE_MODES, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, TimelineMode, formatSceneLength, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import { getActDisplayLabel } from '../utils/actChapter';
 
 /**
@@ -782,8 +782,9 @@ export class TimelineView extends ItemView {
         const statusBadge = footer.createSpan({ cls: 'timeline-card-status', text: statusCfg.label });
         statusBadge.setCssStyles({ color: statusCfg.color });
 
-        if (scene.wordcount) {
-            footer.createSpan({ cls: 'timeline-card-wc', text: `${scene.wordcount} words` });
+        if (scene.wordcount || scene.charcount) {
+            const unit = this.plugin.settings.countUnit === 'chars' ? 'chars' : 'words';
+            footer.createSpan({ cls: 'timeline-card-wc', text: formatSceneLength(scene, unit) });
         }
 
         // Click / double-click / context menu
@@ -980,10 +981,11 @@ export class TimelineView extends ItemView {
         });
         statusBadge.setCssStyles({ color: statusCfg.color });
 
-        if (scene.wordcount) {
+        if (scene.wordcount || scene.charcount) {
+            const unit = this.plugin.settings.countUnit === 'chars' ? 'chars' : 'words';
             footer.createSpan({
                 cls: 'timeline-card-wc',
-                text: `${scene.wordcount} words`
+                text: formatSceneLength(scene, unit),
             });
         }
 

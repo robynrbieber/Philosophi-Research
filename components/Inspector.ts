@@ -531,13 +531,14 @@ export class InspectorComponent {
         });
 
         const wcGroup = wcRow.createDiv();
-        wcGroup.createSpan({ cls: 'inspector-label', text: 'Words' });
+        const useChars = this.plugin.settings.countUnit === 'chars';
+        wcGroup.createSpan({ cls: 'inspector-label', text: useChars ? 'Characters' : 'Words' });
         const wcDisplay = wcGroup.createDiv();
         wcDisplay.setCssStyles({
             marginTop: '4px',
             fontSize: '13px',
         });
-        wcDisplay.textContent = String(scene.wordcount || 0);
+        wcDisplay.textContent = String(useChars ? (scene.charcount || 0) : (scene.wordcount || 0));
 
         const targetGroup = wcRow.createDiv();
         targetGroup.createSpan({ cls: 'inspector-label', text: 'Target' });

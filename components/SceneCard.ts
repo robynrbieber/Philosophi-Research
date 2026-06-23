@@ -5,7 +5,7 @@ import type SceneCardsPlugin from '../main';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
 import type { SceneManager } from '../services/SceneManager';
 import { formatActChapterPrefix } from '../utils/actChapter';
-import { ColorCodingMode, Scene, SceneStatus, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+import { ColorCodingMode, Scene, SceneStatus, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, formatSceneLength, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 
 /**
  * Renders a single scene card element
@@ -133,12 +133,10 @@ export class SceneCardComponent {
         if (!options?.compact) {
             const footer = card.createDiv('scene-card-footer');
             if (this.plugin.settings.showWordCounts) {
-                const wc = scene.wordcount || 0;
-                const target = scene.target_wordcount;
-                const wcText = target ? `${wc} / ${target}` : String(wc);
+                const unit = this.plugin.settings.countUnit === 'chars' ? 'chars' : 'words';
                 footer.createSpan({
                     cls: 'scene-card-wordcount',
-                    text: `${wcText} words`
+                    text: formatSceneLength(scene, unit),
                 });
             }
             const progress = footer.createSpan('scene-card-progress');

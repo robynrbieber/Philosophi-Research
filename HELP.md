@@ -510,6 +510,8 @@ Each scene is a Markdown file with YAML frontmatter. StoryLine manages these fie
 
 These settings flow through scene cards, the inspector, the Writing Tracker, and exports.
 
+**Count unit: words or characters** *(since 1.10.31)* — A **Count unit for scene lengths** dropdown under **Settings → Scene Cards** lets you choose whether scene cards, the Timeline, and the Inspector show scene length in **Words** (default) or **Characters**. The character count is stored in a new `charcount` frontmatter field and applies the same exclusions as the word count. Handy for prose writers who track length in characters (e.g. Russian, Chinese, Japanese).
+
 **Default scene frontmatter** *(since 1.9.6)* — Universal Field Templates have an optional **Default value** that is auto-applied to newly created scenes (multi-select fields accept comma-separated defaults). In addition, **Settings → Default scene frontmatter** accepts a free-form YAML block whose keys are merged into every newly created scene's frontmatter. StoryLine-owned keys (`type`, `title`, `act`, `chapter`, `sequence`, `status`, `wordcount`, …) always win on conflict, so the default snippet can never overwrite the engine's own metadata.
 
 **Scene card preview text** *(since 1.10.14)* — Beneath each scene card title you can show a short preview line. Choose what to display at **Settings → Scene Cards → Scene card preview text**: **None**, **Synopsis**, **First lines of draft**, or **Conflict**. The card stays compact and the preview is clipped to ~4 lines.
@@ -1570,8 +1572,9 @@ By default, StoryLine only scans files inside your project's folder structure (S
 
 - ⚠ **Experimental** — back up your files before linking external folders. Files in linked folders may be modified when you edit entities in StoryLine views.
 - Works with **any folder structure** — files don’t need to be organized by type. StoryLine reads the `type:` field in each file’s frontmatter to determine what it is.
-- Folder paths are **vault-relative** (e.g., `Shared Universe/Characters` or `Book 2/Scenes`).
+- Folder paths are **vault-relative** (e.g., `Shared Universe/Characters` or `Book 2/Scenes`). Leading/trailing slashes and Windows backslashes are normalized automatically.
 - The folder browser provides **autocomplete** — start typing and it suggests matching vault folders.
+- Adding or removing a folder triggers an **immediate re-scan** and view refresh, so newly linked entities appear right away (no project switch or reload needed).
 - Remove a folder by clicking the × button next to it in the settings.
 - Additional source folders are scanned after the main project folders, so project files take priority when there are duplicates.
 

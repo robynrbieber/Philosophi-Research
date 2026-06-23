@@ -6,6 +6,21 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.31
+
+### New Features
+
+- **Character count option for scene lengths** — A new **Count unit for scene lengths** setting under **Settings → Scene Cards** lets you choose whether scene cards, the Timeline, and the Inspector display scene length in **Words** (default) or **Characters**. Useful for prose writers — especially for those who track manuscript length in characters rather than words. The character count is stored in a new `charcount` frontmatter field alongside the existing `wordcount`, and applies the same exclusions (comments, checklists, markdown markup) as the word count.
+
+### Bug Fixes
+
+- **Corkboard notes no longer disappear** — The corkboard note editor could lose its text (while images survived) when a view refresh rebuilt the board mid-edit: the textarea's `blur`/outside-pointer handler would then write a stale empty body over the real note content. The editor now tracks whether it is still attached to the DOM, refuses to overwrite a non-empty body with an empty value from a detached textarea, and flushes the in-flight edit synchronously before marking itself detached. *(Reported: notes disappeared twice; images survived the second time.)*
+- **Corkboard notes no longer appear as "Unassigned" scenes in Plotlines** — The Plotlines (Storyline) view now filters out corkboard sticky notes before grouping, matching the existing filter in the Timeline and Board views. Sticky notes are brainstorming aids, not story scenes, so they no longer pollute the "Unassigned" bucket.
+- **Corkboard notes no longer steal sequence numbers from real scenes** — `SceneManager.createScene` no longer assigns a `sequence` number to corkboard notes, and `globalResequence` / `getNextSequence` now exclude notes from the sequence space. This eliminates the gaps in scene numbering caused by notes and fixes the symptom where Timeline reordering by number appeared not to change the numbers (notes were occupying slots in the numbering).
+- **Plot Grid reset no longer resurrects the grid** — Resetting the grid could make it "disappear then reappear on its own" because a pending debounced save (holding the pre-reset state) fired after the reset. The reset handler now cancels any in-flight debounced save before clearing the grid.
+- **Additional Source Folders now picks up linked notes** — `scanExtraFolders` now normalizes the folder path before the existence check, so paths like `/Test` or `Test\` (common on Windows) no longer cause the scan to abort silently. Adding or removing a folder in **Settings → Advanced → Additional Source Folders** now triggers an immediate re-scan and view refresh, so newly linked notes appear without requiring a project switch or reload.
+- **Nested location dropdowns show the full ancestry** — The location autocomplete in the Inspector now displays the complete parent chain (e.g. `Forest > Old House > Scary Room`) instead of only the immediate parent, so deeply nested locations are distinguishable. Previously a three-level hierarchy collapsed to a single `Parent > Child` label, making it impossible to tell identically-named locations apart. The suggestion dropdown items also now wrap and carry a hover tooltip with the full label, so long names are no longer clipped.
+
 ## Version 1.10.30
 
 ### New Features

@@ -793,8 +793,11 @@ export class SceneManager implements ISceneStore {
             }
         }
 
-        // Auto-generate sequence if enabled (skip when caller already set one)
-        if (this.plugin.settings.autoGenerateSequence && sceneData.sequence === undefined) {
+        // Auto-generate sequence if enabled (skip when caller already set one).
+        // Corkboard notes are layout/brainstorming aids, not story scenes, so
+        // they must NOT consume a sequence number — otherwise they create gaps
+        // in the scene numbering and pollute globalResequence / Timeline order.
+        if (!isNote && this.plugin.settings.autoGenerateSequence && sceneData.sequence === undefined) {
             sceneData.sequence = this.getNextSequence(afterScene);
         }
 
@@ -1332,13 +1335,17 @@ export class SceneManager implements ISceneStore {
      * the current act/chapter/sequence of all scenes.
      */
     async globalResequence(ordered?: Scene[]): Promise<void> {
-        const list = ordered ?? [...this.getAllScenes()].sort((a, b) => {
-            const ac = compareActChapter(a.act, b.act);
-            if (ac !== 0) return ac;
-            const cc = compareActChapter(a.chapter, b.chapter);
-            if (cc !== 0) return cc;
-            return (a.sequence ?? 0) - (b.sequence ?? 0);
-        });
+        // Corkboard notes are excluded from the global sequence space so they
+        // don't create gaps in scene numbering or steal slots from real scenes.
+        const list = (ordered ?? [...this.getAllScenes()])
+            .filter(s => !s.corkboardNote)
+            .sort((a, b) => {
+                const ac = compareActChapter(a.act, b.act);
+                if (ac !== 0) return ac;
+                const cc = compareActChapter(a.chapter, b.chapter);
+                if (cc !== 0) return cc;
+                return (a.sequence ?? 0) - (b.sequence ?? 0);
+            });
         for (let i = 0; i < list.length; i++) {
             const want = i + 1;
             if (list[i].sequence !== want) {
@@ -2179,7 +2186,10 @@ export class SceneManager implements ISceneStore {
     // --- Private helpers ---
 
     private getNextSequence(afterScene?: Scene): number {
+        // Only real scenes participate in the sequence space; corkboard notes
+        // are excluded so they don't inflate the next sequence number.
         const allSequences = this.getAllScenes()
+            .filter(s => !s.corkboardNote)
             .map(s => s.sequence ?? 0)
             .sort((a, b) => a - b);
 

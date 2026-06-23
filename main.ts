@@ -1758,8 +1758,12 @@ export default class SceneCardsPlugin extends Plugin {
 
         const adapter = this.app.vault.adapter;
         const scan = async (folderPath: string): Promise<void> => {
-            if (!await adapter.exists(folderPath)) return;
-            const listing = await adapter.list(folderPath);
+            // Normalize the folder path (strips leading/trailing slashes,
+            // converts backslashes on Windows) so adapter.exists() doesn't
+            // silently fail on paths like "/Test" or "Test\".
+            const normalized = normalizePath(folderPath);
+            if (!await adapter.exists(normalized)) return;
+            const listing = await adapter.list(normalized);
             for (const f of listing.files) {
                 if (!f.endsWith('.md')) continue;
                 try {

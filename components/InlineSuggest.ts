@@ -201,6 +201,11 @@ export class InlineSuggest {
             // Highlight matched characters (use display label if available)
             const displayText = this.getDisplayLabel ? this.getDisplayLabel(visible[i].name) : visible[i].name;
             this.renderHighlighted(item, displayText, query);
+            // Full-text tooltip so long hierarchical labels (e.g.
+            // "Forest > Old House > Scary Room") are readable on hover even
+            // when the dropdown clips them. Critical when sibling locations
+            // share a short name under different parents.
+            item.setAttr('title', displayText);
             item.addEventListener('mousedown', (e) => {
                 e.preventDefault(); // prevent blur
             });
