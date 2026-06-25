@@ -15,7 +15,7 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 ### New Features
 
-- **Manuscript view remembers your scroll position** — switching away from the Manuscript view (to Codex, Plotgrid, etc.) and back, or restarting Obsidian, previously reset the cursor to the top of the document. The Manuscript view now persists its scroll position and the focused scene path to the project's `System/manuscript-state.json` file on close, and restores it after the next render so you return to the exact spot you were writing. *(Discussion #183)*
+- **Manuscript view remembers your cursor and scroll position** — switching away from the Manuscript view (to Codex, Plotgrid, etc.) and back, or restarting Obsidian, previously reset the cursor to the top of the document with no editor focused. The Manuscript view now captures the active editor's CM6 cursor selection and scroll position on focus loss, and after the next render eagerly mounts the previously-focused scene's editor, focuses it, and restores the exact cursor position so you resume typing right where you left off. State is also persisted to the project's `System/manuscript-state.json` so it survives an Obsidian restart. *(Discussion #183)*
 
 ## Version 1.10.32
 

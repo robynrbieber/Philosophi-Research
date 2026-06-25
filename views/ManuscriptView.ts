@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { ItemView, WorkspaceLeaf, WorkspaceSplit, MarkdownRenderer, TFile, setIcon } from 'obsidian';
 import { EditorView, Decoration } from '@codemirror/view';
-import { RangeSetBuilder, StateEffect, Compartment } from '@codemirror/state';
+import { RangeSetBuilder, StateEffect, Compartment, EditorSelection } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import { Scene, SceneFilter, SortConfig } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
@@ -12,6 +12,22 @@ import { buildFormattingToolbar } from '../components/FormattingToolbar';
 import { compareActChapter, getActDisplayLabel } from '../utils/actChapter';
 import SceneCardsPlugin from '../main';
 import { MANUSCRIPT_VIEW_TYPE } from '../constants';
+
+/**
+ * Discussion #183 — module-level cursor/scroll snapshot.
+ *
+ * When the user switches from Manuscript to Codex (or any other view),
+ * Obsidian destroys the ManuscriptView instance and creates a new one when
+ * the user switches back. Any instance-level state is lost. We keep the
+ * last cursor position + scroll offset here at module scope so the new
+ * instance can restore it after its first render.
+ */
+let _lastManuscriptState: {
+    scenePath: string;
+    scrollTop: number;
+    cursorAnchor?: number;
+    cursorHead?: number;
+} | null = null;
 
 /**
  * Manuscript View — Scrivenings-style continuous document view.
@@ -52,6 +68,9 @@ export class ManuscriptView extends ItemView {
     private _focusMode = false;
     /** File path of the scene currently most visible in the scroll area */
     focusedScenePath: string | null = null;
+    /** File path of the scene whose editor currently has focus (being edited).
+     *  Distinct from focusedScenePath which tracks the most-visible scene. */
+    private editingScenePath: string | null = null;
     /** Formatting toolbar element */
     private fmtToolbar: HTMLElement | null = null;
     /** The currently focused embedded leaf (for toolbar commands) */
@@ -86,15 +105,13 @@ export class ManuscriptView extends ItemView {
 
         await this.sceneManager.initialize();
         this.renderView(container);
-        // Discussion #183 — restore the last scroll position + focused scene
-        // after the first render so the user returns to where they were typing.
-        this.restoreScrollPosition();
     }
 
     async onClose(): Promise<void> {
-        // Discussion #183 — persist scroll position + focused scene path so
-        // switching away and coming back (or restarting) resumes at the same spot.
-        this.saveScrollPosition();
+        // Discussion #183 — capture cursor + scroll to the module-level
+        // variable so the next ManuscriptView instance can restore it.
+        this.captureCurrentState();
+        this.captureAndPersistState();
         this.detachAllEmbedded();
         this.focusObserver?.disconnect();
         this.lazyObserver?.disconnect();
@@ -231,10 +248,13 @@ export class ManuscriptView extends ItemView {
             this._hasActiveFocus = true;
             // Find which embedded leaf owns the focused element
             const target = e.target as HTMLElement;
-            for (const [_path, leaf] of this.embeddedLeaves) {
+            for (const [path, leaf] of this.embeddedLeaves) {
                 const splitEl = (leaf as unknown as { containerEl?: { parentElement?: HTMLElement | null } }).containerEl?.parentElement;
                 if (splitEl?.contains(target)) {
                     this.activeLeaf = leaf;
+                    // Discussion #183 — track which scene is being edited so
+                    // we can restore focus to it after a view switch.
+                    this.editingScenePath = path;
                     // In focus mode, highlight the active scene block
                     if (this._focusMode) {
                         this.scrollArea?.querySelectorAll('.sl-focus-active').forEach(
@@ -249,6 +269,10 @@ export class ManuscriptView extends ItemView {
             if (this.fmtToolbar) this.fmtToolbar.setCssStyles({ display: '' });
         });
         this.scrollArea.addEventListener('focusout', () => {
+            // Discussion #183 — capture the cursor + scroll position the
+            // instant the editor loses focus, so a subsequent re-render
+            // (triggered by switching to Codex and back) can restore it.
+            this.captureCurrentState();
             window.setTimeout(() => {
                 if (!this.scrollArea?.contains(activeDocument.activeElement)) {
                     this._hasActiveFocus = false;
@@ -430,6 +454,11 @@ export class ManuscriptView extends ItemView {
             await this.mountEditor(editorContainers[i].el, editorContainers[i].path);
         }
         this._isMounting = false;
+
+        // Discussion #183 — after the initial render, restore the saved
+        // scroll position and cursor. On a fresh open (no in-memory state)
+        // we fall back to the persisted state on disk.
+        this.restoreStateAfterRender();
     }
 
     /** Mount a real Obsidian MarkdownView (Live Preview) inside the given container */
@@ -568,6 +597,28 @@ export class ManuscriptView extends ItemView {
                 ro.observe(cmEl);
                 if (cmContent && cmContent !== cmEl) ro.observe(cmContent);
                 this.editorResizeObservers.set(filePath, ro);
+            }
+
+            // Discussion #183 — capture the cursor position on blur so it
+            // survives the view switch. The scrollArea-level focusout can
+            // fire too late (after the view is being torn down), so we
+            // also listen on the CM6 content element directly.
+            if (cmContent) {
+                cmContent.addEventListener('blur', () => {
+                    this.editingScenePath = filePath;
+                    this.captureCurrentState();
+                });
+                // Also capture on keyup/click so the module-level state always
+                // has the latest cursor position, even if blur never fires
+                // (e.g. the user switches tabs via a keyboard shortcut).
+                cmContent.addEventListener('keyup', () => {
+                    this.editingScenePath = filePath;
+                    this.captureCurrentState();
+                });
+                cmContent.addEventListener('click', () => {
+                    this.editingScenePath = filePath;
+                    this.captureCurrentState();
+                });
             }
         } catch (err) {
             this.mountingPaths.delete(filePath);
@@ -776,35 +827,92 @@ export class ManuscriptView extends ItemView {
     // ── Discussion #183 — cursor / scroll position resume ────────────
     //
     // When the user switches to another StoryLine view (Codex, Plotgrid, etc.)
-    // and comes back to the Manuscript, or restarts Obsidian, the scroll
-    // position previously reset to the top. We now persist the scrollTop and
-    // the focused scene path to the project's System/ folder so the view can
-    // restore the user's place after re-render.
+    // Obsidian destroys this ManuscriptView instance and creates a new one on
+    // return. We keep the last cursor + scroll position in a module-level
+    // variable (`_lastManuscriptState`) so the new instance can restore it.
+    // We also persist to System/manuscript-state.json for the Obsidian-restart
+    // case.
 
     private getManuscriptStateFile(): string {
         const base = this.plugin.getProjectSystemFolder();
         return `${base}/manuscript-state.json`;
     }
 
-    private saveScrollPosition(): void {
+    /**
+     * Capture the current cursor position + scroll position from the active
+     * embedded editor into the module-level `_lastManuscriptState` variable.
+     * Called on `focusout` and on `onClose` so the state survives view
+     * instance destruction.
+     */
+    private captureCurrentState(): void {
         try {
-            if (!this.scrollArea) return;
-            const scrollTop = this.scrollArea.scrollTop;
-            const focusedScenePath = this.focusedScenePath;
+            const scrollTop = this.scrollArea?.scrollTop ?? 0;
+            // Use the editing scene (the one whose editor had focus), not
+            // focusedScenePath (which is the most-visible scene and may be
+            // different from the one being edited).
+            const scenePath = this.editingScenePath ?? this.focusedScenePath;
+            if (!scenePath) return;
+
+            // Try to read the CM6 selection from the active leaf.
+            let cursorAnchor: number | undefined;
+            let cursorHead: number | undefined;
+            const leaf = this.activeLeaf ?? this.embeddedLeaves.get(scenePath);
+            if (leaf) {
+                const cm = this.getCmView(leaf);
+                if (cm) {
+                    const sel = cm.state.selection.main;
+                    cursorAnchor = sel.anchor;
+                    cursorHead = sel.head;
+                }
+            }
+
+            _lastManuscriptState = {
+                scenePath,
+                scrollTop,
+                cursorAnchor,
+                cursorHead,
+            };
+        } catch {
+            // best-effort — ignore
+        }
+    }
+
+    /**
+     * Persist the module-level state to disk (called on close so it survives
+     * an Obsidian restart).
+     */
+    private captureAndPersistState(): void {
+        this.captureCurrentState();
+        try {
             const adapter = this.app.vault.adapter;
             const path = this.getManuscriptStateFile();
-            const data = JSON.stringify({
-                scrollTop,
-                focusedScenePath,
-                savedAt: Date.now(),
-            });
-            void adapter.write(path, data);
+            const payload = _lastManuscriptState
+                ? { ..._lastManuscriptState, savedAt: Date.now() }
+                : {
+                      scenePath: this.editingScenePath ?? this.focusedScenePath ?? '',
+                      scrollTop: this.scrollArea?.scrollTop ?? 0,
+                      savedAt: Date.now(),
+                  };
+            void adapter.write(path, JSON.stringify(payload));
         } catch {
             // best-effort — never block close on a save failure
         }
     }
 
-    private restoreScrollPosition(): void {
+    /**
+     * After renderManuscript() finishes, restore the saved scroll position
+     * and cursor. Uses the module-level `_lastManuscriptState` if available
+     * (view switch case); otherwise falls back to the persisted state on disk
+     * (Obsidian restart case).
+     */
+    private restoreStateAfterRender(): void {
+        if (_lastManuscriptState) {
+            // In-memory state from a view switch — restore immediately.
+            this.applyRestore(_lastManuscriptState);
+            return;
+        }
+
+        // No in-memory state — try the persisted file (fresh open / restart).
         try {
             if (!this.scrollArea) return;
             const adapter = this.app.vault.adapter;
@@ -814,35 +922,19 @@ export class ManuscriptView extends ItemView {
                 void adapter.read(path).then(txt => {
                     try {
                         const data = JSON.parse(txt) as {
+                            scenePath?: string | null;
                             scrollTop?: number;
-                            focusedScenePath?: string | null;
+                            cursorAnchor?: number;
+                            cursorHead?: number;
                         };
-                        // Restore scroll position after the DOM has settled.
-                        window.requestAnimationFrame(() => {
-                            if (!this.scrollArea) return;
-                            if (typeof data.scrollTop === 'number' && data.scrollTop > 0) {
-                                this.scrollArea.scrollTop = data.scrollTop;
-                            }
-                            // If we have a focused scene, ensure its editor is mounted
-                            // (lazy loader) so the user can resume typing immediately.
-                            if (data.focusedScenePath) {
-                                const block = this.scrollArea?.querySelector(
-                                    `[data-scene-path="${CSS.escape(data.focusedScenePath)}"]`
-                                ) as HTMLElement | null;
-                                if (block) {
-                                    // Trigger the lazy observer by ensuring the block is visible
-                                    block.scrollIntoView({ block: 'start' });
-                                    // Re-apply the saved scrollTop after the scrollIntoView
-                                    if (typeof data.scrollTop === 'number') {
-                                        window.requestAnimationFrame(() => {
-                                            if (this.scrollArea && typeof data.scrollTop === 'number') {
-                                                this.scrollArea.scrollTop = data.scrollTop;
-                                            }
-                                        });
-                                    }
-                                }
-                            }
-                        });
+                        if (data && (data.scenePath || typeof data.scrollTop === 'number')) {
+                            this.applyRestore({
+                                scenePath: data.scenePath ?? '',
+                                scrollTop: data.scrollTop ?? 0,
+                                cursorAnchor: data.cursorAnchor,
+                                cursorHead: data.cursorHead,
+                            });
+                        }
                     } catch {
                         // corrupt state file — ignore
                     }
@@ -851,6 +943,82 @@ export class ManuscriptView extends ItemView {
         } catch {
             // best-effort — ignore
         }
+    }
+
+    /**
+     * Apply a saved restore snapshot: scroll to the position, ensure the
+     * focused scene's editor is mounted, focus it, and restore the cursor.
+     */
+    private applyRestore(state: {
+        scenePath: string;
+        scrollTop: number;
+        cursorAnchor?: number;
+        cursorHead?: number;
+    }): void {
+        if (!this.scrollArea) return;
+
+        // Restore scroll position.
+        if (typeof state.scrollTop === 'number' && state.scrollTop > 0) {
+            this.scrollArea.scrollTop = state.scrollTop;
+        }
+
+        if (!state.scenePath) return;
+
+        // Find the scene block. If its editor isn't mounted yet (lazy),
+        // mount it eagerly so we can focus it.
+        const block = this.scrollArea.querySelector(
+            `[data-scene-path="${CSS.escape(state.scenePath)}"]`
+        ) as HTMLElement | null;
+        if (!block) return;
+
+        const editorWrap = block.querySelector('.sl-manuscript-editor-wrap') as HTMLElement | null;
+        if (!editorWrap) return;
+
+        const mountAndFocus = async (): Promise<void> => {
+            // If the editor isn't mounted yet, mount it now.
+            if (!this.embeddedLeaves.has(state.scenePath)) {
+                await this.mountEditor(editorWrap, state.scenePath);
+            }
+            const leaf = this.embeddedLeaves.get(state.scenePath);
+            if (!leaf) return;
+
+            // Scroll the block into view first so the cursor is visible.
+            block.scrollIntoView({ block: 'start' });
+            if (typeof state.scrollTop === 'number') {
+                this.scrollArea!.scrollTop = state.scrollTop;
+            }
+
+            // Focus the CM6 editor and restore the selection.
+            const restoreCm = (cm: import('@codemirror/view').EditorView) => {
+                if (typeof state.cursorAnchor === 'number' && typeof state.cursorHead === 'number') {
+                    try {
+                        cm.dispatch({
+                            selection: EditorSelection.single(
+                                state.cursorAnchor,
+                                state.cursorHead
+                            ),
+                            scrollIntoView: true,
+                        });
+                    } catch {
+                        // selection out of range (file changed) — just focus
+                    }
+                }
+                cm.focus();
+            };
+
+            const cm = this.getCmView(leaf);
+            if (cm) {
+                restoreCm(cm);
+            } else {
+                // CM6 not ready yet — retry on the next frame.
+                window.requestAnimationFrame(() => {
+                    const cm2 = this.getCmView(leaf);
+                    if (cm2) restoreCm(cm2);
+                });
+            }
+        };
+
+        void mountAndFocus();
     }
 }
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- end of file-wide suppression block opened at line 1 */
