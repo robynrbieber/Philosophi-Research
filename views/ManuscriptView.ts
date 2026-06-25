@@ -86,9 +86,15 @@ export class ManuscriptView extends ItemView {
 
         await this.sceneManager.initialize();
         this.renderView(container);
+        // Discussion #183 — restore the last scroll position + focused scene
+        // after the first render so the user returns to where they were typing.
+        this.restoreScrollPosition();
     }
 
     async onClose(): Promise<void> {
+        // Discussion #183 — persist scroll position + focused scene path so
+        // switching away and coming back (or restarting) resumes at the same spot.
+        this.saveScrollPosition();
         this.detachAllEmbedded();
         this.focusObserver?.disconnect();
         this.lazyObserver?.disconnect();
@@ -764,6 +770,86 @@ export class ManuscriptView extends ItemView {
         ) as HTMLElement | null;
         if (block) {
             block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    // ── Discussion #183 — cursor / scroll position resume ────────────
+    //
+    // When the user switches to another StoryLine view (Codex, Plotgrid, etc.)
+    // and comes back to the Manuscript, or restarts Obsidian, the scroll
+    // position previously reset to the top. We now persist the scrollTop and
+    // the focused scene path to the project's System/ folder so the view can
+    // restore the user's place after re-render.
+
+    private getManuscriptStateFile(): string {
+        const base = this.plugin.getProjectSystemFolder();
+        return `${base}/manuscript-state.json`;
+    }
+
+    private saveScrollPosition(): void {
+        try {
+            if (!this.scrollArea) return;
+            const scrollTop = this.scrollArea.scrollTop;
+            const focusedScenePath = this.focusedScenePath;
+            const adapter = this.app.vault.adapter;
+            const path = this.getManuscriptStateFile();
+            const data = JSON.stringify({
+                scrollTop,
+                focusedScenePath,
+                savedAt: Date.now(),
+            });
+            void adapter.write(path, data);
+        } catch {
+            // best-effort — never block close on a save failure
+        }
+    }
+
+    private restoreScrollPosition(): void {
+        try {
+            if (!this.scrollArea) return;
+            const adapter = this.app.vault.adapter;
+            const path = this.getManuscriptStateFile();
+            void adapter.exists(path).then(exists => {
+                if (!exists) return;
+                void adapter.read(path).then(txt => {
+                    try {
+                        const data = JSON.parse(txt) as {
+                            scrollTop?: number;
+                            focusedScenePath?: string | null;
+                        };
+                        // Restore scroll position after the DOM has settled.
+                        window.requestAnimationFrame(() => {
+                            if (!this.scrollArea) return;
+                            if (typeof data.scrollTop === 'number' && data.scrollTop > 0) {
+                                this.scrollArea.scrollTop = data.scrollTop;
+                            }
+                            // If we have a focused scene, ensure its editor is mounted
+                            // (lazy loader) so the user can resume typing immediately.
+                            if (data.focusedScenePath) {
+                                const block = this.scrollArea?.querySelector(
+                                    `[data-scene-path="${CSS.escape(data.focusedScenePath)}"]`
+                                ) as HTMLElement | null;
+                                if (block) {
+                                    // Trigger the lazy observer by ensuring the block is visible
+                                    block.scrollIntoView({ block: 'start' });
+                                    // Re-apply the saved scrollTop after the scrollIntoView
+                                    if (typeof data.scrollTop === 'number') {
+                                        window.requestAnimationFrame(() => {
+                                            if (this.scrollArea && typeof data.scrollTop === 'number') {
+                                                this.scrollArea.scrollTop = data.scrollTop;
+                                            }
+                                        });
+                                    }
+                                }
+                            }
+                        });
+                    } catch {
+                        // corrupt state file — ignore
+                    }
+                });
+            });
+        } catch {
+            // best-effort — ignore
         }
     }
 }

@@ -109,8 +109,8 @@ export class MetadataParser {
             characters: this.parseCharacters(frontmatter.characters),
             location: this.cleanWikilink(frontmatter.location),
             timeline: frontmatter.timeline,
-            storyDate: frontmatter.storyDate ?? (frontmatter.story_date as string | undefined),
-            storyTime: frontmatter.storyTime ?? (frontmatter.story_time as string | undefined),
+            storyDate: this.normalizeFrontmatterString(frontmatter.storyDate ?? frontmatter.story_date),
+            storyTime: this.normalizeFrontmatterString(frontmatter.storyTime ?? frontmatter.story_time),
             status: this.parseStatus(frontmatter.status),
             conflict: frontmatter.conflict,
             emotion: frontmatter.emotion,
@@ -127,13 +127,13 @@ export class MetadataParser {
             modified: frontmatter.modified,
             body,
             notes: frontmatter.notes,
-            notesFile: frontmatter.notesFile ?? (frontmatter.notes_file as string | undefined),
-            synopsis: frontmatter.synopsis,
+            notesFile: this.normalizeFrontmatterString(frontmatter.notesFile ?? frontmatter.notes_file),
+            synopsis: this.normalizeFrontmatterString(frontmatter.synopsis),
             corkboardNote: this.parseBooleanFlag(frontmatter.corkboardNote ?? (frontmatter.corkboard_note as boolean | undefined)),
-            corkboardNoteColor: frontmatter.corkboardNoteColor ?? (frontmatter.corkboard_note_color as string | undefined),
-            corkboardNoteImage: frontmatter.corkboardNoteImage,
-            corkboardNoteCaption: frontmatter.corkboardNoteCaption,
-            plotgridOrigin: frontmatter.plotgridOrigin ?? (frontmatter.plotgrid_origin as string | undefined),
+            corkboardNoteColor: this.normalizeFrontmatterString(frontmatter.corkboardNoteColor ?? frontmatter.corkboard_note_color),
+            corkboardNoteImage: this.normalizeFrontmatterString(frontmatter.corkboardNoteImage),
+            corkboardNoteCaption: this.normalizeFrontmatterString(frontmatter.corkboardNoteCaption),
+            plotgridOrigin: this.normalizeFrontmatterString(frontmatter.plotgridOrigin ?? frontmatter.plotgrid_origin),
             timeline_mode: this.parseTimelineMode(frontmatter.timeline_mode),
             timeline_strand: frontmatter.timeline_strand,
             subtitle: frontmatter.subtitle,
@@ -148,6 +148,28 @@ export class MetadataParser {
             beatsheet: frontmatter.beatsheet,
             arcAnchor: this.parseBooleanFlag(frontmatter.arcAnchor ?? (frontmatter.arc_anchor as boolean | undefined)),
         };
+    }
+
+    /**
+     * Issue #182 — coerce a frontmatter value into a trimmed string or undefined.
+     * Obsidian's YAML parser can produce `undefined`, `number`, `boolean`, or even
+     * `object`/`array` for fields typed as `string`. Passing these directly into
+     * Obsidian APIs (normalizePath, getAbstractFileByPath, stringifyYaml) crashes
+     * with `Cannot read properties of undefined (reading 'replace')`. This helper
+     * is the single normalization point so downstream code always receives a
+     * properly typed value.
+     */
+    private static normalizeFrontmatterString(value: unknown): string | undefined {
+        if (value === undefined || value === null) return undefined;
+        if (typeof value === 'string') {
+            const s = value.trim();
+            return s.length > 0 ? s : undefined;
+        }
+        if (typeof value === 'number' || typeof value === 'boolean') {
+            return String(value);
+        }
+        // objects, arrays, symbols, etc. → undefined (never leak to Obsidian APIs)
+        return undefined;
     }
 
     /**

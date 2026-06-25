@@ -41,24 +41,28 @@ export class SnapshotManager {
      * Save a named snapshot of a scene.
      */
     async saveSnapshot(sceneFilePath: string, label: string): Promise<SceneSnapshot> {
-        const file = this.app.vault.getAbstractFileByPath(sceneFilePath);
+        // Issue #182 — guard against non-string inputs that would crash
+        // downstream `.replace()` calls when building the snapshot filename.
+        const safePath = typeof sceneFilePath === 'string' ? sceneFilePath : String(sceneFilePath ?? '');
+        const safeLabel = typeof label === 'string' ? label : String(label ?? 'Snapshot');
+        const file = this.app.vault.getAbstractFileByPath(safePath);
         if (!(file instanceof TFile)) {
-            throw new Error(`Scene file not found: ${sceneFilePath}`);
+            throw new Error(`Scene file not found: ${safePath}`);
         }
 
         // Migrate any legacy snapshots from the (vault-invisible) `.snapshots`
         // folder into the current snapshot folder before saving.
-        await this.migrateLegacySnapshotsFolder(sceneFilePath);
+        await this.migrateLegacySnapshotsFolder(safePath);
 
         const content = await this.app.vault.read(file);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const safeName = file.basename.replace(/[\\/:*?"<>|]/g, '-');
-        const safeLabel = label.replace(/[\\/:*?"<>|]/g, '-').substring(0, 40);
+        const safeLabelPart = safeLabel.replace(/[\\/:*?"<>|]/g, '-').substring(0, 40);
 
-        const snapshotDir = this.getSnapshotDir(sceneFilePath);
+        const snapshotDir = this.getSnapshotDir(safePath);
         await this.ensureFolder(snapshotDir);
 
-        const snapshotFileName = `${safeName}__${timestamp}__${safeLabel}.md`;
+        const snapshotFileName = `${safeName}__${timestamp}__${safeLabelPart}.md`;
         const snapshotPath = normalizePath(`${snapshotDir}/${snapshotFileName}`);
 
         // Write the snapshot as an exact copy of the scene file so it opens
@@ -68,12 +72,12 @@ export class SnapshotManager {
         const wordcount = this.countWords(content);
         await this.app.vault.create(snapshotPath, content);
 
-        new Notice(`Snapshot "${label}" saved`);
+        new Notice(`Snapshot "${safeLabel}" saved`);
 
         return {
             filePath: snapshotPath,
-            sceneFilePath,
-            label,
+            sceneFilePath: safePath,
+            label: safeLabel,
             timestamp: new Date().toISOString(),
             wordcount,
         };

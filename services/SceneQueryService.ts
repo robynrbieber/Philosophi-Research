@@ -76,8 +76,12 @@ export class SceneQueryService {
         const scenes = this.getFilteredScenes(filter, sort);
         const groups = new Map<string, Scene[]>();
 
-        const isCustom = field.startsWith('cf:');
-        const customId = isCustom ? field.slice(3) : '';
+        // Issue #182 — guard against non-string `field` values reaching .startsWith().
+        // Obsidian's YAML parser or hand-edited frontmatter can produce non-string
+        // group keys, which previously threw `t.startsWith is not a function`.
+        const fieldStr = typeof field === 'string' ? field : String(field ?? '');
+        const isCustom = fieldStr.startsWith('cf:');
+        const customId = isCustom ? fieldStr.slice(3) : '';
 
         const push = (key: string, scene: Scene) => {
             if (!groups.has(key)) groups.set(key, []);
@@ -98,7 +102,7 @@ export class SceneQueryService {
             }
 
             let key: string;
-            switch (field) {
+            switch (fieldStr) {
                 case 'act':
                     key = scene.act !== undefined ? getActDisplayLabel(scene.act) : 'No Act';
                     break;
@@ -110,6 +114,16 @@ export class SceneQueryService {
                     break;
                 case 'pov':
                     key = scene.pov || 'No POV';
+                    break;
+                case 'plotlines':
+                    // Issue #182 — plotlines grouping was previously unhandled and
+                    // fell through to `default: key = 'Unknown'`. Group by tags.
+                    if (scene.tags && scene.tags.length > 0) {
+                        // Push the scene into one group per tag (multi-plotline membership)
+                        for (const tag of scene.tags) push(tag, scene);
+                        continue;
+                    }
+                    key = 'No Plotline';
                     break;
                 default:
                     key = 'Unknown';

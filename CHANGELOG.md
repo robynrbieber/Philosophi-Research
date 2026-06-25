@@ -6,6 +6,17 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.33
+
+### Bug Fixes
+
+- **Scene Snapshot no longer crashes when `notesFile` is undefined** — `SnapshotManager.saveSnapshot()` could throw `Cannot read properties of undefined (reading 'replace')` when a scene had no external notes file, because an unvalidated `undefined` value leaked into Obsidian APIs (`normalizePath`, `getAbstractFileByPath`, `stringifyYaml`) that assume a string. `MetadataParser.parseContent()` now normalizes `notesFile` (and other frontmatter string fields like `synopsis`, `storyDate`, `storyTime`, `corkboardNoteColor`, `plotgridOrigin`) through a single `normalizeFrontmatterString()` helper that coerces `undefined`/`null`/non-string YAML values to a safe `string | undefined`. `SnapshotManager.saveSnapshot()` also guards its `sceneFilePath` and `label` parameters against non-string input. *(Issue #182)*
+- **`getScenesGroupedBy()` no longer throws `t.startsWith is not a function`** — grouping by `act`, `chapter`, or `plotlines` crashed because non-string frontmatter values (numbers, `undefined`) reached `.startsWith()` without a type guard. The `field` argument is now coerced to a string before the `cf:` prefix check, and a previously-missing `plotlines` case has been added to the switch statement so scenes are grouped by their tags instead of falling through to `Unknown`. *(Issue #182)*
+
+### New Features
+
+- **Manuscript view remembers your scroll position** — switching away from the Manuscript view (to Codex, Plotgrid, etc.) and back, or restarting Obsidian, previously reset the cursor to the top of the document. The Manuscript view now persists its scroll position and the focused scene path to the project's `System/manuscript-state.json` file on close, and restores it after the next render so you return to the exact spot you were writing. *(Discussion #183)*
+
 ## Version 1.10.32
 
 ### Bug Fixes
