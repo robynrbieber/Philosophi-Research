@@ -957,7 +957,8 @@ export class ManuscriptView extends ItemView {
     }): void {
         if (!this.scrollArea) return;
 
-        // Restore scroll position.
+        // Restore scroll position as a first approximation — the final
+        // restore happens after the editor mounts and layout settles.
         if (typeof state.scrollTop === 'number' && state.scrollTop > 0) {
             this.scrollArea.scrollTop = state.scrollTop;
         }
@@ -982,12 +983,6 @@ export class ManuscriptView extends ItemView {
             const leaf = this.embeddedLeaves.get(state.scenePath);
             if (!leaf) return;
 
-            // Scroll the block into view first so the cursor is visible.
-            block.scrollIntoView({ block: 'start' });
-            if (typeof state.scrollTop === 'number') {
-                this.scrollArea!.scrollTop = state.scrollTop;
-            }
-
             // Focus the CM6 editor and restore the selection.
             const restoreCm = (cm: import('@codemirror/view').EditorView) => {
                 if (typeof state.cursorAnchor === 'number' && typeof state.cursorHead === 'number') {
@@ -1004,6 +999,37 @@ export class ManuscriptView extends ItemView {
                     }
                 }
                 cm.focus();
+
+                // After CM6 has restored the cursor, scroll the outer
+                // container so the cursor is actually visible.  CM6's
+                // `scrollIntoView: true` only affects the editor's own
+                // viewport; the manuscript view uses a single outer scroll
+                // container, so we need to scroll that as well.
+                const scrollToCursor = (): void => {
+                    if (!this.scrollArea) return;
+                    const pos = typeof state.cursorAnchor === 'number'
+                        ? state.cursorAnchor
+                        : cm.state.selection.main.head;
+                    try {
+                        const coords = cm.coordsAtPos(pos);
+                        if (!coords) return;
+                        const rect = this.scrollArea.getBoundingClientRect();
+                        const margin = 80;
+                        if (coords.top < rect.top + margin) {
+                            // Cursor is above the visible area — scroll up.
+                            this.scrollArea.scrollTop -= rect.top + margin - coords.top;
+                        } else if (coords.bottom > rect.bottom - margin) {
+                            // Cursor is below the visible area — scroll down.
+                            this.scrollArea.scrollTop += coords.bottom - (rect.bottom - margin);
+                        }
+                    } catch {
+                        // coordsAtPos can throw if the position is invalid
+                    }
+                };
+
+                // Give CM6 a frame to process the dispatch + reflow, then
+                // adjust the outer scroll container.
+                window.requestAnimationFrame(scrollToCursor);
             };
 
             const cm = this.getCmView(leaf);

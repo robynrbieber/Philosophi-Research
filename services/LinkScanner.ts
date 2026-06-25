@@ -391,11 +391,14 @@ export class LinkScanner {
 
         // 3. #tags — accept any non-punctuation/whitespace run after `#`, so
         // tags like `#主角` (Chinese) or `#キャラ` (Japanese) work alongside ASCII.
+        // Strip [[...]] wikilinks first so section headers like [[Page#heading]]
+        // are not mistaken for #tags.
         const tagRe = /#([^\s#.,;:!?()\[\]{}'"“”‘’「」『』，。！？、]+)/g;
         const tags: string[] = [];
         const tagSeen = new Set<string>();
         let tm: RegExpExecArray | null;
-        while ((tm = tagRe.exec(text)) !== null) {
+        const textForTags = text.replace(/\[\[[^\]]*\]\]/g, ' ');
+        while ((tm = tagRe.exec(textForTags)) !== null) {
             const tag = tm[1];
             const low = tag.toLowerCase();
             if (!tagSeen.has(low)) { tagSeen.add(low); tags.push(tag); }

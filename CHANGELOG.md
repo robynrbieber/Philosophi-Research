@@ -6,6 +6,14 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.34
+
+### Bug Fixes
+
+- **Consistent toolbar separator line across all Codex views** — The Characters view showed a thin horizontal separator line between the StoryLine toolbar and the content area, but the Locations and Codex (Items) views did not. The shared CSS variables that the toolbar's `border-bottom` depends on are now applied to the Location and Codex containers as well, so the separator appears consistently in all three views.
+- **Wikilink section headers no longer parsed as tags** — A wikilink to a note section (e.g. `[[Test#Header]]`) in a Codex note body caused the word after the `#` to be interpreted as a `#tag`, showing up as a spurious tag on the codex item card and in the Story Graph. Wikilinks are now stripped from the text before tag extraction runs, matching the approach already used for plain-text name mention scanning.
+- **Manuscript view scroll position now restores correctly** — The cursor position was restored when switching back to the Manuscript view, but the scroll position snapped to the top of the document and only returned to the saved position once the user started typing. After restoring the cursor, the view now uses `coordsAtPos()` to find the cursor's actual screen position and scrolls the outer container so the cursor is visible, regardless of how content height changed during editor mounting.
+
 ## Version 1.10.33
 
 ### Bug Fixes

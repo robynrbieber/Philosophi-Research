@@ -182,6 +182,8 @@ body.theme-dark {
 .story-line-timeline-container,
 .story-line-storyline-container,
 .story-line-character-container,
+.story-line-location-container,
+.story-line-codex-container,
 .story-line-stats-container {
     --sc-card-bg: var(--background-secondary);
     --sc-card-hover: var(--background-modifier-hover);
