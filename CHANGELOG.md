@@ -16,6 +16,10 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
   The existing **Remove from series** (`x`) button is unchanged: it moves the book out of the series folder and keeps it as a standalone project, without deleting anything. *(Issue #185)*
 
+### Bug Fixes
+
+- **Setup / Payoff links stored as file paths no longer report false "scene doesn't exist" errors** — `setup_scenes` and `payoff_scenes` are matched by scene title, but `MetadataParser.cleanWikilink()` only stripped path prefixes from values wrapped in `[[...]]` wikilink brackets. Plain strings like `"MyProject/Scenes/Scene 10.md"` were returned unchanged and never matched a title, so the validator and Inspector warned that the target scene didn't exist even though the file was present. `cleanWikilink()` now normalises plain path/filename strings too: a new `stripPathAndExtension()` helper drops any folder prefix (forward or back slash) and a trailing `.md` extension, so `"MyProject/Scenes/Scene 10.md"` resolves to `"Scene 10"`. The same normalisation is applied to the inner text of wikilinks, so `[[Scene 10.md]]` also resolves. The HELP.md frontmatter table and Setup/Payoff section now recommend titles or wikilinks and note that paths are tolerated. *(Issue #186)*
+
 ## Version 1.10.34
 
 ### Bug Fixes

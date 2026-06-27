@@ -394,6 +394,12 @@ export class MetadataParser {
      *   `[[Name|Display]]`     → `Display`  (alias preferred for display)
      *   `[[Name#heading]]`     → `Name`
      * Quoted YAML strings are also unwrapped. Issue #73.
+     *
+     * Since v1.10.35 (issue #186): plain (non-wikilink) strings that look like
+     * file paths or filenames are also normalised to the scene title — e.g.
+     * `"MyProject/Scenes/Scene 10.md"` → `"Scene 10"`, `"Scene 10.md"` →
+     * `"Scene 10"`. This makes setup/payoff links tolerant of values written
+     * as paths (as the old template comment suggested) instead of titles.
      */
     static cleanWikilink(value: string | undefined): string | undefined {
         if (value === undefined || value === null) return undefined;
@@ -404,7 +410,12 @@ export class MetadataParser {
             s = s.slice(1, -1).trim();
         }
         const m = s.match(/^\[\[([^\]]+)\]\]$/);
-        if (!m) return s;
+        if (!m) {
+            // Plain string (not a wikilink). If it looks like a path or a
+            // filename with a .md extension, normalise it to the scene title
+            // so setup/payoff links stored as paths still resolve. Issue #186.
+            return MetadataParser.stripPathAndExtension(s);
+        }
         let inner = m[1];
         // Alias: prefer the right-hand display label
         const pipe = inner.indexOf('|');
@@ -416,7 +427,26 @@ export class MetadataParser {
             const slash = inner.lastIndexOf('/');
             if (slash >= 0) inner = inner.slice(slash + 1);
         }
-        return inner.trim();
+        inner = inner.trim();
+        // Also strip a trailing .md extension that may survive after the
+        // last-segment extraction above (e.g. `[[Scene 10.md]]`).
+        return MetadataParser.stripPathAndExtension(inner);
+    }
+
+    /**
+     * Normalise a plain scene-reference string to its title form:
+     * drop any folder path prefix and a trailing `.md` extension.
+     * `"Folder/Scene 10.md"` → `"Scene 10"`, `"Scene 10"` → `"Scene 10"`.
+     * Issue #186.
+     */
+    private static stripPathAndExtension(s: string): string {
+        let out = s;
+        const slash = out.lastIndexOf('/');
+        if (slash >= 0) out = out.slice(slash + 1);
+        const backslash = out.lastIndexOf('\\');
+        if (backslash >= 0) out = out.slice(backslash + 1);
+        if (out.toLowerCase().endsWith('.md')) out = out.slice(0, -3);
+        return out.trim();
     }
 
     /**

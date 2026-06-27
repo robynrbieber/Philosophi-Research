@@ -496,8 +496,8 @@ Each scene is a Markdown file with YAML frontmatter. StoryLine manages these fie
 | `subtitle` | Optional subtitle below the title | `"Three years later"` |
 | `color` | Custom scene card background color (hex) | `"#FF6B6B"` |
 | `codexLinks` | Linked Codex entries per category | `{ items: ["Sword"], factions: ["Rebels"] }` |
-| `setup_scenes` | Scenes this sets up | `["path/to/scene.md"]` |
-| `payoff_scenes` | Scenes that pay off this one | `["path/to/scene.md"]` |
+| `setup_scenes` | Scenes this sets up (by title or `[[wikilink]]`) | `["Scene 10"]` or `["[[Scene 10]]"]` |
+| `payoff_scenes` | Scenes that pay off this one (by title or `[[wikilink]]`) | `["Scene 10"]` or `["[[Scene 10]]"]` |
 
 **Status progression:** `idea` → `outlined` → `draft` → `written` → `revised` → `final`. Custom statuses can be added in Settings. Enable **Counts as written** on a custom status if it should be included in character writing-progress bars.
 
@@ -626,6 +626,8 @@ Link scenes that set up (foreshadow) and pay off (resolve) each other:
 2. Scroll to the **Setup / Payoff** section.
 3. Type a scene title in the **Sets up** or **Set up by** input to search and select. Existing links appear as removable pills.
 4. Links are bidirectional — if Scene A "sets up" Scene B, Scene B shows Scene A under "Set up by".
+
+Links are stored by **scene title** (or as `[[wikilinks]]` to the scene). The reader is tolerant of other forms too — plain file paths (`"MyProject/Scenes/Scene 10.md"`) and filenames with a `.md` extension are normalised to the scene title automatically, so links written that way still resolve. The recommended form is a plain title or a `[[wikilink]]`.
 
 The Stats View and Plot Hole Detection will warn about:
 - Setups without payoffs.
