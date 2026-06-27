@@ -1649,6 +1649,16 @@ Create a copy of an existing project (useful for alternate drafts or backups):
 1. Command palette → **Fork Current StoryLine Project**.
 2. Enter a new title. All scenes are duplicated.
 
+### Deleting a Project
+Permanently delete the active project and everything inside its folder (scenes, codex, notes, research, and project settings):
+1. Switch to the project you want to delete.
+2. Command palette → **Delete Current StoryLine Project**.
+3. A warning modal lists everything that will be removed. **Type the project title** to enable the Delete button, then click **Delete permanently**.
+
+The project folder is moved to your system trash (or Obsidian's `.trash` folder, depending on your **Settings → Files & Links → Deleted files** preference). If the project belongs to a series, it is also removed from `series.json`. If it was the active project, StoryLine switches to another project automatically.
+
+> **Why this matters:** StoryLine discovers projects by scanning the vault for `type: storyline` markdown files. Simply deleting a folder from Obsidian's file explorer can leave the `.md` file in `.trash/` (or have it restored by a sync plugin), which causes the project to reappear. The Delete command trashes the folder through Obsidian's API and re-scans, so the project is gone for good.
+
 ---
 
 ## Series Mode
@@ -1684,7 +1694,8 @@ Open the **Series Management Modal** from **Settings → Project Management → 
 - Reorder books within a series using the arrow buttons.
 - Rename individual books.
 - Add standalone books to the series.
-- Remove books from the series.
+- Remove books from the series (moves the book out of the series folder; the book is kept as a standalone project).
+- **Delete a book permanently** (🗑️ trash icon) — trashes the book's folder and removes it from the series. A type-to-confirm warning modal is shown first.
 
 ### How It Works
 - When a project has a `seriesId` in its frontmatter, all Codex paths (Characters, Locations, custom categories) resolve to the **series-level** Codex folder instead of the book-local one.

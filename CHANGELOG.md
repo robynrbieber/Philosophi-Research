@@ -6,6 +6,16 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.35
+
+### New Features
+
+- **Delete projects and books** — StoryLine previously had no built-in way to delete a project, which meant deleted books kept reappearing in the Navigator because `SceneManager.scanProjects()` re-discovered any surviving `type: storyline` markdown file (in `.trash/` or restored by a sync plugin). There are now two ways to permanently delete a project, both with a type-to-confirm warning modal that lists everything that will be removed (scenes, codex, notes, research, settings, and series removal where applicable):
+  - **Command palette → Delete current project** — trashes the active project's folder via Obsidian's `fileManager.trashFile()` (so your "Deleted files" setting is respected), removes it from `series.json` if it belongs to a series, switches to another project if the deleted one was active, and re-scans so the project map stays in sync.
+  - **Manage Series modal → 🗑️ trash button per book** — each book row in the Manage Series modal now has a trash icon next to the existing "Remove from series" (`x`) button. It opens the same warning modal and calls the same `deleteProject()` logic, so you can delete any book in a series without first switching to it.
+
+  The existing **Remove from series** (`x`) button is unchanged: it moves the book out of the series folder and keeps it as a standalone project, without deleting anything. *(Issue #185)*
+
 ## Version 1.10.34
 
 ### Bug Fixes

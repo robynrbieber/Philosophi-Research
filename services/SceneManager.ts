@@ -557,6 +557,80 @@ export class SceneManager implements ISceneStore {
     }
 
     /**
+     * Delete a project and its entire folder from the vault.
+     *
+     * - Trashes the project's base folder via Obsidian's `fileManager.trashFile()`
+     *   so the user's "Deleted files" setting is respected (system trash vs. `.trash`).
+     * - Removes the project from any series it belongs to (updates `series.json`).
+     * - Clears `activeProjectFile` if the deleted project was active and switches
+     *   to another project when one is available.
+     * - Re-scans so the in-memory project map stays in sync.
+     *
+     * Returns `true` if the project was deleted, `false` if it could not be found.
+     */
+    async deleteProject(project: StoryLineProject): Promise<boolean> {
+        const filePath = normalizePath(project.filePath);
+        if (!this.projects.has(filePath)) {
+            new Notice(`Project "${project.title}" was not found. It may have already been deleted.`);
+            return false;
+        }
+
+        const folders = deriveProjectFoldersFromFilePath(filePath);
+        const baseFolder = normalizePath(folders.baseFolder);
+
+        // ── Remove from series metadata (if applicable) ──────────────
+        if (project.seriesId) {
+            // Series folder is the parent of the book's base folder.
+            const seriesFolder = baseFolder.substring(0, baseFolder.lastIndexOf('/'));
+            const meta = await this.plugin.seriesManager.loadSeriesMetadata(seriesFolder);
+            if (meta) {
+                const bookBaseName = baseFolder.split('/').pop() ?? '';
+                meta.bookOrder = meta.bookOrder.filter(b => b !== bookBaseName);
+                await this.plugin.seriesManager.saveSeriesMetadata(seriesFolder, meta);
+            }
+        }
+
+        // ── Trash the project folder (and everything inside) ─────────
+        // `fileManager.trashFile()` accepts a TFile or TFolder and recursively
+        // trashes all children. It respects the user's "Deleted files" setting
+        // (Settings → Files & Links → Deleted files).
+        const folderEntry = this.app.vault.getAbstractFileByPath(baseFolder);
+        if (folderEntry) {
+            await this.app.fileManager.trashFile(folderEntry);
+        } else {
+            // Folder entry not found — try to trash the .md file directly
+            // so the project stops being discovered by the vault-wide scan.
+            const mdEntry = this.app.vault.getAbstractFileByPath(filePath);
+            if (mdEntry) {
+                await this.app.fileManager.trashFile(mdEntry);
+            }
+        }
+
+        // ── Update in-memory state ───────────────────────────────────
+        this.projects.delete(filePath);
+
+        // If the deleted project was active, pick a replacement
+        const wasActive = this._activeProject?.filePath === filePath;
+        if (wasActive) {
+            const remaining = this.getProjects();
+            if (remaining.length > 0) {
+                await this.setActiveProject(remaining[0]);
+            } else {
+                this._activeProject = null;
+                this.plugin.settings.activeProjectFile = '';
+                await this.plugin.saveSettings();
+            }
+        }
+
+        // Re-scan to make sure the project map is fully in sync (handles
+        // any stray files that may have been left behind).
+        await this.scanProjects();
+
+        new Notice(`Project "${project.title}" deleted.`);
+        return true;
+    }
+
+    /**
      * Duplicate an existing project (fork a variant).
      */
     async forkProject(source: StoryLineProject, newTitle: string): Promise<StoryLineProject> {

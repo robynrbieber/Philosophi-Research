@@ -345,6 +345,12 @@ export default class SceneCardsPlugin extends Plugin {
         });
 
         this.addCommand({
+            id: 'delete-project',
+            name: 'Delete current project',
+            callback: () => this.openDeleteProjectModal(),
+        });
+
+        this.addCommand({
             id: 'undo',
             name: 'Undo last scene change',
             callback: async () => {
@@ -2489,6 +2495,80 @@ export default class SceneCardsPlugin extends Plugin {
         modal.open();
     }
 
+    /**
+     * Open a confirmation modal to delete the active project.
+     *
+     * The project folder (and everything inside — scenes, codex, notes,
+     * system data) is moved to the system trash / `.trash` according to
+     * the user's "Deleted files" setting. If the project belongs to a
+     * series it is also removed from `series.json`.
+     */
+    private openDeleteProjectModal(): void {
+        const activeProject = this.sceneManager.activeProject;
+        if (!activeProject) {
+            new Notice('No active project to delete');
+            return;
+        }
+
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(`Delete "${activeProject.title}"`);
+
+        // Warning banner
+        const warningEl = modal.contentEl.createDiv({ cls: 'sl-delete-warning' });
+        warningEl.createEl('p', {
+            text: '⚠️ This will permanently delete the project folder and everything inside it:',
+        });
+        const list = warningEl.createEl('ul');
+        list.createEl('li', { text: 'All scenes' });
+        list.createEl('li', { text: 'All characters, locations and codex entries' });
+        list.createEl('li', { text: 'All notes, research and archive items' });
+        list.createEl('li', { text: 'Project settings and view data' });
+        if (activeProject.seriesId) {
+            list.createEl('li', { text: 'The book will also be removed from its series.' });
+        }
+        warningEl.createEl('p', {
+            text: 'This action cannot be undone. The folder will be moved to your system trash (or Obsidian\u2019s .trash folder, depending on your settings).',
+            cls: 'sl-delete-warning-strong',
+        });
+
+        // Type-to-confirm: user must type the project title to enable Delete.
+        const expected = activeProject.title;
+        let typed = '';
+        new Setting(modal.contentEl)
+            .setName('Confirm by typing the project title')
+            .setDesc(`Type "${expected}" to enable the Delete button.`)
+            .addText((text: TextComponent) => {
+                text.setPlaceholder(expected);
+                text.onChange((v: string) => {
+                    typed = v;
+                    deleteBtn.setDisabled(v.trim() !== expected);
+                });
+                window.setTimeout(() => text.inputEl.focus(), 50);
+            });
+
+        let deleteBtn: ButtonComponent;
+        new Setting(modal.contentEl)
+            .addButton((btn: ButtonComponent) => {
+                btn.setButtonText('Cancel').onClick(() => modal.close());
+            })
+            .addButton((btn: ButtonComponent) => {
+                deleteBtn = btn.setButtonText('Delete permanently').setClass('mod-warning').setDisabled(true);
+                btn.onClick(async () => {
+                    if (typed.trim() !== expected) return;
+                    modal.close();
+                    try {
+                        const ok = await this.sceneManager.deleteProject(activeProject);
+                        if (ok) {
+                            this.refreshOpenViews();
+                        }
+                    } catch (e: unknown) {
+                        new Notice('Failed to delete project: ' + (e instanceof Error ? e.message : String(e)), 10000);
+                    }
+                });
+            });
+        modal.open();
+    }
+
     // ────────────────────────────────────
     //  Series modals
     // ────────────────────────────────────
@@ -2958,6 +3038,11 @@ class SeriesManagementModal extends Modal {
                 const removeBtn = bookActions.createEl('button', { cls: 'clickable-icon sl-series-remove', attr: { 'aria-label': 'Remove from series' } });
                 setIcon(removeBtn, 'x');
                 removeBtn.addEventListener('click', () => this.removeBook(folder, meta, bookName));
+
+                // Delete book permanently
+                const deleteBookBtn = bookActions.createEl('button', { cls: 'clickable-icon sl-series-delete', attr: { 'aria-label': 'Delete book permanently' } });
+                setIcon(deleteBookBtn, 'trash');
+                deleteBookBtn.addEventListener('click', () => this.deleteBook(folder, meta, bookName));
             }
 
             // ── Add book button ──
@@ -3080,6 +3165,79 @@ class SeriesManagementModal extends Modal {
         }
         this.plugin.refreshOpenViews();
         this.render();
+    }
+
+    /**
+     * Permanently delete a book from a series.
+     *
+     * Shows a type-to-confirm warning modal, then trashes the book's folder
+     * (scenes, codex, notes, etc.) and removes it from `series.json`.
+     */
+    private async deleteBook(folder: string, meta: SeriesMetadata, bookName: string) {
+        const projects = this.plugin.sceneManager.getProjects();
+        const bookProject = projects.find(p => {
+            const fp = normalizePath(p.filePath);
+            return fp.startsWith(normalizePath(folder) + '/') && p.title === bookName;
+        });
+
+        if (!bookProject) {
+            new Notice(`Could not find project "${bookName}" — it may have been moved or deleted.`);
+            return;
+        }
+
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(`Delete "${bookName}"`);
+
+        const warningEl = modal.contentEl.createDiv({ cls: 'sl-delete-warning' });
+        warningEl.createEl('p', {
+            text: `\u26a0\ufe0f This will permanently delete "${bookName}" and everything inside it:`,
+        });
+        const list = warningEl.createEl('ul');
+        list.createEl('li', { text: 'All scenes' });
+        list.createEl('li', { text: 'All characters, locations and codex entries' });
+        list.createEl('li', { text: 'All notes, research and archive items' });
+        list.createEl('li', { text: 'The book will be removed from the series "' + meta.name + '".' });
+        warningEl.createEl('p', {
+            text: 'This action cannot be undone. The folder will be moved to your system trash (or Obsidian\u2019s .trash folder, depending on your settings).',
+            cls: 'sl-delete-warning-strong',
+        });
+
+        const expected = bookName;
+        let typed = '';
+        let deleteBtn: ButtonComponent;
+        new Setting(modal.contentEl)
+            .setName('Confirm by typing the book title')
+            .setDesc(`Type "${expected}" to enable the Delete button.`)
+            .addText((text: TextComponent) => {
+                text.setPlaceholder(expected);
+                text.onChange((v: string) => {
+                    typed = v;
+                    deleteBtn.setDisabled(v.trim() !== expected);
+                });
+                window.setTimeout(() => text.inputEl.focus(), 50);
+            });
+
+        new Setting(modal.contentEl)
+            .addButton((btn: ButtonComponent) => {
+                btn.setButtonText('Cancel').onClick(() => modal.close());
+            })
+            .addButton((btn: ButtonComponent) => {
+                deleteBtn = btn.setButtonText('Delete permanently').setClass('mod-warning').setDisabled(true);
+                btn.onClick(async () => {
+                    if (typed.trim() !== expected) return;
+                    modal.close();
+                    try {
+                        const ok = await this.plugin.sceneManager.deleteProject(bookProject);
+                        if (ok) {
+                            this.plugin.refreshOpenViews();
+                            this.render();
+                        }
+                    } catch (e: unknown) {
+                        new Notice('Failed to delete book: ' + (e instanceof Error ? e.message : String(e)), 10000);
+                    }
+                });
+            });
+        modal.open();
     }
 
     private async renameBook(folder: string, _meta: SeriesMetadata, bookName: string) {
