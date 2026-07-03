@@ -588,6 +588,11 @@ export class CodexView extends ItemView {
             const existingSiblings = this.plugin.fieldTemplates
                 .getBySection(cat.title, catDef.id)
                 .map(t => ({ id: t.id, label: t.label }));
+            // Snapshot the current built-in keys so moveAfter can resolve the
+            // merged order even before the new field is rendered (issue #197).
+            const builtInKeysForAdd = cat.fields
+                .filter(f => !(this.plugin.settings.hiddenFields[catDef.id] ?? []).includes(f.key))
+                .map(f => f.key);
             const modal = new AddFieldModal(
                 this.app,
                 cat.title,
@@ -596,7 +601,10 @@ export class CodexView extends ItemView {
                     template.category = catDef.id;
                     await this.plugin.fieldTemplates.add(template);
                     if (positionAfterId !== undefined) {
-                        await this.plugin.fieldTemplates.moveAfter(template.id, positionAfterId);
+                        await this.plugin.fieldTemplates.moveAfter(
+                            cat.title, catDef.id, builtInKeysForAdd,
+                            template.id, positionAfterId,
+                        );
                     }
                     if (this.rootContainer) this.renderView(this.rootContainer);
                 },
@@ -842,7 +850,10 @@ export class CodexView extends ItemView {
                 async (updated, positionAfterId) => {
                     await this.plugin.fieldTemplates.update(tpl.id, updated);
                     if (positionAfterId !== undefined) {
-                        await this.plugin.fieldTemplates.moveAfter(tpl.id, positionAfterId);
+                        await this.plugin.fieldTemplates.moveAfter(
+                            tpl.section, tpl.category, builtInKeys ?? [],
+                            tpl.id, positionAfterId,
+                        );
                     }
                     if (this.rootContainer) this.renderView(this.rootContainer);
                 },

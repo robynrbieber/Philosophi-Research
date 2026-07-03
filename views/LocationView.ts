@@ -737,6 +737,11 @@ export class LocationView extends ItemView {
             const existingSiblings = this.plugin.fieldTemplates
                 .getBySection(category.title, 'location')
                 .map(t => ({ id: t.id, label: t.label }));
+            // Snapshot the current built-in keys so moveAfter can resolve the
+            // merged order even before the new field is rendered (issue #197).
+            const builtInKeysForAdd = category.fields
+                .filter(f => !(this.plugin.settings.hiddenFields['location'] ?? []).includes(f.key))
+                .map(f => f.key);
             const modal = new AddFieldModal(
                 this.app,
                 category.title,
@@ -745,7 +750,10 @@ export class LocationView extends ItemView {
                     template.category = 'location';
                     await this.plugin.fieldTemplates.add(template);
                     if (positionAfterId !== undefined) {
-                        await this.plugin.fieldTemplates.moveAfter(template.id, positionAfterId);
+                        await this.plugin.fieldTemplates.moveAfter(
+                            category.title, 'location', builtInKeysForAdd,
+                            template.id, positionAfterId,
+                        );
                     }
                     if (this.rootContainer) {
                         this.renderDetail(this.rootContainer);
@@ -1004,7 +1012,10 @@ export class LocationView extends ItemView {
                     updated.category = 'location';
                     await this.plugin.fieldTemplates.update(tpl.id, updated);
                     if (positionAfterId !== undefined) {
-                        await this.plugin.fieldTemplates.moveAfter(tpl.id, positionAfterId);
+                        await this.plugin.fieldTemplates.moveAfter(
+                            tpl.section, tpl.category, builtInKeys ?? [],
+                            tpl.id, positionAfterId,
+                        );
                     }
                     if (this.rootContainer) this.renderDetail(this.rootContainer);
                 },

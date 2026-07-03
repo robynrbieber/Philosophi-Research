@@ -239,12 +239,25 @@ export class InfoPanelComponent {
 
     private async mountNotesEditor(container: HTMLElement, scene: Scene): Promise<void> {
         container.empty();
-        const notesPath = await this.sceneManager.getOrCreateSceneNotesFile(scene);
-        this.notesPath = notesPath;
+        // Issue #200 — read-only lookup so mounting the Notes tab doesn't
+        // create an empty notes file. The file is created lazily when the
+        // user actually types something (see writeSceneNotes()).
+        const notesPath = this.sceneManager.getSceneNotesFile(scene);
+        this.notesPath = notesPath ?? null;
 
-        const file = this.plugin.app.vault.getAbstractFileByPath(notesPath);
+        const file = notesPath
+            ? this.plugin.app.vault.getAbstractFileByPath(notesPath)
+            : null;
         if (!(file instanceof obsidian.TFile)) {
-            container.createDiv({ cls: 'sl-info-notes-placeholder', text: 'Unable to open notes file.' });
+            // No notes file yet — show a clickable placeholder that creates
+            // the file on first input instead of eagerly on render.
+            const placeholder = container.createDiv({ cls: 'sl-info-notes-placeholder', text: 'Click to add notes…' });
+            placeholder.addEventListener('click', () => {
+                void this.sceneManager.getOrCreateSceneNotesFile(scene).then((path) => {
+                    this.notesPath = path;
+                    void this.mountNotesEditor(container, scene);
+                });
+            });
             return;
         }
 

@@ -2,7 +2,7 @@
 import * as obsidian from 'obsidian';
 import { Modal, App } from 'obsidian';
 import type SceneCardsPlugin from '../main';
-import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
+import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors, resolveStickyNoteFontColor } from '../settings';
 import type { SceneManager } from '../services/SceneManager';
 import { formatActChapterPrefix } from '../utils/actChapter';
 import { ColorCodingMode, Scene, SceneStatus, TIMELINE_MODE_ICONS, TIMELINE_MODE_LABELS, formatSceneLength, getStatusOrder, resolveStatusCfg } from '../models/Scene';
@@ -467,6 +467,14 @@ export class SceneCardComponent {
         card.style.setProperty('--sl-note-bg', base);
         card.style.setProperty('--sl-note-accent', this.darken(base, 0.24));
         card.style.setProperty('--sl-note-accent-strong', this.darken(base, 0.34));
+        // Issue #205 — optional custom font colour overrides the auto-derived accent.
+        // Two buckets (light/dark backgrounds) keep text readable across both.
+        const fontColor = resolveStickyNoteFontColor(this.plugin.settings, base);
+        if (fontColor) {
+            card.style.setProperty('--sl-note-text', fontColor);
+        } else {
+            card.style.removeProperty('--sl-note-text');
+        }
     }
 
     /** Darken a hex colour by a 0-1 factor */

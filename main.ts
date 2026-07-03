@@ -60,6 +60,7 @@ import { CascadeRenameService } from './services/CascadeRenameService';
 import { FieldTemplateService } from './services/FieldTemplateService';
 import { SeriesManager } from './services/SeriesManager';
 import { buildFormattingToolbar } from './components/FormattingToolbar';
+import { setupMobileKeyboardHandling } from './components/MobileAdapter';
 
 /**
  * StoryLine Plugin for Obsidian
@@ -88,11 +89,27 @@ export default class SceneCardsPlugin extends Plugin {
     storyLeaf: WorkspaceLeaf | null = null;
     /** Removes native browser tooltips (`title`) inside StoryLine UI */
     private nativeTooltipObserver: MutationObserver | null = null;
+    /** Disables native spell-check inside StoryLine UI inputs (issue #189) */
+    private spellcheckObserver: MutationObserver | null = null;
 
     async onload(): Promise<void> {
         await this.loadSettings();
         registerCustomStatuses(this.settings.customStatuses || []);
         this.applyImageSizingVariables();
+
+        // Issue #189 — disable native spell-check in all StoryLine UI inputs,
+        // textareas and contenteditables. Obsidian's "Disable spell check" only
+        // applies to its own editor; plugin-rendered form fields inherit the
+        // browser default (spellcheck on), causing red underlines for users
+        // writing in languages like Vietnamese. A scoped MutationObserver
+        // catches fields added dynamically (Inspector, modals, toolbar, etc.).
+        this.disableSpellCheckInPluginUI();
+
+        // Issue #190 — on mobile the soft keyboard can cover the focused
+        // field in the Codex, Inspector, Corkboard note editor, etc. Install
+        // a global focus/visual-viewport listener that scrolls the field
+        // into the visible (above-keyboard) region. No-op on desktop.
+        this.register(setupMobileKeyboardHandling());
 
         this.sceneManager = new SceneManager(this.app, this);
         this.locationManager = new LocationManager(this.app);
@@ -672,6 +689,26 @@ export default class SceneCardsPlugin extends Plugin {
             })
         );
 
+        // Issue #195 — add "Find & replace in manuscript" to the editor
+        // right-click menu when the active view is the Manuscript view, so
+        // it appears alongside Obsidian's own editor menu items.
+        this.registerEvent(
+            this.app.workspace.on('editor-menu', (menu) => {
+                const view = this.app.workspace.getActiveViewOfType(ItemView);
+                const viewType = (view as unknown as { getViewType?: () => string })?.getViewType?.();
+                if (viewType !== MANUSCRIPT_VIEW_TYPE) return;
+                menu.addItem((item) => {
+                    item.setTitle('Find & replace in manuscript')
+                        .setIcon('search')
+                        .onClick(() => {
+                            const leaves = this.app.workspace.getLeavesOfType(MANUSCRIPT_VIEW_TYPE);
+                            const mv = leaves[0]?.view as unknown as { toggleSearch?: () => void };
+                            mv?.toggleSearch?.();
+                        });
+                });
+            })
+        );
+
         // Inject formatting toolbar into scene editors when Editing Toolbar is absent
         this.registerEvent(
             this.app.workspace.on('active-leaf-change', (leaf) => {
@@ -752,6 +789,71 @@ export default class SceneCardsPlugin extends Plugin {
         }
     }
 
+    /**
+     * Issue #189 — disable native spell-check in all StoryLine UI inputs,
+     * textareas and contenteditable elements. Obsidian's "Disable spell
+     * check" setting only applies to its own editor; plugin-rendered form
+     * fields inherit the browser default (spellcheck on), causing red
+     * underlines for users writing in languages like Vietnamese.
+     *
+     * A scoped MutationObserver catches fields added dynamically (Inspector,
+     * modals, toolbar, corkboard note editor, etc.) without touching the
+     * user's manuscript editor (CM6 / `.cm-editor` / `.markdown-view`).
+     */
+    private disableSpellCheckInPluginUI(): void {
+        // Any element whose class contains the plugin's prefix is considered
+        // StoryLine-owned UI. We deliberately exclude the CodeMirror / markdown
+        // editor so the user's manuscript keeps Obsidian's spell-check setting.
+        const STORYLINE_SELECTOR = '[class*="story-line-"], [class*="storyline-"]';
+        const EXCLUDE_SELECTOR = '.cm-editor, .markdown-view, .cm-content';
+        const SPELL_FIELDS = 'input, textarea, [contenteditable="true"], [contenteditable=""]';
+
+        const disableIn = (root: ParentNode): void => {
+            // Fields directly inside a StoryLine container…
+            root.querySelectorAll(STORYLINE_SELECTOR).forEach(container => {
+                container.querySelectorAll(SPELL_FIELDS).forEach(field => {
+                    // Skip fields that live inside the manuscript editor.
+                    if (field.closest(EXCLUDE_SELECTOR)) return;
+                    const el = field as HTMLElement;
+                    if (el.getAttribute('spellcheck') !== 'false') {
+                        el.setAttribute('spellcheck', 'false');
+                    }
+                });
+            });
+            // …and a StoryLine container that is itself a spellable field.
+            root.querySelectorAll(SPELL_FIELDS).forEach(field => {
+                if (field.closest(EXCLUDE_SELECTOR)) return;
+                if (field.closest(STORYLINE_SELECTOR)) {
+                    const el = field as HTMLElement;
+                    if (el.getAttribute('spellcheck') !== 'false') {
+                        el.setAttribute('spellcheck', 'false');
+                    }
+                }
+            });
+        };
+
+        const body = activeDocument.body;
+        if (!body) return;
+
+        // Initial pass for views/modals already rendered at load.
+        disableIn(body);
+
+        this.spellcheckObserver = new MutationObserver(mutations => {
+            for (const m of mutations) {
+                if (m.type !== 'childList' || m.addedNodes.length === 0) continue;
+                m.addedNodes.forEach(node => {
+                    if (node.nodeType !== Node.ELEMENT_NODE) return;
+                    const el = node as HTMLElement;
+                    disableIn(el);
+                });
+            }
+        });
+        this.spellcheckObserver.observe(body, {
+            childList: true,
+            subtree: true,
+        });
+    }
+
     onunload(): void {
         // Flush writing session into daily history and persist to System/stats.json
         try {
@@ -767,6 +869,10 @@ export default class SceneCardsPlugin extends Plugin {
         if (this.nativeTooltipObserver) {
             this.nativeTooltipObserver.disconnect();
             this.nativeTooltipObserver = null;
+        }
+        if (this.spellcheckObserver) {
+            this.spellcheckObserver.disconnect();
+            this.spellcheckObserver = null;
         }
 
         // Clean up any floating lightbox windows left on activeDocument.body
@@ -901,6 +1007,8 @@ export default class SceneCardsPlugin extends Plugin {
             stickyNoteSaturation: this.settings.stickyNoteSaturation,
             stickyNoteLightness: this.settings.stickyNoteLightness,
             stickyNoteOverrides: { ...(this.settings.stickyNoteOverrides || {}) },
+            stickyNoteFontColorLight: this.settings.stickyNoteFontColorLight,
+            stickyNoteFontColorDark: this.settings.stickyNoteFontColorDark,
         };
     }
 
@@ -944,6 +1052,8 @@ export default class SceneCardsPlugin extends Plugin {
                 toSave.stickyNoteSaturation = g.stickyNoteSaturation;
                 toSave.stickyNoteLightness = g.stickyNoteLightness;
                 toSave.stickyNoteOverrides = g.stickyNoteOverrides ?? {};
+                toSave.stickyNoteFontColorLight = g.stickyNoteFontColorLight;
+                toSave.stickyNoteFontColorDark = g.stickyNoteFontColorDark;
             } else {
                 // Keep global colour snapshot in sync so toggling
                 // useProjectColors later doesn't revert to stale values.
@@ -957,6 +1067,8 @@ export default class SceneCardsPlugin extends Plugin {
                     stickyNoteSaturation: this.settings.stickyNoteSaturation,
                     stickyNoteLightness: this.settings.stickyNoteLightness,
                     stickyNoteOverrides: { ...(this.settings.stickyNoteOverrides || {}) },
+                    stickyNoteFontColorLight: this.settings.stickyNoteFontColorLight,
+                    stickyNoteFontColorDark: this.settings.stickyNoteFontColorDark,
                 };
             }
         }
@@ -1306,6 +1418,8 @@ export default class SceneCardsPlugin extends Plugin {
             if (isRecord(pc.stickyNoteOverrides)) {
                 this.settings.stickyNoteOverrides = pc.stickyNoteOverrides as Record<number, string>;
             }
+            if (typeof pc.stickyNoteFontColorLight === 'string') this.settings.stickyNoteFontColorLight = pc.stickyNoteFontColorLight;
+            if (typeof pc.stickyNoteFontColorDark === 'string') this.settings.stickyNoteFontColorDark = pc.stickyNoteFontColorDark;
         } else {
             // No per-project overrides — restore the global colour defaults
             this.settings.useProjectColors = false;
@@ -1320,6 +1434,8 @@ export default class SceneCardsPlugin extends Plugin {
                 if (g.stickyNoteSaturation !== undefined) this.settings.stickyNoteSaturation = g.stickyNoteSaturation;
                 if (g.stickyNoteLightness !== undefined) this.settings.stickyNoteLightness = g.stickyNoteLightness;
                 this.settings.stickyNoteOverrides = { ...(g.stickyNoteOverrides || {}) };
+                if (g.stickyNoteFontColorLight !== undefined) this.settings.stickyNoteFontColorLight = g.stickyNoteFontColorLight;
+                if (g.stickyNoteFontColorDark !== undefined) this.settings.stickyNoteFontColorDark = g.stickyNoteFontColorDark;
             }
         }
 
@@ -1364,6 +1480,8 @@ export default class SceneCardsPlugin extends Plugin {
                 stickyNoteSaturation: this.settings.stickyNoteSaturation,
                 stickyNoteLightness: this.settings.stickyNoteLightness,
                 stickyNoteOverrides: this.settings.stickyNoteOverrides || {},
+                stickyNoteFontColorLight: this.settings.stickyNoteFontColorLight ?? '',
+                stickyNoteFontColorDark: this.settings.stickyNoteFontColorDark ?? '',
             };
         }
 

@@ -489,6 +489,19 @@ export function resolveStickyNoteColors(settings: {
     stickyNoteHue: number;
     stickyNoteSaturation: number;
     stickyNoteLightness: number;
+    /**
+     * Issue #205 — custom font colour for sticky-note text on LIGHT
+     * backgrounds. Empty string means "auto" (derived by darkening the
+     * note background). Paired with `stickyNoteFontColorDark` so users
+     * can keep text readable across both bright and dark note colours.
+     */
+    stickyNoteFontColorLight?: string;
+    /**
+     * Issue #205 — custom font colour for sticky-note text on DARK
+     * backgrounds. Empty string means "auto" (derived by lightening the
+     * note background).
+     */
+    stickyNoteFontColorDark?: string;
 }): Array<{ label: string; color: string }> {
     const base = STICKY_NOTE_THEMES[settings.stickyNoteTheme] ?? STICKY_NOTE_THEMES.classic;
     return base.map((c, i) => {
@@ -498,6 +511,45 @@ export function resolveStickyNoteColors(settings: {
             : adjustHSL(overridden, settings.stickyNoteHue, settings.stickyNoteSaturation, settings.stickyNoteLightness);
         return { label: STICKY_NOTE_COLOR_NAMES[i], color: final };
     });
+}
+
+/**
+ * Issue #205 — resolve the custom sticky-note font colour for a given
+ * note background. Returns a `#rrggbb` hex string when the user has set a
+ * custom font colour for the relevant brightness bucket, or `undefined`
+ * when the colour should be auto-derived from the note background (the
+ * historical behaviour).
+ *
+ * Two buckets are supported so a single global setting stays readable
+ * across both bright pastels and dark note colours: the plugin picks the
+ * light- or dark-background variant based on the WCAG relative luminance
+ * of each note's background.
+ */
+export function resolveStickyNoteFontColor(
+    settings: { stickyNoteFontColorLight?: string; stickyNoteFontColorDark?: string },
+    noteBgHex: string,
+): string | undefined {
+    const isLight = isLightBackground(noteBgHex);
+    const raw = isLight
+        ? settings.stickyNoteFontColorLight?.trim()
+        : settings.stickyNoteFontColorDark?.trim();
+    if (raw && /^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toUpperCase();
+    return undefined;
+}
+
+/**
+ * Issue #205 — returns true when the given background hex is "light"
+ * (relative luminance above 0.4), meaning dark text reads better on it.
+ * Mirrors the threshold used by `contrastTextColor`.
+ */
+export function isLightBackground(bgHex: string): boolean {
+    const h = bgHex.replace('#', '');
+    const r = Number.parseInt(h.slice(0, 2), 16) / 255;
+    const g = Number.parseInt(h.slice(2, 4), 16) / 255;
+    const b = Number.parseInt(h.slice(4, 6), 16) / 255;
+    const toLinear = (c: number) => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    const luminance = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+    return luminance > 0.4;
 }
 
 /**
@@ -666,6 +718,19 @@ export interface SceneCardsSettings {
     stickyNoteHue: number;
     stickyNoteSaturation: number;
     stickyNoteLightness: number;
+    /**
+     * Issue #205 — custom font colour for sticky-note text on LIGHT
+     * backgrounds. Empty string means "auto" (derived by darkening the
+     * note background). Paired with `stickyNoteFontColorDark` so a single
+     * global setting stays readable across both bright and dark notes.
+     */
+    stickyNoteFontColorLight?: string;
+    /**
+     * Issue #205 — custom font colour for sticky-note text on DARK
+     * backgrounds. Empty string means "auto" (derived by lightening the
+     * note background).
+     */
+    stickyNoteFontColorDark?: string;
 
     // Per-project colour override flag
     // When true, colorScheme, plotline HSL, stickyNote theme/HSL/overrides
@@ -803,6 +868,18 @@ export interface SceneCardsSettings {
      * on conflict.
      */
     defaultSceneFrontmatter?: string;
+
+    /**
+     * Type of separator to insert between scenes in manuscript exports.
+     * Can be a blank line, three asterisks (* * *), or a custom text string.
+     */
+    exportSceneSeparatorType?: 'blank' | 'asterisks' | 'custom';
+
+    /**
+     * Custom text/separator string to insert between scenes in manuscript exports
+     * when `exportSceneSeparatorType` is set to 'custom'.
+     */
+    exportSceneSeparatorCustom?: string;
 }
 
 /**
@@ -886,6 +963,8 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     stickyNoteHue: 0,
     stickyNoteSaturation: 0,
     stickyNoteLightness: 0,
+    stickyNoteFontColorLight: '',
+    stickyNoteFontColorDark: '',
 
     useProjectColors: false,
 
@@ -919,6 +998,8 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     excludeChecklistFromWordcount: false,
     defaultProjectLanguage: 'en',
     defaultSceneFrontmatter: '',
+    exportSceneSeparatorType: 'blank',
+    exportSceneSeparatorCustom: '',
 };
 
 /**
@@ -1791,6 +1872,8 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                                 if (g.stickyNoteSaturation !== undefined) this.plugin.settings.stickyNoteSaturation = g.stickyNoteSaturation;
                                 if (g.stickyNoteLightness !== undefined) this.plugin.settings.stickyNoteLightness = g.stickyNoteLightness;
                                 this.plugin.settings.stickyNoteOverrides = { ...(g.stickyNoteOverrides || {}) };
+                                if (g.stickyNoteFontColorLight !== undefined) this.plugin.settings.stickyNoteFontColorLight = g.stickyNoteFontColorLight;
+                                if (g.stickyNoteFontColorDark !== undefined) this.plugin.settings.stickyNoteFontColorDark = g.stickyNoteFontColorDark;
                             }
                         }
                         await this.plugin.saveSettings();
@@ -2195,6 +2278,35 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         //  Export & Import
         // ═══════════════════════════════════════════
         new Setting(containerEl).setName('Export & Import').setHeading();
+
+        new Setting(containerEl)
+            .setName('Scene separator')
+            .setDesc('Separator used between scenes in manuscript exports (Markdown, Word, PDF, and HTML).')
+            .addDropdown(dropdown => dropdown
+                .addOptions({
+                    'blank': 'Blank Line',
+                    'asterisks': '* * *',
+                    'custom': 'Custom Separator',
+                })
+                .setValue(this.plugin.settings.exportSceneSeparatorType ?? 'blank')
+                .onChange(async (value) => {
+                    this.plugin.settings.exportSceneSeparatorType = value as 'blank' | 'asterisks' | 'custom';
+                    await this.plugin.saveSettings();
+                    this.refreshSettingsView();
+                }));
+
+        if (this.plugin.settings.exportSceneSeparatorType === 'custom') {
+            new Setting(containerEl)
+                .setName('Custom separator')
+                .setDesc('Enter any UTF-8 character or text to use as a scene separator.')
+                .addText(text => text
+                    .setPlaceholder('e.g. ~ ~ ~')
+                    .setValue(this.plugin.settings.exportSceneSeparatorCustom ?? '')
+                    .onChange(async (value) => {
+                        this.plugin.settings.exportSceneSeparatorCustom = value;
+                        await this.plugin.saveSettings();
+                    }));
+        }
 
         // --- DOCX Export Settings (collapsible) ---
         this.renderDocxSettings(containerEl);
@@ -2635,6 +2747,76 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         createSlider('Hue shift', settings.stickyNoteHue, -30, 30, (v) => { settings.stickyNoteHue = v; });
         createSlider('Saturation', settings.stickyNoteSaturation, -50, 50, (v) => { settings.stickyNoteSaturation = v; });
         createSlider('Lightness', settings.stickyNoteLightness, -30, 30, (v) => { settings.stickyNoteLightness = v; });
+
+        // ── Issue #205 — custom font colours for sticky-note text ──
+        // Two buckets (light/dark backgrounds) so a single global setting
+        // stays readable across both bright pastels and dark note colours.
+        const fontSectionLabel = container.createDiv();
+        fontSectionLabel.setCssStyles({
+            fontSize: '11px',
+            fontWeight: '600',
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            marginTop: '8px',
+            marginBottom: '6px',
+        });
+        fontSectionLabel.textContent = 'Font Color';
+
+        const fontHelp = container.createEl('p', { cls: 'setting-item-description' });
+        fontHelp.setCssStyles({ marginTop: '0', marginBottom: '8px' });
+        fontHelp.textContent = 'Set a dark color for light note backgrounds and a light color for dark note backgrounds. Leave on "Auto" to derive the text color from each note\'s background.';
+
+        const createFontRow = (
+            label: string,
+            value: string | undefined,
+            onChange: (v: string) => void,
+            onClear: () => void,
+        ) => {
+            const row = container.createDiv();
+            row.setCssStyles({
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '6px',
+            });
+            const lbl = row.createSpan();
+            lbl.setCssStyles({ fontSize: '12px', minWidth: '120px' });
+            lbl.textContent = label;
+            const picker = row.createEl('input', { type: 'color' });
+            picker.value = value && /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000';
+            picker.setCssStyles({ width: '32px', height: '20px', padding: '0', border: 'none', cursor: 'pointer' });
+            const hint = row.createSpan();
+            hint.setCssStyles({ fontSize: '11px', color: 'var(--text-muted)' });
+            hint.textContent = value ? 'Custom' : 'Auto';
+            picker.addEventListener('input', async () => {
+                onChange(picker.value.toUpperCase());
+                hint.textContent = 'Custom';
+                await this.plugin.saveSettings();
+                this.plugin.refreshOpenViews();
+            });
+            const clearBtn = row.createEl('button', { text: 'Auto' });
+            clearBtn.setCssStyles({ fontSize: '11px', padding: '2px 10px' });
+            clearBtn.addEventListener('click', async () => {
+                onClear();
+                hint.textContent = 'Auto';
+                await this.plugin.saveSettings();
+                this.plugin.refreshOpenViews();
+            });
+        };
+
+        createFontRow(
+            'On light notes',
+            settings.stickyNoteFontColorLight,
+            (v) => { settings.stickyNoteFontColorLight = v; },
+            () => { settings.stickyNoteFontColorLight = ''; },
+        );
+        createFontRow(
+            'On dark notes',
+            settings.stickyNoteFontColorDark,
+            (v) => { settings.stickyNoteFontColorDark = v; },
+            () => { settings.stickyNoteFontColorDark = ''; },
+        );
 
         // Reset sliders button
         const resetRow = container.createDiv();

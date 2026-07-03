@@ -15,7 +15,7 @@ import { SplitSceneModal, MergeSceneModal } from '../components/SplitMergeModals
 import { isMobile, applyMobileClass, enableTouchDrag } from '../components/MobileAdapter';
 import { BOARD_VIEW_TYPE } from '../constants';
 import { openManageSnapshotsModal } from '../components/ViewSnapshotModal';
-import { resolveStickyNoteColors } from '../settings';
+import { resolveStickyNoteColors, resolveStickyNoteFontColor } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import { resolveImagePath } from '../components/ImagePicker';
 import type SceneCardsPlugin from '../main';
@@ -1429,6 +1429,30 @@ export class BoardView extends ItemView {
             .setIcon('rotate-ccw')
             .onClick(() => { void this.setCorkboardNoteColor(scene, undefined); }));
 
+        // Issue #205 — font color controls (global setting, accessible from note context menu).
+        // Two buckets (light/dark backgrounds) so text stays readable on both.
+        const hasFontLight = !!this.plugin.settings.stickyNoteFontColorLight;
+        const hasFontDark = !!this.plugin.settings.stickyNoteFontColorDark;
+        menu.addItem(item => item
+            .setTitle('Font Color: Light Notes…')
+            .setIcon('text')
+            .onClick(() => { this.openStickyNoteFontColorModal(scene, 'light'); }));
+        menu.addItem(item => item
+            .setTitle('Font Color: Dark Notes…')
+            .setIcon('text')
+            .onClick(() => { this.openStickyNoteFontColorModal(scene, 'dark'); }));
+        if (hasFontLight || hasFontDark) {
+            menu.addItem(item => item
+                .setTitle('Font Color: Reset to Auto')
+                .setIcon('rotate-ccw')
+                .onClick(async () => {
+                    this.plugin.settings.stickyNoteFontColorLight = '';
+                    this.plugin.settings.stickyNoteFontColorDark = '';
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
+                }));
+        }
+
         menu.addSeparator();
         menu.addItem(item => item
             .setTitle('Duplicate Note')
@@ -1557,6 +1581,14 @@ export class BoardView extends ItemView {
         cardEl.style.setProperty('--sl-note-bg', base);
         cardEl.style.setProperty('--sl-note-accent', accentSoft);
         cardEl.style.setProperty('--sl-note-accent-strong', accentStrong);
+        // Issue #205 — optional custom font colour overrides the auto-derived accent.
+        // Two buckets (light/dark backgrounds) keep text readable across both.
+        const fontColor = resolveStickyNoteFontColor(this.plugin.settings, base);
+        if (fontColor) {
+            cardEl.style.setProperty('--sl-note-text', fontColor);
+        } else {
+            cardEl.style.removeProperty('--sl-note-text');
+        }
     }
 
     private async setCorkboardNoteColor(scene: Scene, color: string | undefined): Promise<void> {
@@ -1593,6 +1625,69 @@ export class BoardView extends ItemView {
             .addButton(btn => {
                 btn.setButtonText('Apply').setCta().onClick(async () => {
                     await this.setCorkboardNoteColor(scene, picker.value);
+                    modal.close();
+                });
+            });
+
+        modal.open();
+    }
+
+    /**
+     * Issue #205 — modal to pick a global font color for sticky-note text.
+     * Two buckets are supported: 'light' (text on light note backgrounds)
+     * and 'dark' (text on dark note backgrounds). The font color is a
+     * global setting, but it is convenient to expose it from the note's
+     * context menu so users discover it next to the background color
+     * controls.
+     */
+    private openStickyNoteFontColorModal(scene: Scene, bucket: 'light' | 'dark'): void {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(bucket === 'light' ? 'Sticky note font color (light notes)' : 'Sticky note font color (dark notes)');
+
+        const currentValue = bucket === 'light'
+            ? this.plugin.settings.stickyNoteFontColorLight
+            : this.plugin.settings.stickyNoteFontColorDark;
+        const fallback = bucket === 'light' ? '#000000' : '#FFFFFF';
+        const row = modal.contentEl.createDiv('story-line-note-color-modal-row');
+        row.createEl('label', { text: 'Pick font color' });
+        const picker = row.createEl('input', {
+            attr: {
+                type: 'color',
+                value: currentValue && /^#[0-9a-fA-F]{6}$/.test(currentValue) ? currentValue : fallback,
+            },
+        });
+
+        const desc = modal.contentEl.createEl('p', { cls: 'setting-item-description' });
+        desc.textContent = bucket === 'light'
+            ? 'Used on bright note backgrounds. Applies to all sticky notes. Use "Auto" to derive the text color from each note\'s background.'
+            : 'Used on dark note backgrounds. Applies to all sticky notes. Use "Auto" to derive the text color from each note\'s background.';
+
+        new Setting(modal.contentEl)
+            .addButton(btn => {
+                btn.setButtonText('Auto').onClick(async () => {
+                    if (bucket === 'light') {
+                        this.plugin.settings.stickyNoteFontColorLight = '';
+                    } else {
+                        this.plugin.settings.stickyNoteFontColorDark = '';
+                    }
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
+                    modal.close();
+                });
+            })
+            .addButton(btn => {
+                btn.setButtonText('Cancel').onClick(() => modal.close());
+            })
+            .addButton(btn => {
+                btn.setButtonText('Apply').setCta().onClick(async () => {
+                    const v = picker.value.toUpperCase();
+                    if (bucket === 'light') {
+                        this.plugin.settings.stickyNoteFontColorLight = v;
+                    } else {
+                        this.plugin.settings.stickyNoteFontColorDark = v;
+                    }
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
                     modal.close();
                 });
             });

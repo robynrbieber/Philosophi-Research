@@ -535,22 +535,105 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                     break;
                 }
                 case 'multi-select': {
-                    // Lightweight tag-pill UI: pills container + free-form input.
-                    // Heavier dropdown/folder-source autocomplete would
-                    // duplicate the InlineSuggest infrastructure used by
-                    // universal fields; users wanting that can keep using
-                    // universal fields. Here we just provide comma-friendly
-                    // storage (joined by ", ") and a clear visual layout.
+                    // Lightweight tag-pill UI: pills container + free-form input
+                    // with autocomplete suggestions when options are defined.
                     const wrap = row.createDiv('codex-custom-multi-wrap');
                     const pills = wrap.createDiv('codex-custom-multi-pills');
                     const inp = wrap.createEl('input', {
                         cls: fieldInputLabel,
-                        attr: { type: 'text', placeholder: placeholderHint },
+                        attr: { type: 'text', placeholder: placeholderHint, autocomplete: 'off' },
                     });
                     let values = currentValue
                         ? currentValue.split(',').map(v => v.trim()).filter(Boolean)
                         : [];
                     const allowed = selectableOptions(app, def);
+
+                    // ── Suggestion dropdown ──────────────────────
+                    const suggestList = wrap.createDiv('codex-custom-multi-suggest');
+                    suggestList.style.display = 'none';
+
+                    const showSuggestions = () => {
+                        const term = inp.value.trim().toLowerCase();
+                        if (!term || allowed.length === 0) {
+                            suggestList.style.display = 'none';
+                            suggestList.empty();
+                            return;
+                        }
+                        const matches = allowed.filter(
+                            o => o.toLowerCase().includes(term) && !values.includes(o)
+                        );
+                        if (matches.length === 0) {
+                            suggestList.style.display = 'none';
+                            suggestList.empty();
+                            return;
+                        }
+                        suggestList.empty();
+                        suggestList.style.display = '';
+                        for (const m of matches) {
+                            const item = suggestList.createDiv('codex-custom-multi-suggest-item', { text: m });
+                            item.addEventListener('click', (ev) => {
+                                ev.stopPropagation();
+                                if (!values.includes(m)) {
+                                    values.push(m);
+                                    if (!draft.custom) draft.custom = {};
+                                    draft.custom[key] = values.join(', ');
+                                    host.scheduleSave(draft);
+                                    renderPills();
+                                }
+                                inp.value = '';
+                                suggestList.style.display = 'none';
+                                suggestList.empty();
+                                inp.focus();
+                            });
+                        }
+                    };
+
+                    // Debounced show on input
+                    let suggestTimer: number | null = null;
+                    inp.addEventListener('input', () => {
+                        if (suggestTimer) clearTimeout(suggestTimer);
+                        suggestTimer = window.setTimeout(showSuggestions, 120);
+                    });
+                    inp.addEventListener('focus', () => {
+                        if (inp.value.trim()) showSuggestions();
+                    });
+                    // Dismiss on blur (allow click-to-select first)
+                    inp.addEventListener('blur', () => {
+                        setTimeout(() => {
+                            suggestList.style.display = 'none';
+                            suggestList.empty();
+                        }, 150);
+                    });
+                    inp.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') {
+                            suggestList.style.display = 'none';
+                            suggestList.empty();
+                            return;
+                        }
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            // Prefer picking the first visible suggestion
+                            const first = suggestList.querySelector('.codex-custom-multi-suggest-item') as HTMLElement | null;
+                            if (first) { first.click(); return; }
+                            const v = inp.value.trim();
+                            if (!v) return;
+                            if (allowed.length > 0 && !allowed.includes(v)) {
+                                new Notice(`"${v}" is not one of the allowed options.`);
+                                return;
+                            }
+                            if (!values.includes(v)) {
+                                values.push(v);
+                                if (!draft.custom) draft.custom = {};
+                                draft.custom[key] = values.join(', ');
+                                host.scheduleSave(draft);
+                                renderPills();
+                            }
+                            inp.value = '';
+                            suggestList.style.display = 'none';
+                            suggestList.empty();
+                        }
+                    });
+
                     const renderPills = () => {
                         pills.empty();
                         for (let i = 0; i < values.length; i++) {
@@ -568,25 +651,6 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                         }
                     };
                     renderPills();
-                    inp.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const v = inp.value.trim();
-                            if (!v) return;
-                            if (allowed.length > 0 && !allowed.includes(v)) {
-                                new Notice(`"${v}" is not one of the allowed options.`);
-                                return;
-                            }
-                            if (!values.includes(v)) {
-                                values.push(v);
-                                if (!draft.custom) draft.custom = {};
-                                draft.custom[key] = values.join(', ');
-                                host.scheduleSave(draft);
-                                renderPills();
-                            }
-                            inp.value = '';
-                        }
-                    });
                     break;
                 }
                 case 'checkbox': {

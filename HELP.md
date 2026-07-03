@@ -244,6 +244,7 @@ A Scrivenings-style continuous document view that presents your entire story as 
 - **Navigator integration** — clicking a scene in the Navigator scrolls the manuscript to that scene instead of opening a new file.
 - **Inspector tracking** — the Scene Details sidebar automatically follows whichever scene is currently visible in the manuscript.
 - **Focus Mode** — click the glasses icon (👓) in the filter bar to enter Focus Mode. Surrounding UI (sidebars, ribbon, title bar, tab headers) is dimmed, darkened, and optionally blurred so you can concentrate on your text. The filter bar, scene headers, dividers, and footer are hidden. Adjust the effect in **Settings → Focus Mode Settings**: Dim amount (toolbar opacity), Darken (environment brightness), and Blur (environment blur). Click the glasses icon again to exit.
+- **Find & replace across the whole book** — right-click inside a scene in the Manuscript view and choose **Find & replace in manuscript** (added to Obsidian's native editor context menu, so all the usual editor menu items remain available) to open a search panel that scans every scene in the current filter/sort scope (not just the scenes currently scrolled into view). Use the chevron buttons or Enter / Shift+Enter to jump between matches; navigating to a match in an unmounted scene auto-mounts its editor and scrolls it into view. Toggle case-sensitive, whole-word, or regular-expression matching with the Aa / whole-word / .* buttons. Enter replacement text and click the replace icon (single match) or check icon (all matches). Replacements in unmounted scenes are written directly to disk. *(Issue #195)*
 
 Access the Manuscript view from the **Manuscript** tab (📖 book-open-text icon) in the view switcher, located between Plotlines and Codex.
 
@@ -710,6 +711,16 @@ For non-linear narratives (flashbacks, time jumps, in medias res), StoryLine sup
 
 Both `sequence` and `chronologicalOrder` are included in all export formats (Markdown, JSON, CSV, PDF).
 
+#### Scene separators
+
+When exporting a manuscript you can insert a separator between scenes. Choose from:
+
+- **Blank Line** — default; no extra separator is added (heading structure provides separation).
+- **`* * *`** — centered three-asterisk scene break.
+- **Custom Separator** — any UTF-8 text (e.g. `~ ~ ~`, `—`, or a word).
+
+The setting is in **Settings → Export & Import → Scene separator**, and can also be overridden per-export in the Export modal. Separators are skipped at act and chapter boundaries, where a heading already provides visual separation. Markdown exports emit plain text (no HTML), keeping the `.md` file portable for Scribe and other markdown consumers; HTML/PDF/Word exports render the separator centered with vertical spacing.
+
 ---
 
 ## Beat Sheet Templates
@@ -984,6 +995,21 @@ Corkboard sticky notes have their own independent color system. Choose a theme i
 | **Mono** | Greyscale neutrals |
 
 Each theme provides 14 colors. Like plotline colors, sticky notes also have **HSL sliders** (hue shift, saturation, lightness) for fine-tuning and **per-note color overrides** — right-click a sticky note to assign a specific color.
+
+### Font Color
+
+By default, sticky-note text color is derived automatically by darkening the note's background. On similarly-toned backgrounds (e.g. pale yellow text on a pale yellow note) this can be hard to read. You can set an explicit font color in **Settings → Sticky Note Colors → Font Color**, with **two independent buckets** so a single global setting stays readable across both bright and dark notes:
+
+- **On light notes** — text color used on bright note backgrounds (defaults to black).
+- **On dark notes** — text color used on dark note backgrounds (defaults to white).
+
+The plugin uses the WCAG relative-luminance formula to decide which bucket applies to each note, so a bright yellow note and a dark violet note automatically get the right text color without any per-note configuration. Leave a bucket on "Auto" to keep the background-derived behavior for that brightness.
+
+Both buckets are also reachable from the corkboard note's right-click context menu:
+
+- **Font Color: Light Notes…** — opens a color picker for the light-background bucket.
+- **Font Color: Dark Notes…** — opens a color picker for the dark-background bucket.
+- **Font Color: Reset to Auto** — clears both buckets back to the default (only appears when a custom color is set).
 
 ---
 

@@ -44,6 +44,8 @@ export class ExportService {
         includeCorkboardNotes: false,
         includeInactiveScenes: false,
     };
+    private separatorType: 'blank' | 'asterisks' | 'custom' = 'blank';
+    private separatorCustom = '';
 
     constructor(app: App, sceneManager: SceneManager, characterManager: CharacterManager, locationManager: LocationManager) {
         this.app = app;
@@ -65,6 +67,12 @@ export class ExportService {
     /** Set per-export options (scene titles, numbering, corkboard notes). */
     setExportOptions(options: ExportOptions): void {
         this.exportOptions = { ...this.exportOptions, ...options };
+    }
+
+    /** Set scene separator options. */
+    setSeparatorSettings(type: 'blank' | 'asterisks' | 'custom', custom: string): void {
+        this.separatorType = type;
+        this.separatorCustom = custom;
     }
 
     /**
@@ -215,6 +223,13 @@ export class ExportService {
             }
 
             // (no divider between scenes – the heading structure is sufficient)
+            // Scene separator (plain text for Markdown exports — keeps the .md
+            // file portable for Scribe and other markdown consumers).
+            const separatorText = this.getSceneSeparatorText(scenes[sceneNumber], currentAct, currentChapter);
+            if (separatorText) {
+                lines.push(separatorText);
+                lines.push('');
+            }
         }
     }
 
@@ -526,6 +541,7 @@ export class ExportService {
     h5 { font-size: 11pt; margin-top: 0.9em; font-weight: 600; }
     h6 { font-size: 10pt; margin-top: 0.8em; font-weight: 600; color: #666; }
     hr { border: none; border-top: 1px solid #ccc; margin: 1.5em 0; }
+    .scene-separator { text-align: center; margin: 1.5em 0; }
     table { width: 100%; border-collapse: collapse; font-size: 10pt; margin: 1em 0; }
     th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
     th { background: #f5f5f5; font-weight: 600; }
@@ -591,6 +607,12 @@ ${body}
             }
 
             parts.push('</div>');
+
+            // Scene separator (styled HTML div for HTML/PDF exports).
+            const separatorHtml = this.getSceneSeparatorHtml(scenes[sceneNumber], currentAct, currentChapter);
+            if (separatorHtml) {
+                parts.push(separatorHtml);
+            }
         }
 
         return parts.join('\n');
@@ -813,6 +835,52 @@ ${body}
     }
 
     /**
+     * Returns the configured separator string (ignoring scene context), or an
+     * empty string for the 'blank' type. Used to tell the DOCX converter which
+     * plain-text line to render as a centered separator.
+     */
+    private configuredSeparatorText(): string {
+        if (this.separatorType === 'asterisks') return '* * *';
+        if (this.separatorType === 'custom' && this.separatorCustom) return this.separatorCustom;
+        return '';
+    }
+
+    /**
+     * Determines whether to insert a scene separator before nextScene, and
+     * returns the plain-text separator string if applicable. Returns an empty
+     * string if no separator is needed (e.g. at act/chapter boundaries, where
+     * a heading already provides visual separation, or when type is 'blank').
+     *
+     * Used by the Markdown export path so the exported .md file stays portable
+     * (no raw HTML divs) for Scribe and other markdown consumers.
+     */
+    private getSceneSeparatorText(
+        nextScene: Scene | undefined,
+        currentAct: string | number | undefined,
+        currentChapter: string | number | undefined
+    ): string {
+        if (!nextScene) return '';
+        const startsNewAct = nextScene.act !== undefined && nextScene.act !== currentAct;
+        const startsNewChapter = nextScene.chapter !== undefined && nextScene.chapter !== currentChapter;
+        if (startsNewAct || startsNewChapter) return '';
+        return this.configuredSeparatorText();
+    }
+
+    /**
+     * Same logic as `getSceneSeparatorText` but wraps the result in a styled
+     * `<div class="scene-separator">` for the HTML/PDF export paths.
+     */
+    private getSceneSeparatorHtml(
+        nextScene: Scene | undefined,
+        currentAct: string | number | undefined,
+        currentChapter: string | number | undefined
+    ): string {
+        const text = this.getSceneSeparatorText(nextScene, currentAct, currentChapter);
+        if (!text) return '';
+        return `<div class="scene-separator">${this.escHtml(text)}</div>`;
+    }
+
+    /**
      * Strip Obsidian-style wikilinks from text, keeping only the display name.
      *  - `[[Alias|Display]]`  → `Display`
      *  - `[[Path/To/Note]]`   → `Note`  (last path segment)
@@ -919,6 +987,9 @@ ${body}
         };
 
         const converter = new SLMarkdownToDocxConverter(settings);
+        // Tell the converter which plain-text line acts as a scene separator so
+        // it can render matching lines as centered separator paragraphs.
+        converter.setSceneSeparatorText(this.configuredSeparatorText());
 
         // Build the markdown content (reuse existing builders)
         const lines: string[] = [];
@@ -1288,6 +1359,7 @@ ${body}
     h6 { font-size: ${h6Size}pt; margin-top: 0.8em; font-weight: 600; color: #666; }
     p  { margin: 0 0 0.5em 0; }
     hr { border: none; border-top: 1px solid #ccc; margin: 1.5em 0; }
+    .scene-separator { text-align: center; margin: 1.5em 0; }
     table { width: 100%; border-collapse: collapse; font-size: ${Math.round(fontSize * 0.9)}pt; margin: 1em 0; }
     th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: left; }
     th { background: #f5f5f5; font-weight: 600; }

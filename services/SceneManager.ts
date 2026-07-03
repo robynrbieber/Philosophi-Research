@@ -316,8 +316,30 @@ export class SceneManager implements ISceneStore {
             }
         } catch { /* vault-wide scan is best-effort */ }
 
-        // Restore active project from settings
+        // ── Saved-active-project fallback ──────────────────────────
+        // Issue #207 — projects created in a custom vault folder (outside
+        // storyLineRoot) can be missed by both the root scan and the
+        // vault-wide metadataCache scan when the cache hasn't indexed the
+        // newly-created file yet (common on mobile, with synced folders,
+        // or immediately after creation). When a saved activeProjectFile
+        // path exists on disk but wasn't picked up, read it directly and
+        // parse it from its file contents — bypassing the metadata cache
+        // entirely — so the project is never orphaned on reload.
         const savedPath = this.plugin.settings.activeProjectFile;
+        if (savedPath && !this.projects.has(savedPath)) {
+            try {
+                if (await this.app.vault.adapter.exists(savedPath)) {
+                    const content = await this.app.vault.adapter.read(savedPath);
+                    const project = this.parseProjectContent(content, savedPath);
+                    if (project) {
+                        await this.detectLegacyFolders(project);
+                        this.projects.set(savedPath, project);
+                    }
+                }
+            } catch { /* file unreadable or missing — skip */ }
+        }
+
+        // Restore active project from settings
         if (savedPath && this.projects.has(savedPath)) {
             this._activeProject = this.projects.get(savedPath)!;
         } else if (this.projects.size > 0) {
@@ -1930,6 +1952,25 @@ export class SceneManager implements ISceneStore {
         scene.notesFile = filePath;
 
         return filePath;
+    }
+
+    /**
+     * Read-only lookup of a scene's external notes file path.
+     *
+     * Returns the vault-relative path if the scene has a `notesFile` *and* the
+     * file still exists on disk; otherwise `undefined`. Crucially this does
+     * **not** create a file — render paths (Inspector / InfoPanel / NotesView)
+     * use it so that merely opening a scene doesn't sprout an empty
+     * `Title - Notes.md`. Creation is deferred to `writeSceneNotes()` /
+     * `getOrCreateSceneNotesFile()`, which are only called when the user
+     * actually types something or explicitly opens the notes file.
+     *
+     * Issue #200.
+     */
+    getSceneNotesFile(scene: Scene): string | undefined {
+        if (!scene.notesFile) return undefined;
+        const existing = this.app.vault.getAbstractFileByPath(scene.notesFile);
+        return existing instanceof TFile ? scene.notesFile : undefined;
     }
 
     private getSceneNotesBaseName(scene: Scene): string {

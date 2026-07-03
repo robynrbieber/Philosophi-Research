@@ -122,9 +122,41 @@ export class NotesView extends ItemView {
         const scene = this.sceneManager.getScene(filePath);
         if (!scene) return;
         this.currentScenePath = scene.filePath;
-        const notesPath = await this.sceneManager.getOrCreateSceneNotesFile(scene);
-        await this.mountNotesEditor(notesPath);
+        // Issue #200 — read-only lookup so opening a scene in the Notes view
+        // doesn't create an empty notes file. The file is created lazily when
+        // the user actually types something (see attachAutosave / openBtn).
+        const notesPath = this.sceneManager.getSceneNotesFile(scene);
+        if (notesPath) {
+            await this.mountNotesEditor(notesPath);
+        } else {
+            // No notes file yet — show a clickable placeholder that creates
+            // the file on first input instead of eagerly on render.
+            this.detachEditor();
+            this.currentNotesPath = null;
+            this.showNotesPlaceholder(scene);
+        }
         this.refreshEmptyState();
+    }
+
+    /**
+     * Show a "Click to add notes…" placeholder when no notes file exists yet.
+     * Clicking it creates the file (lazy creation, issue #200) and remounts
+     * the embedded editor.
+     */
+    private showNotesPlaceholder(scene: Scene): void {
+        if (!this.editorHost) return;
+        this.editorHost.empty();
+        const placeholder = this.editorHost.createDiv('sl-notes-placeholder');
+        placeholder.createEl('p', { text: 'No notes file yet.' });
+        const addBtn = placeholder.createEl('button', {
+            cls: 'sl-notes-create-btn',
+            text: 'Click to add notes…',
+        });
+        addBtn.addEventListener('click', async () => {
+            const path = await this.sceneManager.getOrCreateSceneNotesFile(scene);
+            await this.mountNotesEditor(path);
+            this.refreshEmptyState();
+        });
     }
 
     private updateForActiveFile(): void {

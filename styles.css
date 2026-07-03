@@ -917,7 +917,7 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     display: none;
 }
 .scene-card.story-line-kanban-note .scene-card-title {
-    color: var(--sl-note-accent-strong, var(--text-normal));
+    color: var(--sl-note-text, var(--sl-note-accent-strong, var(--text-normal)));
     font-style: italic;
 }
 
@@ -1005,7 +1005,7 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     font-size: 1em;
     line-height: 1.45;
     background: var(--sl-note-bg);
-    color: var(--sl-note-accent-strong, #3b3520);
+    color: var(--sl-note-text, var(--sl-note-accent-strong, #3b3520));
     box-sizing: border-box;
     overflow: hidden;
     box-shadow: none;
@@ -1022,7 +1022,7 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
     font-size: 1em;
     line-height: 1.45;
     background: var(--sl-note-bg);
-    color: var(--sl-note-accent-strong, #3b3520);
+    color: var(--sl-note-text, var(--sl-note-accent-strong, #3b3520));
     box-sizing: border-box;
     overflow: hidden;
     cursor: text;
@@ -1046,7 +1046,7 @@ body.sl-auto-hide-tab-labels .story-line-view-switcher.sl-collapsed .story-line-
 }
 
 .story-line-corkboard-note-preview-empty.story-line-corkboard-note-preview-empty {
-    color: var(--sl-note-accent, var(--text-muted));
+    color: var(--sl-note-text, var(--sl-note-accent, var(--text-muted)));
     opacity: 0.6;
 }
 
@@ -8142,6 +8142,145 @@ body /* Clamp title on mobile too, in case it's very long */
     gap: 2px;
 }
 
+/* ── Issue #190: mobile keyboard / overflow fixes ─────── */
+
+/*
+ * Use dynamic viewport height units where supported so the layout
+ * shrinks when the soft keyboard appears, instead of the keyboard
+ * covering the bottom of the content. `dvh` is the live viewport
+ * (excluding keyboard); `vh` is the legacy fallback.
+ */
+@supports (height: 100dvh) {
+    .sl-mobile.story-line-board-container,
+    .sl-mobile.story-line-timeline-container,
+    .sl-mobile.story-line-storyline-container,
+    .sl-mobile.story-line-character-container,
+    .sl-mobile.story-line-location-container,
+    .sl-mobile.story-line-codex-container,
+    .sl-mobile.story-line-stats-container,
+    .sl-mobile .story-line-main-area,
+    .sl-mobile .sl-scene-inspector-sidebar,
+    .sl-mobile .sl-inspector-panels,
+    .sl-mobile .sl-inspector-panel.is-active {
+        height: 100dvh;
+        max-height: 100dvh;
+    }
+    /* But the view containers themselves should fill their leaf, not the
+       whole viewport — cap with min-height so flex children still scroll. */
+    .sl-mobile.story-line-board-container,
+    .sl-mobile.story-line-timeline-container,
+    .sl-mobile.story-line-storyline-container,
+    .sl-mobile.story-line-character-container,
+    .sl-mobile.story-line-location-container,
+    .sl-mobile.story-line-codex-container,
+    .sl-mobile.story-line-stats-container {
+        height: 100%;
+        max-height: 100%;
+    }
+}
+
+/*
+ * Inspector bottom sheet on mobile: cap its height to the dynamic
+ * viewport so it never extends behind the keyboard, and make sure its
+ * inner content scrolls rather than the sheet growing off-screen.
+ */
+.sl-mobile .story-line-inspector-panel {
+    max-height: 60dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Pad the bottom so the last field clears the keyboard + safe area. */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 40vh);
+    /* But cap total padding so short sheets don't waste space. */
+    box-sizing: border-box;
+}
+
+/* When a field inside the inspector is focused, the global JS handler
+   scrolls it into view; ensure the scroll container is the panel. */
+.sl-mobile .story-line-inspector-panel:focus-within {
+    scroll-margin-bottom: 45dvh;
+}
+
+/*
+ * Corkboard note editor textarea: when focused on mobile, ensure it
+ * sits above the keyboard. The corkboard camera is panned by JS
+ * (panCorkboardToRevealNote); this just keeps the textarea itself
+ * scrollable if it grows tall.
+ */
+.sl-mobile .story-line-corkboard-note-text {
+    max-height: 50dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * Board view toolbar: on phones the controls row can overrun the
+ * screen width, causing horizontal scroll and making the sidebar
+ * toggle unreachable. Allow the controls to wrap and the toolbar to
+ * scroll vertically instead of overflowing horizontally.
+ */
+.sl-phone .story-line-toolbar {
+    flex-wrap: wrap;
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-height: 50dvh;
+}
+
+.sl-phone .story-line-toolbar-controls {
+    flex-wrap: wrap;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+}
+
+/* Keep the view-switcher on its own line on phones so it doesn't
+   compete with the controls for width. */
+.sl-phone .story-line-view-switcher {
+    width: 100%;
+    flex: 1 1 100%;
+}
+
+/*
+ * Timeline view: the swimlane grid can overflow horizontally on
+ * phones. Make sure the container scrolls rather than pushing the
+ * toolbar off-screen.
+ */
+.sl-phone .story-line-timeline-container .swimlane-timeline {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Timeline zoom controls: wrap on phones so they don't overflow. */
+.sl-phone .timeline-zoom-controls {
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+/*
+ * Codex / Character / Location detail forms: on phones the side
+ * panel stacks below the form. Make sure the form area scrolls
+ * independently and the last fields clear the keyboard.
+ */
+.sl-phone .codex-detail-layout,
+.sl-phone .character-detail-layout,
+.sl-phone .location-detail-layout {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 40dvh;
+}
+
+/*
+ * Generic: any StoryLine scroll container should leave breathing room
+ * at the bottom equal to roughly half the viewport, so a focused field
+ * near the end of the content can be scrolled above the keyboard.
+ */
+.sl-mobile .story-line-storyline-content,
+.sl-mobile .story-line-codex-container .story-line-main-area,
+.sl-mobile .sl-inspector-panel.is-active {
+    padding-bottom: 40dvh;
+}
+
 /* ═══════════════════════════════════════════════════════════
    Story Navigator — compact sidebar panel
    ═══════════════════════════════════════════════════════════ */
@@ -9190,10 +9329,15 @@ body.theme-dark .location-field-input.dropdown {
 /* Custom fields row */
 .codex-custom-field-row {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 6px;
 }
-.codex-custom-field-row .codex-field-input { flex: 1; }
+.codex-custom-field-row .codex-field-label {
+    flex-shrink: 0; min-width: 0; max-width: 140px;
+    display: inline-block;
+    margin-bottom: 0;
+}
+.codex-custom-field-row .codex-field-input { flex: 1; min-width: 0; }
 
 /* Multi-select widget used inside custom-section fields (v1.10.17). Compact
    pills + a free-form text input. Comma-friendly storage on save. */
@@ -9203,6 +9347,7 @@ body.theme-dark .location-field-input.dropdown {
     flex-direction: column;
     gap: 4px;
     min-width: 0;
+    position: relative;
 }
 .codex-custom-multi-pills {
     display: flex;
@@ -9231,6 +9376,29 @@ body.theme-dark .location-field-input.dropdown {
     accent-color: var(--interactive-accent);
     width: auto;
     flex: 0 0 auto;
+}
+
+/* Multi-select suggestion dropdown (issue #202) */
+.codex-custom-multi-suggest {
+    position: absolute;
+    z-index: 100;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    box-shadow: var(--sl-shadow-md);
+    max-height: 180px;
+    overflow-y: auto;
+    width: min(280px, 100%);
+    margin-top: 2px;
+}
+.codex-custom-multi-suggest-item {
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-normal);
+}
+.codex-custom-multi-suggest-item:hover {
+    background: var(--background-modifier-hover);
 }
 
 /* Row-action icons (Edit / Move-up / Move-down / Remove) on custom-section
@@ -10197,6 +10365,107 @@ body /* ── Plain-text mode: hide link/tag decorations ───────�
 /* Tablet: moderate padding */
 .sl-tablet .sl-manuscript-scroll {
     padding: 20px 32px 48px;
+}
+
+/* ── Issue #195 — Manuscript cross-scene search & replace ──── */
+
+.sl-manuscript-search {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+    margin: 4px auto;
+    width: fit-content;
+    max-width: 720px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    flex: 0 0 auto;
+}
+
+.sl-manuscript-search-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sl-manuscript-search-input {
+    flex: 1 1 auto;
+    min-width: 180px;
+    padding: 4px 8px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+}
+
+.sl-manuscript-search-input:focus {
+    border-color: var(--interactive-accent);
+    outline: none;
+}
+
+.sl-manuscript-search-count {
+    flex: 0 0 auto;
+    min-width: 70px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.sl-manuscript-search-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    color: var(--text-normal);
+    cursor: pointer;
+    border-radius: var(--radius-s);
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+.sl-manuscript-search-btn:hover {
+    background: var(--background-modifier-hover);
+}
+.sl-manuscript-search-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.75;
+}
+
+.sl-manuscript-search-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-s);
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 14px;
+    font-weight: 600;
+}
+.sl-manuscript-search-toggle:hover {
+    background: var(--background-modifier-hover);
+}
+.sl-manuscript-search-toggle.is-active {
+    color: var(--text-on-accent);
+    background: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+}
+.sl-manuscript-search-toggle svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.75;
+}
+
+.sl-manuscript-replace-row .sl-manuscript-search-input {
+    min-width: 180px;
 }
 
 /* Read-only preview fallback (phone) — normal markdown rendering */
@@ -11509,6 +11778,29 @@ body.sl-focus-active-global .titlebar {
     color: var(--text-muted);
     font-style: italic;
     text-align: center;
+}
+
+/* Issue #200 — placeholder shown in the Notes sidebar view when a scene has
+   no notes file yet. Clicking it creates the file lazily (no empty files
+   spawned just by opening a scene). */
+.sl-notes-placeholder {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 24px;
+}
+.sl-notes-placeholder p {
+    margin: 0;
+    font-style: italic;
+}
+.sl-notes-create-btn {
+    cursor: pointer;
 }
 
 /* Dedicated Synopsis / Notes inspector tabs: full-width, full-height,

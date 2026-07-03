@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { ItemView, WorkspaceLeaf, WorkspaceSplit, MarkdownRenderer, TFile, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, WorkspaceSplit, MarkdownRenderer, TFile, setIcon, Notice } from 'obsidian';
 import { EditorView, Decoration } from '@codemirror/view';
 import { RangeSetBuilder, StateEffect, Compartment, EditorSelection } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
@@ -75,6 +75,19 @@ export class ManuscriptView extends ItemView {
     private fmtToolbar: HTMLElement | null = null;
     /** The currently focused embedded leaf (for toolbar commands) */
     private activeLeaf: WorkspaceLeaf | null = null;
+    /** Cross-scene search & replace bar (Issue #195) */
+    private searchPanel: HTMLElement | null = null;
+    private searchInput: HTMLInputElement | null = null;
+    private replaceInput: HTMLInputElement | null = null;
+    private searchCaseSensitive = false;
+    private searchWholeWord = false;
+    private searchRegex = false;
+    /** Current match index (0-based) across all scenes */
+    private searchMatchIndex = -1;
+    /** Total matches found across all scenes */
+    private searchMatchTotal = 0;
+    /** Flat list of matches: {path, from, to} */
+    private searchMatches: { path: string; from: number; to: number }[] = [];
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -129,8 +142,9 @@ export class ManuscriptView extends ItemView {
 
     /** Called by refreshOpenViews() */
     refresh(): void {
-        // Don't re-render while user is editing or during mount sequence
-        if (this._hasActiveFocus || this._isMounting) {
+        // Don't re-render while user is editing, during mount sequence,
+        // or while the cross-scene search panel is open (Issue #195).
+        if (this._hasActiveFocus || this._isMounting || this.isSearchOpen()) {
             this.updateFooter();
             return;
         }
@@ -238,6 +252,12 @@ export class ManuscriptView extends ItemView {
             this.fmtToolbar.setCssStyles({ display: 'none' });
             this.buildFormattingToolbar(this.fmtToolbar);
         }
+
+        // Issue #195 — cross-scene search & replace bar (hidden by default).
+        // Opened via the editor right-click menu (see main.ts editor-menu
+        // handler for MANUSCRIPT_VIEW_TYPE) so it appears alongside
+        // Obsidian's own editor menu items.
+        this.buildSearchPanel(container);
 
         // Manuscript scroll area
         this.scrollArea = container.createDiv('sl-manuscript-scroll');
@@ -714,6 +734,386 @@ export class ManuscriptView extends ItemView {
     /** Build the formatting toolbar buttons */
     private buildFormattingToolbar(el: HTMLElement): void {
         buildFormattingToolbar(el, () => this.getActiveCm());
+    }
+
+    // ── Issue #195 — cross-scene search & replace ───────────────────
+
+    /** Build the search & replace panel (hidden until toggled). */
+    private buildSearchPanel(container: HTMLElement): void {
+        const panel = container.createDiv('sl-manuscript-search');
+        panel.setCssStyles({ display: 'none' });
+        this.searchPanel = panel;
+
+        const row = panel.createDiv('sl-manuscript-search-row');
+        const findIcon = row.createSpan();
+        setIcon(findIcon, 'search');
+
+        const input = row.createEl('input', {
+            cls: 'sl-manuscript-search-input',
+            attr: { type: 'text', placeholder: 'Find in manuscript…', 'aria-label': 'Find in manuscript' },
+        });
+        this.searchInput = input;
+
+        const count = row.createSpan({ cls: 'sl-manuscript-search-count', text: '' });
+
+        const prevBtn = row.createEl('button', { cls: 'sl-manuscript-search-btn', attr: { 'aria-label': 'Previous match', title: 'Previous (Shift+Enter)' } });
+        setIcon(prevBtn, 'chevron-up');
+        prevBtn.addEventListener('click', () => this.searchNext(false));
+
+        const nextBtn = row.createEl('button', { cls: 'sl-manuscript-search-btn', attr: { 'aria-label': 'Next match', title: 'Next (Enter)' } });
+        setIcon(nextBtn, 'chevron-down');
+        nextBtn.addEventListener('click', () => this.searchNext(true));
+
+        const caseBtn = row.createEl('button', { cls: 'sl-manuscript-search-toggle', attr: { 'aria-label': 'Match case', title: 'Match case' } });
+        caseBtn.setText('Aa');
+        caseBtn.addEventListener('click', () => {
+            this.searchCaseSensitive = !this.searchCaseSensitive;
+            caseBtn.toggleClass('is-active', this.searchCaseSensitive);
+            this.runSearch();
+        });
+
+        const wordBtn = row.createEl('button', { cls: 'sl-manuscript-search-toggle', attr: { 'aria-label': 'Whole word', title: 'Whole word' } });
+        setIcon(wordBtn, 'whole-word');
+        wordBtn.addEventListener('click', () => {
+            this.searchWholeWord = !this.searchWholeWord;
+            wordBtn.toggleClass('is-active', this.searchWholeWord);
+            this.runSearch();
+        });
+
+        const regexBtn = row.createEl('button', { cls: 'sl-manuscript-search-toggle', attr: { 'aria-label': 'Regular expression', title: 'Regex' } });
+        regexBtn.setText('.*');
+        regexBtn.addEventListener('click', () => {
+            this.searchRegex = !this.searchRegex;
+            regexBtn.toggleClass('is-active', this.searchRegex);
+            this.runSearch();
+        });
+
+        const closeBtn = row.createEl('button', { cls: 'sl-manuscript-search-btn', attr: { 'aria-label': 'Close', title: 'Close (Esc)' } });
+        setIcon(closeBtn, 'x');
+        closeBtn.addEventListener('click', () => this.closeSearch());
+
+        // Replace row
+        const replaceRow = panel.createDiv('sl-manuscript-search-row sl-manuscript-replace-row');
+        const replaceIcon = replaceRow.createSpan();
+        setIcon(replaceIcon, 'replace');
+
+        const replaceInput = replaceRow.createEl('input', {
+            cls: 'sl-manuscript-search-input',
+            attr: { type: 'text', placeholder: 'Replace…', 'aria-label': 'Replace' },
+        });
+        this.replaceInput = replaceInput;
+
+        const replaceBtn = replaceRow.createEl('button', { cls: 'sl-manuscript-search-btn', attr: { 'aria-label': 'Replace this match', title: 'Replace' } });
+        setIcon(replaceBtn, 'replace');
+        replaceBtn.addEventListener('click', () => this.replaceCurrent());
+
+        const replaceAllBtn = replaceRow.createEl('button', { cls: 'sl-manuscript-search-btn', attr: { 'aria-label': 'Replace all matches', title: 'Replace all' } });
+        setIcon(replaceAllBtn, 'check-check');
+        replaceAllBtn.addEventListener('click', () => this.replaceAll());
+
+        // Wire up input events
+        input.addEventListener('input', () => this.runSearch());
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.searchNext(!e.shiftKey);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeSearch();
+            }
+        });
+        replaceInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.replaceCurrent();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeSearch();
+            }
+        });
+    }
+
+    /** Toggle the search panel open/closed. */
+    toggleSearch(): void {
+        if (!this.searchPanel) return;
+        const open = this.searchPanel.style.display === 'none';
+        this.searchPanel.setCssStyles({ display: open ? '' : 'none' });
+        if (open) {
+            this.searchInput?.focus();
+            this.searchInput?.select();
+            if (this.searchInput && this.searchInput.value) this.runSearch();
+        } else {
+            this.clearSearchHighlights();
+        }
+    }
+
+    /** Whether the search panel is currently open. */
+    isSearchOpen(): boolean {
+        return !!this.searchPanel && this.searchPanel.style.display !== 'none';
+    }
+
+    /** Close the search panel. */
+    private closeSearch(): void {
+        this.searchPanel?.setCssStyles({ display: 'none' });
+        this.clearSearchHighlights();
+        this.searchMatches = [];
+        this.searchMatchTotal = 0;
+        this.searchMatchIndex = -1;
+        this.updateSearchCount();
+    }
+
+    /** Build a RegExp from the current search input + options. */
+    private buildSearchRegex(): RegExp | null {
+        const term = this.searchInput?.value ?? '';
+        if (!term) return null;
+        let flags = 'g';
+        if (!this.searchCaseSensitive) flags += 'i';
+        let pattern = this.searchRegex ? term : term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (this.searchWholeWord && !this.searchRegex) pattern = `\\b${pattern}\\b`;
+        try {
+            return new RegExp(pattern, flags);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Get the current text of a scene for search/replace purposes.
+     * Prefers the live CM6 editor (so unsaved edits are included); falls
+     * back to the SceneManager's cached body for unmounted scenes.
+     */
+    private getSceneText(path: string): string | null {
+        const leaf = this.embeddedLeaves.get(path);
+        if (leaf) {
+            const cm = this.getCmView(leaf);
+            if (cm) return cm.state.doc.toString();
+        }
+        const scene = this.sceneManager.getScene(path);
+        return scene?.body ?? null;
+    }
+
+    /**
+     * Run a fresh search across the entire book.
+     *
+     * Issue #195 — searches every scene in the current filter/sort scope,
+     * not just the mounted editors. Unmounted scenes are read from the
+     * SceneManager cache so users can find matches across the whole book
+     * without scrolling every scene into view first.
+     */
+    private runSearch(): void {
+        this.clearSearchHighlights();
+        this.searchMatches = [];
+        const re = this.buildSearchRegex();
+        if (!re) {
+            this.searchMatchTotal = 0;
+            this.searchMatchIndex = -1;
+            this.updateSearchCount();
+            return;
+        }
+
+        // Use the same scene list currently rendered in the manuscript
+        // (respects active filters/sort) so search scope matches what the
+        // user sees.
+        const scenes = this._lastScenes.length > 0
+            ? this._lastScenes
+            : this.sceneManager.queryService
+                .getFilteredScenes(this.currentFilter, this.currentSort)
+                .filter(s => !s.corkboardNote);
+
+        for (const scene of scenes) {
+            const text = this.getSceneText(scene.filePath);
+            if (text == null) continue;
+            re.lastIndex = 0;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(text)) !== null) {
+                if (m[0].length === 0) { re.lastIndex++; continue; }
+                this.searchMatches.push({
+                    path: scene.filePath,
+                    from: m.index,
+                    to: m.index + m[0].length,
+                });
+            }
+        }
+
+        this.searchMatchTotal = this.searchMatches.length;
+        this.searchMatchIndex = this.searchMatchTotal > 0 ? 0 : -1;
+        // Highlight the first match in its editor WITHOUT stealing focus
+        // from the search input (Issue #195). scrollToMatch() (which does
+        // focus the editor) is only called on explicit next/previous
+        // navigation.
+        this.applySearchHighlights();
+        this.updateSearchCount();
+    }
+
+    /** Move to the next/previous match. */
+    private searchNext(forward: boolean): void {
+        if (this.searchMatches.length === 0) {
+            this.runSearch();
+            return;
+        }
+        if (forward) {
+            this.searchMatchIndex = (this.searchMatchIndex + 1) % this.searchMatches.length;
+        } else {
+            this.searchMatchIndex = (this.searchMatchIndex - 1 + this.searchMatches.length) % this.searchMatches.length;
+        }
+        this.updateSearchCount();
+        void this.scrollToMatch(this.searchMatchIndex);
+    }
+
+    /** Update the "x of y" counter. */
+    private updateSearchCount(): void {
+        const el = this.searchPanel?.querySelector('.sl-manuscript-search-count') as HTMLElement | null;
+        if (!el) return;
+        if (this.searchMatchTotal === 0) {
+            el.setText(this.searchInput?.value ? 'No results' : '');
+        } else {
+            el.setText(`${this.searchMatchIndex + 1} of ${this.searchMatchTotal}`);
+        }
+    }
+
+    /** Apply CM6 selection-based highlight to the current match. */
+    private applySearchHighlights(): void {
+        if (this.searchMatchIndex < 0 || this.searchMatchIndex >= this.searchMatches.length) return;
+        const match = this.searchMatches[this.searchMatchIndex];
+        const leaf = this.embeddedLeaves.get(match.path);
+        if (!leaf) return;
+        const cm = this.getCmView(leaf);
+        if (!cm) return;
+        cm.dispatch({
+            selection: EditorSelection.single(match.from, match.to),
+            scrollIntoView: true,
+        });
+        // Do NOT call cm.focus() here — doing so while the user is typing
+        // in the search input steals focus after the first keystroke
+        // (Issue #195). Focus is only moved to the editor when the user
+        // explicitly navigates to a match via scrollToMatch().
+    }
+
+    /** Clear search highlights by collapsing selections in all editors. */
+    private clearSearchHighlights(): void {
+        for (const [, leaf] of this.embeddedLeaves) {
+            const cm = this.getCmView(leaf);
+            if (!cm) continue;
+            const sel = cm.state.selection.main;
+            if (sel.from !== sel.to) {
+                cm.dispatch({ selection: EditorSelection.single(sel.head, sel.head) });
+            }
+        }
+    }
+
+    /** Scroll the manuscript so the given match is visible. */
+    private async scrollToMatch(idx: number): Promise<void> {
+        if (idx < 0 || idx >= this.searchMatches.length) return;
+        const match = this.searchMatches[idx];
+        // Ensure the scene editor is mounted so we can highlight the match.
+        if (!this.embeddedLeaves.has(match.path)) {
+            const block = this.scrollArea?.querySelector(
+                `[data-scene-path="${CSS.escape(match.path)}"]`
+            ) as HTMLElement | null;
+            const editorWrap = block?.querySelector('.sl-manuscript-editor-wrap') as HTMLElement | null;
+            if (editorWrap) await this.mountEditor(editorWrap, match.path);
+        }
+        const block = this.scrollArea?.querySelector(
+            `[data-scene-path="${CSS.escape(match.path)}"]`
+        ) as HTMLElement | null;
+        if (block) block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Give the editor a frame to lay out before selecting. Focus the
+        // editor here because this is an explicit navigation action (next/
+        // previous match), unlike runSearch() which must keep focus in the
+        // search input while the user types.
+        window.requestAnimationFrame(() => {
+            this.applySearchHighlights();
+            const leaf = this.embeddedLeaves.get(match.path);
+            if (leaf) {
+                const cm = this.getCmView(leaf);
+                cm?.focus();
+            }
+        });
+    }
+
+    /**
+     * Replace the current match.
+     *
+     * If the scene's editor is mounted, the replacement is applied directly
+     * via CM6 (so the user sees it immediately). If the scene is not
+     * mounted, the file is rewritten via SceneManager.updateScene so the
+     * change still lands on disk.
+     */
+    private async replaceCurrent(): Promise<void> {
+        if (this.searchMatchIndex < 0 || this.searchMatchIndex >= this.searchMatches.length) return;
+        const replacement = this.replaceInput?.value ?? '';
+        const match = this.searchMatches[this.searchMatchIndex];
+        const leaf = this.embeddedLeaves.get(match.path);
+
+        if (leaf) {
+            const cm = this.getCmView(leaf);
+            if (!cm) return;
+            cm.dispatch({
+                changes: { from: match.from, to: match.to, insert: replacement },
+                selection: EditorSelection.single(match.from, match.from + replacement.length),
+            });
+        } else {
+            // Scene not mounted — rewrite the body via SceneManager.
+            const scene = this.sceneManager.getScene(match.path);
+            if (!scene) return;
+            const body = scene.body ?? '';
+            const newBody = body.slice(0, match.from) + replacement + body.slice(match.to);
+            await this.sceneManager.updateScene(match.path, { body: newBody });
+        }
+
+        // Wait for the file modify event to propagate, then re-run search.
+        await new Promise(r => window.setTimeout(r, 200));
+        this.runSearch();
+    }
+
+    /**
+     * Replace all matches across the entire book.
+     *
+     * Mounted scenes are updated via CM6 dispatches; unmounted scenes are
+     * rewritten via SceneManager.updateScene. Changes are applied
+     * per-scene from end-to-start so offsets stay valid within each file.
+     */
+    private async replaceAll(): Promise<void> {
+        if (this.searchMatches.length === 0) return;
+        const replacement = this.replaceInput?.value ?? '';
+
+        // Group matches by path.
+        const byPath = new Map<string, { from: number; to: number }[]>();
+        for (const m of this.searchMatches) {
+            const arr = byPath.get(m.path) ?? [];
+            arr.push({ from: m.from, to: m.to });
+            byPath.set(m.path, arr);
+        }
+
+        let totalReplaced = 0;
+        for (const [path, matches] of byPath) {
+            const leaf = this.embeddedLeaves.get(path);
+            if (leaf) {
+                const cm = this.getCmView(leaf);
+                if (!cm) continue;
+                // Apply from end to start so offsets stay valid.
+                const sorted = [...matches].sort((a, b) => b.from - a.from);
+                const changes = sorted.map(m => ({ from: m.from, to: m.to, insert: replacement }));
+                cm.dispatch({ changes });
+                totalReplaced += matches.length;
+            } else {
+                // Unmounted scene — rewrite body via SceneManager.
+                const scene = this.sceneManager.getScene(path);
+                if (!scene) continue;
+                let body = scene.body ?? '';
+                const sorted = [...matches].sort((a, b) => b.from - a.from);
+                for (const m of sorted) {
+                    body = body.slice(0, m.from) + replacement + body.slice(m.to);
+                }
+                await this.sceneManager.updateScene(path, { body });
+                totalReplaced += matches.length;
+            }
+        }
+
+        new Notice(`Replaced ${totalReplaced} occurrence${totalReplaced === 1 ? '' : 's'}`);
+        // Wait for file modify events to propagate, then re-run search.
+        await new Promise(r => window.setTimeout(r, 300));
+        this.runSearch();
     }
 
     /** Recalculate the footer word count from SceneManager data */

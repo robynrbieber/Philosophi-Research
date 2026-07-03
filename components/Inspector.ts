@@ -1380,11 +1380,16 @@ export class InspectorComponent {
     }
 
     private async getCurrentSceneNotesText(scene: Scene): Promise<string> {
-        const notesPath = await this.sceneManager.getOrCreateSceneNotesFile(scene);
-        const notesFile = this.plugin.app.vault.getAbstractFileByPath(notesPath);
+        // Issue #200 — read-only lookup so rendering a scene doesn't create an
+        // empty notes file. The file is created lazily by writeSceneNotes()
+        // when the user actually types something.
+        const notesPath = this.sceneManager.getSceneNotesFile(scene);
+        const notesFile = notesPath
+            ? this.plugin.app.vault.getAbstractFileByPath(notesPath)
+            : null;
         const fileNotes = notesFile instanceof obsidian.TFile
             ? await this.plugin.app.vault.read(notesFile)
-            : '';
+            : (scene.notes ?? '');
         return this.stripRedundantNotesHeadings(fileNotes, scene).trim();
     }
 

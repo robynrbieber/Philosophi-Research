@@ -238,22 +238,44 @@ export class FieldTemplateService {
     }
 
     /**
-     * Issue #92 — place an existing template directly after another sibling
-     * (same section + category). Pass `null` to move to the top.
-     * Normalises orders to 0..n.
+     * Issue #92 / #197 — place an existing universal-field template at a
+     * specific position within its (section, category)'s merged display order
+     * (built-in + universal interleaved). Pass `null` to move to the very top,
+     * a sibling id to insert after that sibling, or `undefined` to leave it at
+     * the end (no-op).
+     *
+     * The previous implementation only shuffled the per-template `order` field,
+     * which `getMergedOrder` ignores once a `sectionOrders` entry exists — so
+     * the position was silently lost and every new field landed at the end
+     * (issue #197). This version updates the persisted `sectionOrders` map so
+     * the chosen position is honoured on the next render.
      */
-    async moveAfter(id: string, afterId: string | null): Promise<void> {
-        const t = this.templates.find(f => f.id === id);
-        if (!t) return;
-        const siblings = this.getBySection(t.section, t.category).filter(s => s.id !== id);
+    async moveAfter(
+        section: string,
+        category: string | undefined,
+        builtInKeys: string[],
+        id: string,
+        afterId: string | null | undefined,
+    ): Promise<void> {
+        // No explicit position → leave at end (getMergedOrder already appends
+        // new universals at the end by default).
+        if (afterId === undefined) return;
+
+        const order = this.getMergedOrder(section, category, builtInKeys);
+        // Remove the entry we're moving.
+        const fromIdx = order.findIndex(e => e.kind === 'universal' && e.key === id);
+        if (fromIdx < 0) return;
+        const [moved] = order.splice(fromIdx, 1);
+
         let insertIdx = 0;
-        if (afterId) {
-            const i = siblings.findIndex(s => s.id === afterId);
-            insertIdx = i >= 0 ? i + 1 : siblings.length;
+        if (afterId === null) {
+            insertIdx = 0;
+        } else {
+            const i = order.findIndex(e => e.key === afterId);
+            insertIdx = i >= 0 ? i + 1 : order.length;
         }
-        siblings.splice(insertIdx, 0, t);
-        siblings.forEach((s, i) => { s.order = i; });
-        await this.save();
+        order.splice(insertIdx, 0, moved);
+        await this.setSectionOrder(section, category, order);
     }
 
     // ── Merged ordering (built-in + universal) ─────────

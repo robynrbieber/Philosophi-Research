@@ -70,7 +70,7 @@ export interface SLObsidianFontSettings {
 }
 
 interface SLDocumentElement {
-    type: 'paragraph' | 'heading' | 'list' | 'codeblock' | 'table' | 'break' | 'blockquote' | 'tasklist' | 'horizontal-rule' | 'image';
+    type: 'paragraph' | 'heading' | 'list' | 'codeblock' | 'table' | 'break' | 'blockquote' | 'tasklist' | 'horizontal-rule' | 'image' | 'scene-separator';
     content?: string;
     level?: number;
     style?: SLTextStyle;
@@ -101,6 +101,9 @@ export class SLMarkdownToDocxConverter {
     private imageCounter: number = 0;
     private imageRelationships: Array<{id: string, data: ArrayBuffer, extension: string}> = [];
     private md: MarkdownIt;
+    /** When set, lines whose trimmed content equals this string are rendered
+     *  as centered scene-separator paragraphs instead of normal body text. */
+    private sceneSeparatorText: string | null = null;
 
     constructor(settings: SLDocxSettings) {
         this.settings = settings;
@@ -111,6 +114,11 @@ export class SLMarkdownToDocxConverter {
 
     updateSettings(settings: SLDocxSettings): void {
         this.settings = settings;
+    }
+
+    /** Set the scene separator string so matching lines render as centered separators. */
+    setSceneSeparatorText(text: string | null): void {
+        this.sceneSeparatorText = text ? text.trim() : null;
     }
 
     // ── Chunked processing for large documents ──
@@ -681,12 +689,18 @@ ${imageRels}</Relationships>`;
                 case 'horizontal-rule': return this.horizontalRuleToXml();
                 case 'image': return this.imageToXml(element);
                 case 'break': return '<w:p><w:pPr></w:pPr></w:p>';
+                case 'scene-separator': return this.sceneSeparatorToXml(element);
                 default: return '';
             }
         } catch (error) {
             console.error('StoryLine DOCX: Error converting element to XML:', element.type, error);
             return `<w:p><w:pPr></w:pPr><w:r><w:t>[Error processing ${element.type}]</w:t></w:r></w:p>`;
         }
+    }
+
+    private sceneSeparatorToXml(element: SLDocumentElement): string {
+        const text = this.escapeXml(element.content || '* * *');
+        return `<w:p>\n  <w:pPr>\n    <w:jc w:val="center"/>\n    <w:spacing w:before="240" w:after="240"/>\n  </w:pPr>\n  <w:r>\n    <w:t xml:space="preserve">${text}</w:t>\n  </w:r>\n</w:p>`;
     }
 
     private headingToXml(element: SLDocumentElement): string {
@@ -1261,6 +1275,16 @@ ${imageRels}</Relationships>`;
             }
 
             const trimmedLine = line.trim();
+
+            // Scene separators (plain-text line matching the configured separator)
+            if (this.sceneSeparatorText && trimmedLine === this.sceneSeparatorText) {
+                elements.push({
+                    type: 'scene-separator',
+                    content: this.decodeHtmlEntities(trimmedLine)
+                });
+                i++;
+                continue;
+            }
 
             // Horizontal rules
             const cleanLine = trimmedLine.replace(/\s/g, '');

@@ -206,6 +206,10 @@ export class InlineSuggest {
             // when the dropdown clips them. Critical when sibling locations
             // share a short name under different parents.
             item.setAttr('title', displayText);
+            // Store the canonical value (not the display label) so keyboard
+            // selection (Enter/Tab) commits the real note name rather than the
+            // breadcrumb display text (e.g. "America > New York"). See #191.
+            item.dataset.suggestValue = visible[i].name;
             item.addEventListener('mousedown', (e) => {
                 e.preventDefault(); // prevent blur
             });
@@ -321,8 +325,10 @@ export class InlineSuggest {
         if (el.hasClass('sl-suggest-new')) {
             this.commit(this.inputEl.value.trim());
         } else {
-            // Extract plain text (skipping highlight spans)
-            this.commit(el.textContent ?? '');
+            // Prefer the canonical value stored on the element (see #191) so
+            // we commit the real note name, not the breadcrumb display label.
+            const stored = el.dataset.suggestValue;
+            this.commit(stored ?? el.textContent ?? '');
         }
     }
 

@@ -925,6 +925,11 @@ export class CharacterView extends ItemView {
             const existingSiblings = this.plugin.fieldTemplates
                 .getBySection(category.title, 'character')
                 .map(t => ({ id: t.id, label: t.label }));
+            // Snapshot the current built-in keys so moveAfter can resolve the
+            // merged order even before the new field is rendered (issue #197).
+            const builtInKeysForAdd = category.fields
+                .filter(f => !(this.plugin.settings.hiddenFields['character'] ?? []).includes(f.key))
+                .map(f => f.key);
             const modal = new AddFieldModal(
                 this.app,
                 category.title,
@@ -933,7 +938,10 @@ export class CharacterView extends ItemView {
                     template.category = 'character';
                     await this.plugin.fieldTemplates.add(template);
                     if (positionAfterId !== undefined) {
-                        await this.plugin.fieldTemplates.moveAfter(template.id, positionAfterId);
+                        await this.plugin.fieldTemplates.moveAfter(
+                            category.title, 'character', builtInKeysForAdd,
+                            template.id, positionAfterId,
+                        );
                     }
                     // Re-render the detail view to show the new field
                     if (this.selectedCharacter && this.rootContainer) {
@@ -1219,7 +1227,10 @@ export class CharacterView extends ItemView {
                 async (updated, positionAfterId) => {
                     await this.plugin.fieldTemplates.update(tpl.id, updated);
                     if (positionAfterId !== undefined) {
-                        await this.plugin.fieldTemplates.moveAfter(tpl.id, positionAfterId);
+                        await this.plugin.fieldTemplates.moveAfter(
+                            tpl.section, tpl.category, builtInKeys ?? [],
+                            tpl.id, positionAfterId,
+                        );
                     }
                     if (this.selectedCharacter && this.rootContainer) {
                         this.renderCharacterDetail(this.rootContainer);

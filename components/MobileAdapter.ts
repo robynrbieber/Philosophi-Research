@@ -282,4 +282,114 @@ export function enableTouchDrag(
         card.removeEventListener('click', onClickCapture, { capture: true });
     };
 }
-/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- end of file-wide suppression block opened at line 1 */
+// ── Soft-keyboard / viewport handling ─────────────────
+
+/**
+ * StoryLine UI containers whose scroll context should be panned when the
+ * soft keyboard appears. The focused field is scrolled into the visible
+ * (above-keyboard) region.
+ */
+const STORYLINE_UI_SELECTOR = '[class*="story-line-"], [class*="storyline-"], [class*="sl-"]';
+const FOCUSABLE_SELECTOR = 'input, textarea, select, [contenteditable="true"], [contenteditable=""]';
+
+/**
+ * Install global listeners that keep the focused StoryLine field visible
+ * above the mobile soft keyboard.
+ *
+ * On mobile, when a textarea/input inside the Codex, Inspector, Corkboard
+ * note editor, or any other StoryLine panel gains focus, the soft keyboard
+ * can cover it. Obsidian's webview does not always scroll the focused
+ * element into view reliably. We use the Visual Viewport API to compute
+ * the visible (keyboard-free) region and scroll the nearest scrollable
+ * ancestor so the field lands in the upper portion of the visible area.
+ *
+ * Returns a cleanup function that removes the listeners.
+ */
+export function setupMobileKeyboardHandling(): () => void {
+    if (!isMobile) return () => {};
+
+    let rafId: number | null = null;
+
+    const isStoryLineField = (el: Element | null): boolean => {
+        if (!el) return false;
+        return !!el.closest(STORYLINE_UI_SELECTOR);
+    };
+
+    const revealFocusedField = (target: EventTarget | null): void => {
+        if (rafId !== null) window.cancelAnimationFrame(rafId);
+        rafId = window.requestAnimationFrame(() => {
+            rafId = null;
+            const el = target as HTMLElement | null;
+            if (!el || !isStoryLineField(el)) return;
+
+            // Compute the visible top region (above the keyboard).
+            // visualViewport.height shrinks when the keyboard is shown.
+            const vv = window.visualViewport;
+            if (!vv) {
+                el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                return;
+            }
+
+            const visibleTop = vv.offsetTop;
+            // Reserve the bottom ~45% for the keyboard; aim for the field
+            // to sit in the upper portion of the visible region.
+            const visibleHeight = vv.height;
+            const safeBottom = visibleTop + visibleHeight * 0.55;
+
+            const rect = el.getBoundingClientRect();
+            // Already within the safe region — nothing to do.
+            if (rect.top >= visibleTop + 8 && rect.bottom <= safeBottom) return;
+
+            // Find the nearest scrollable ancestor and scroll it so the
+            // field lands ~24px below the visible top.
+            let parent: HTMLElement | null = el.parentElement;
+            while (parent) {
+                const style = getComputedStyle(parent);
+                const overflowY = style.overflowY;
+                const canScroll = (overflowY === 'auto' || overflowY === 'scroll' ||
+                    (style.overflow === 'auto' || style.overflow === 'scroll'));
+                if (canScroll && parent.scrollHeight > parent.clientHeight) {
+                    const parentRect = parent.getBoundingClientRect();
+                    const desiredTop = Math.max(parentRect.top + 24, visibleTop + 24);
+                    const delta = rect.top - desiredTop;
+                    if (delta > 0 || rect.bottom > safeBottom) {
+                        parent.scrollTop += delta > 0 ? delta : (rect.bottom - safeBottom + 24);
+                    }
+                    break;
+                }
+                parent = parent.parentElement;
+            }
+
+            // Fallback: also nudge the field itself into view.
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        });
+    };
+
+    const onFocusIn = (e: FocusEvent): void => {
+        const target = e.target as HTMLElement | null;
+        if (!target || !target.matches(FOCUSABLE_SELECTOR)) return;
+        if (!isStoryLineField(target)) return;
+        revealFocusedField(target);
+    };
+
+    // When the visual viewport resizes (keyboard shown/hidden), re-check
+    // the currently focused element.
+    const onViewportResize = (): void => {
+        const active = activeDocument.activeElement as HTMLElement | null;
+        if (active && active.matches(FOCUSABLE_SELECTOR) && isStoryLineField(active)) {
+            revealFocusedField(active);
+        }
+    };
+
+    const opts: AddEventListenerOptions = { capture: true, passive: true };
+    activeDocument.addEventListener('focusin', onFocusIn, opts);
+    window.visualViewport?.addEventListener('resize', onViewportResize, opts);
+    window.visualViewport?.addEventListener('scroll', onViewportResize, opts);
+
+    return () => {
+        if (rafId !== null) window.cancelAnimationFrame(rafId);
+        activeDocument.removeEventListener('focusin', onFocusIn, opts);
+        window.visualViewport?.removeEventListener('resize', onViewportResize, opts);
+        window.visualViewport?.removeEventListener('scroll', onViewportResize, opts);
+    };
+}/* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- end of file-wide suppression block opened at line 1 */
