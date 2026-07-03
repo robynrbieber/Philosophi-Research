@@ -9391,6 +9391,9 @@ body.theme-dark .location-field-input.dropdown {
     width: min(280px, 100%);
     margin-top: 2px;
 }
+.codex-custom-multi-suggest.is-hidden {
+    display: none;
+}
 .codex-custom-multi-suggest-item {
     padding: 6px 10px;
     cursor: pointer;

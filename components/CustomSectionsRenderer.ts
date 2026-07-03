@@ -549,13 +549,12 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                     const allowed = selectableOptions(app, def);
 
                     // ── Suggestion dropdown ──────────────────────
-                    const suggestList = wrap.createDiv('codex-custom-multi-suggest');
-                    suggestList.style.display = 'none';
+                    const suggestList = wrap.createDiv('codex-custom-multi-suggest is-hidden');
 
                     const showSuggestions = () => {
                         const term = inp.value.trim().toLowerCase();
                         if (!term || allowed.length === 0) {
-                            suggestList.style.display = 'none';
+                            suggestList.addClass('is-hidden');
                             suggestList.empty();
                             return;
                         }
@@ -563,12 +562,12 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                             o => o.toLowerCase().includes(term) && !values.includes(o)
                         );
                         if (matches.length === 0) {
-                            suggestList.style.display = 'none';
+                            suggestList.addClass('is-hidden');
                             suggestList.empty();
                             return;
                         }
                         suggestList.empty();
-                        suggestList.style.display = '';
+                        suggestList.removeClass('is-hidden');
                         for (const m of matches) {
                             const item = suggestList.createDiv('codex-custom-multi-suggest-item', { text: m });
                             item.addEventListener('click', (ev) => {
@@ -581,7 +580,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                                     renderPills();
                                 }
                                 inp.value = '';
-                                suggestList.style.display = 'none';
+                                suggestList.addClass('is-hidden');
                                 suggestList.empty();
                                 inp.focus();
                             });
@@ -591,7 +590,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                     // Debounced show on input
                     let suggestTimer: number | null = null;
                     inp.addEventListener('input', () => {
-                        if (suggestTimer) clearTimeout(suggestTimer);
+                        if (suggestTimer) window.clearTimeout(suggestTimer);
                         suggestTimer = window.setTimeout(showSuggestions, 120);
                     });
                     inp.addEventListener('focus', () => {
@@ -599,22 +598,22 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                     });
                     // Dismiss on blur (allow click-to-select first)
                     inp.addEventListener('blur', () => {
-                        setTimeout(() => {
-                            suggestList.style.display = 'none';
+                        window.setTimeout(() => {
+                            suggestList.addClass('is-hidden');
                             suggestList.empty();
                         }, 150);
                     });
                     inp.addEventListener('keydown', (e) => {
                         if (e.key === 'Escape') {
-                            suggestList.style.display = 'none';
+                            suggestList.addClass('is-hidden');
                             suggestList.empty();
                             return;
                         }
                         if (e.key === 'Enter') {
                             e.preventDefault();
                             // Prefer picking the first visible suggestion
-                            const first = suggestList.querySelector('.codex-custom-multi-suggest-item') as HTMLElement | null;
-                            if (first) { first.click(); return; }
+                            const first = suggestList.querySelector('.codex-custom-multi-suggest-item');
+                            if (first) { (first as HTMLElement).click(); return; }
                             const v = inp.value.trim();
                             if (!v) return;
                             if (allowed.length > 0 && !allowed.includes(v)) {
@@ -629,7 +628,7 @@ function renderOneSection<T extends { custom?: Record<string, string> }>(
                                 renderPills();
                             }
                             inp.value = '';
-                            suggestList.style.display = 'none';
+                            suggestList.addClass('is-hidden');
                             suggestList.empty();
                         }
                     });
