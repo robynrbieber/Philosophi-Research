@@ -236,7 +236,7 @@ A Scrivenings-style continuous document view that presents your entire story as 
 - **Act & chapter headings** — automatic section dividers appear whenever the act or chapter changes.
 - **Scene dividers** — each scene block shows a subtle header with the scene title and a color-coded status badge (idea, draft, written, etc.).
 - **Clickable titles** — click any scene title to open that scene file in a new tab.
-- **Plain Text toggle** — hides wiki-link styling, tag `#` prefixes, and external-link URLs so the text reads like clean prose. Default: ON.
+- **Plain Text toggle** — hides wiki-link styling, tag `#` prefixes, and external-link URLs so the text reads like clean prose. Defaults to ON for first-time users; the toolbar remembers your last choice (ON or OFF) across view switches and Obsidian restarts.
 - **Lock Links toggle** — makes internal links and tags non-editable. The cursor skips over link and tag text, preventing accidental changes while you write around them. Default: ON.
 - **Filter support** — use the same filter bar as other views to narrow down which scenes appear.
 - **Word count footer** — total scene count and aggregate word count displayed at the bottom.
@@ -281,6 +281,7 @@ A dedicated character management system with rich profiles. Characters are acces
   - Gap detection warnings.
   - Full list of scenes the character appears in, with status badges.
   - **Referenced By** — other characters, locations, codex entries, and scenes that mention this character (see [Cross-Entity References](#cross-entity-references)).
+  - **Linked Aliases** — when you use the **Link to…** action on an unlinked character name (in the overview grid's "Unlinked" tab), that alias is mapped to a canonical character profile so scenes aggregate correctly. The side panel now lists every alias linked to the current character, each with an **Unlink** button that removes the mapping and restores the alias as a standalone entry. *(Issue #213)*
 - **Hide/show fields** — hover over any field label to reveal an eye icon. Click to hide unused fields. See [Hide / Show Built-in Fields](#hide--show-built-in-fields).
 
 ### Locations View
@@ -1286,7 +1287,7 @@ StoryLine now tracks **cross-entity references** across your entire project. Whe
 | **Locations** | Description, atmosphere, significance, inhabitants, connected locations, map notes, notes |
 | **Worlds** | Description, geography, culture, politics, magic/technology, beliefs, economy, history, notes |
 | **Codex entries** | All text fields |
-| **Scenes** | Full body text (wikilinks and plain-text matches) |
+| **Scenes** | Full body text (wikilinks and plain-text matches) **plus** Codex entries tagged via the Scene Inspector (`codexLinks` frontmatter) |
 
 ### Reference Display
 

@@ -984,6 +984,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     showFormattingToolbar: true,
 
+
     focusDarkenAmount: 40,
     focusBlurAmount: 1,
 

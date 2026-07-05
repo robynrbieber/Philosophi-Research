@@ -331,10 +331,16 @@ export function setupMobileKeyboardHandling(): () => void {
             }
 
             const visibleTop = vv.offsetTop;
-            // Reserve the bottom ~45% for the keyboard; aim for the field
-            // to sit in the upper portion of the visible region.
             const visibleHeight = vv.height;
-            const safeBottom = visibleTop + visibleHeight * 0.55;
+            // Compute the actual keyboard height by comparing the visual
+            // viewport to the layout viewport. This avoids the old fixed
+            // 45% heuristic which over-scrolled when the keyboard was small
+            // or absent (issue #190: content peeking above sticky toolbars).
+            const layoutHeight = window.innerHeight;
+            const keyboardHeight = Math.max(0, layoutHeight - visibleHeight - visibleTop);
+            // Reserve the keyboard region plus a small margin. If no
+            // keyboard is visible, this collapses to the full viewport.
+            const safeBottom = visibleTop + visibleHeight - 16;
 
             const rect = el.getBoundingClientRect();
             // Already within the safe region — nothing to do.
@@ -360,8 +366,14 @@ export function setupMobileKeyboardHandling(): () => void {
                 parent = parent.parentElement;
             }
 
-            // Fallback: also nudge the field itself into view.
-            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            // NOTE: the previous fallback `el.scrollIntoView({ block: 'nearest' })`
+            // was removed because it fought the manual ancestor-scroll logic
+            // and could push content above sticky toolbars on mobile
+            // (issue #190: toolbar not aligned to top, content peeking above
+            // it when scrolling). The ancestor-scroll above is sufficient;
+            // if no scrollable ancestor was found, the field is already in
+            // a non-scrolling context and the browser will handle it.
+            void keyboardHeight;
         });
     };
 
@@ -373,12 +385,19 @@ export function setupMobileKeyboardHandling(): () => void {
     };
 
     // When the visual viewport resizes (keyboard shown/hidden), re-check
-    // the currently focused element.
+    // the currently focused element. Debounced because `resize` fires
+    // continuously while the keyboard animates in/out — each fire used to
+    // re-scroll and fight the user's own scroll position (issue #190/#211).
+    let resizeTimer: number | null = null;
     const onViewportResize = (): void => {
-        const active = activeDocument.activeElement as HTMLElement | null;
-        if (active && active.matches(FOCUSABLE_SELECTOR) && isStoryLineField(active)) {
-            revealFocusedField(active);
-        }
+        if (resizeTimer !== null) window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(() => {
+            resizeTimer = null;
+            const active = activeDocument.activeElement as HTMLElement | null;
+            if (active && active.matches(FOCUSABLE_SELECTOR) && isStoryLineField(active)) {
+                revealFocusedField(active);
+            }
+        }, 120);
     };
 
     const opts: AddEventListenerOptions = { capture: true, passive: true };
@@ -388,6 +407,7 @@ export function setupMobileKeyboardHandling(): () => void {
 
     return () => {
         if (rafId !== null) window.cancelAnimationFrame(rafId);
+        if (resizeTimer !== null) window.clearTimeout(resizeTimer);
         activeDocument.removeEventListener('focusin', onFocusIn, opts);
         window.visualViewport?.removeEventListener('resize', onViewportResize, opts);
         window.visualViewport?.removeEventListener('scroll', onViewportResize, opts);

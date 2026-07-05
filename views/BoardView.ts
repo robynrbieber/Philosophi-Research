@@ -65,6 +65,14 @@ export class BoardView extends ItemView {
     private scrollers: VirtualScroller<Scene>[] = [];
     /** Saved column scroll positions across refreshes (keyed by group title) */
     private columnScrollPositions: Map<string, number> = new Map();
+    /**
+     * File path of the scene whose corkboard note editor is currently
+     * focused. While set, `refresh()` and `restoreColumnScrollPositions()`
+     * skip their rebuild so the textarea isn't torn down mid-edit
+     * (issue #190: editing a corkboard note at certain zoom levels kicked
+     * focus out and hid the text being typed).
+     */
+    private editingNotePath: string | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -423,8 +431,10 @@ export class BoardView extends ItemView {
 
     /**
      * Restore previously saved scroll positions after a re-render.
+     * Skipped while a corkboard note editor is focused (issue #190).
      */
     private restoreColumnScrollPositions(): void {
+        if (this.editingNotePath) return;
         if (!this.boardEl || this.columnScrollPositions.size === 0) return;
         const columns = this.boardEl.querySelectorAll('.story-line-column');
         columns.forEach((col) => {
@@ -648,6 +658,10 @@ export class BoardView extends ItemView {
         const markDetached = () => {
             editorAttached = false;
             detachOutsideClose();
+            // Clear the active-edit flag so refreshes resume.
+            if (this.editingNotePath === scene.filePath) {
+                this.editingNotePath = null;
+            }
         };
 
         const renderPreview = async () => {
@@ -688,6 +702,9 @@ export class BoardView extends ItemView {
         const setEditing = (editing: boolean, clickPoint?: { x: number; y: number }) => {
             isEditing = editing;
             if (editing) {
+                // Track the actively-edited note so refresh() skips rebuilds
+                // that would tear down the textarea mid-edit (issue #190).
+                this.editingNotePath = scene.filePath;
                 preview.setCssStyles({ display: 'none' });
                 textarea.setCssStyles({ display: 'block' });
                 autoGrow();
@@ -718,6 +735,12 @@ export class BoardView extends ItemView {
                 detachOutsideClose();
                 textarea.setCssStyles({ display: 'none' });
                 preview.setCssStyles({ display: 'block' });
+                // Clear the active-edit flag so refreshes resume. Only clear
+                // if this editor still owns the flag (a newer editor may
+                // have already set it).
+                if (this.editingNotePath === scene.filePath) {
+                    this.editingNotePath = null;
+                }
             }
         };
 
@@ -3357,6 +3380,14 @@ export class BoardView extends ItemView {
      */
     refresh(): void {
         if (!this.rootContainer) return;
+        // If a corkboard note editor is focused, skip the rebuild — tearing
+        // down the textarea mid-edit loses focus and hides the text being
+        // typed (issue #190). The cache version is still bumped so the next
+        // refresh after editing ends will pick up changes.
+        if (this.editingNotePath) {
+            this._lastCacheVersion = this.sceneManager.cacheVersion;
+            return;
+        }
         if (this._pendingRefresh) { cancelAnimationFrame(this._pendingRefresh); }
         this._pendingRefresh = window.requestAnimationFrame(() => {
             this._pendingRefresh = null;

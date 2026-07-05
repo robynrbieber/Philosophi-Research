@@ -10479,7 +10479,8 @@ body /* ── Plain-text mode: hide link/tag decorations ───────�
 /* ── Referenced By panel ───────────────────────────── */
 .character-references-panel,
 .location-references-panel,
-.codex-references-panel {
+.codex-references-panel,
+.character-linked-aliases-panel {
     margin-top: 16px;
     padding: 12px;
     border-radius: 8px;
@@ -10488,7 +10489,8 @@ body /* ── Plain-text mode: hide link/tag decorations ───────�
 
 .character-references-panel h3,
 .location-references-panel h3,
-.codex-references-panel h3 {
+.codex-references-panel h3,
+.character-linked-aliases-panel h3 {
     margin: 0 0 8px;
     font-size: 0.95em;
     font-weight: 600;
@@ -10521,6 +10523,40 @@ body /* ── Plain-text mode: hide link/tag decorations ───────�
 
 .reference-link:hover {
     text-decoration: underline;
+}
+
+/* ── Linked Aliases panel ──────────────────────────── */
+.linked-aliases-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0;
+}
+
+.linked-alias-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    flex-wrap: wrap;
+}
+
+.linked-alias-name {
+    font-weight: 600;
+    color: var(--text-normal);
+    font-size: 0.9em;
+}
+
+.linked-alias-target {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+.linked-alias-unlink-btn {
+    margin-left: auto;
+    font-size: 0.8em;
+    padding: 2px 8px;
+    height: auto;
+    line-height: 1.4;
 }
 
 /* ── Plot Grid: Codex entity tags in cells ─────────── */

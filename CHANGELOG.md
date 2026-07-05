@@ -6,6 +6,24 @@ If StoryLine helps your writing, please consider buying me a coffee. Donations k
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
+## Version 1.10.38
+
+### New Features
+
+- **Manuscript Plain Text toggle now remembers your last choice** — the Plain Text toolbar checkbox in the Manuscript view previously always reset to ON every time you opened the view or switched back to it. It now persists your last choice (ON or OFF) to localStorage, so the Manuscript view reopens exactly as you left it — across view switches and Obsidian restarts. First-time users still default to ON.
+
+### Bug Fixes
+
+- **Linked aliases now visible on character profiles** — using "Link to…" in the Characters view previously made the alias disappear as a separate entry, but there was no way to see which aliases pointed at a given character, nor to unlink one. The character side panel now shows a **Linked Aliases** section listing every alias mapped to that character, each with an **Unlink** button that removes the mapping and rebuilds the link scanner lookups. *(Issue #213)*
+
+- **Tagged Codex entries now appear in Referenced By** — checking a Codex entry in the Scene Inspector saved the link to the scene's `codexLinks` frontmatter, but the connection was one-way: the Codex entry's "Referenced By" panel only scanned scene body text, so tagged entries that weren't also mentioned by name never showed up. The reverse-lookup (`buildEntityIndex()`) now also reads `scene.codexLinks`, so tagged entries appear in the Referenced By panel of the corresponding Codex entry, character, or location. *(Issue #213)*
+
+- **Mobile keyboard / scroll handling improved** — on phones and tablets the soft-keyboard handler used a fixed 45% viewport reservation that over-scrolled when the keyboard was small or absent, causing content to peek above sticky toolbars and the editing row to blank out (Codex Locations/Items tabs, Scene Details). The handler now computes the actual keyboard height from the Visual Viewport API, debounces `resize`/`scroll` events (which previously fired continuously during keyboard animation and fought the user's scroll position), and removes the `scrollIntoView` fallback that could push content above sticky toolbars. *(Issue #190)*
+
+- **Corkboard note editing no longer loses focus mid-edit** — editing a corkboard note triggered a save → cache-version bump → `refreshOpenViews()` → `BoardView.refresh()` → `renderBoard()` cycle that rebuilt all cards and destroyed the focused textarea, kicking the user out of the text box. The board now tracks the actively-edited note's file path and skips rebuilds (and column scroll-position restores) while that editor is focused, so the textarea survives the refresh. *(Issues #190, #211)*
+
+- **VirtualScroller no longer kicks focus out of text boxes on scroll** — the scroller rebuilt its visible window on every scroll event by calling `contentEl.empty()`, which unmounted any focused input/textarea inside the window. It now tags each rendered item with its index and skips the rebuild when the focused element is still within the new visible window. *(Issue #211)*
+
 ## Version 1.10.37
 ## Version 1.10.36
 

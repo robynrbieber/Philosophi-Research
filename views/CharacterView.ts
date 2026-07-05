@@ -895,6 +895,7 @@ export class CharacterView extends ItemView {
         // ── Side panel: gallery + scene info + references ──
         this.renderGallery(sidePanel, draft);
         this.renderScenePanel(sidePanel, character.name);
+        this.renderLinkedAliasesPanel(sidePanel, character.name);
         this.renderReferencesPanel(sidePanel, character.name);
     }
 
@@ -2264,6 +2265,58 @@ export class CharacterView extends ItemView {
 
         // Gap detection
         this.renderGapDetection(container, characterName, scenes, allCharScenes);
+    }
+
+    /**
+     * Render the "Linked Aliases" panel — shows every alias name that has
+     * been linked to this character via the "Link to…" action (stored in
+     * `settings.characterAliases` as alias → canonical). Each alias has an
+     * "Unlink" button that removes the mapping.
+     *
+     * This addresses issue #213: previously, linking an alias to a character
+     * made the alias disappear as a separate entry, but there was no way to
+     * see which aliases pointed at a given character, nor to unlink one.
+     */
+    private renderLinkedAliasesPanel(container: HTMLElement, characterName: string): void {
+        const aliases = this.plugin.settings.characterAliases || {};
+        const linked = Object.entries(aliases).filter(
+            ([, canonical]) => canonical.toLowerCase() === characterName.toLowerCase()
+        );
+
+        if (linked.length === 0) return;
+
+        const section = container.createDiv('character-linked-aliases-panel');
+        section.createEl('h3', { text: 'Linked Aliases' });
+
+        const desc = section.createEl('p', {
+            cls: 'setting-item-description',
+            text: 'These names are linked to this character. They appear in scenes as this character and no longer show up as separate entries.',
+        });
+
+        const list = section.createEl('ul', { cls: 'linked-aliases-list' });
+        for (const [aliasLower, canonical] of linked) {
+            const li = list.createEl('li', { cls: 'linked-alias-row' });
+            // Recover original casing from the alias key (stored lowercased).
+            // Fall back to the lowercased key if no better source is available.
+            li.createSpan({ text: aliasLower, cls: 'linked-alias-name' });
+            li.createSpan({ text: ` → ${canonical}`, cls: 'linked-alias-target' });
+
+            const unlinkBtn = li.createEl('button', {
+                cls: 'linked-alias-unlink-btn',
+                text: 'Unlink',
+                attr: { 'aria-label': `Unlink "${aliasLower}" from ${canonical}` },
+            });
+            unlinkBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                delete this.plugin.settings.characterAliases[aliasLower];
+                await this.plugin.saveSettings();
+                // Rebuild lookups so the alias is treated as standalone again
+                this.plugin.linkScanner.invalidateAll();
+                this.plugin.linkScanner.rebuildLookups(this.plugin.settings.characterAliases);
+                new Notice(`Unlinked "${aliasLower}"`);
+                if (this.rootContainer) this.renderView(this.rootContainer);
+            });
+        }
     }
 
     private renderReferencesPanel(container: HTMLElement, entityName: string): void {

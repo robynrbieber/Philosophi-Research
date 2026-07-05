@@ -53,6 +53,10 @@ export interface EntityReference {
 export class LinkScanner {
     /** Cache keyed by scene filePath → scan result */
     private cache: Map<string, LinkScanResult> = new Map();
+    /** Cache keyed by scene filePath → the Scene object itself, so
+     *  buildEntityIndex() can read structured fields like codexLinks
+     *  (issue #213: tagged Codex entries weren't shown in Referenced By). */
+    private sceneCache: Map<string, Scene> = new Map();
 
     private characterManager: CharacterManager;
     private locationManager: LocationManager;
@@ -96,10 +100,15 @@ export class LinkScanner {
      */
     scan(scene: Scene): LinkScanResult {
         const cached = this.cache.get(scene.filePath);
-        if (cached) return cached;
+        if (cached) {
+            // Keep the scene reference fresh even on cache hits
+            this.sceneCache.set(scene.filePath, scene);
+            return cached;
+        }
 
         const result = this.performScan(scene);
         this.cache.set(scene.filePath, result);
+        this.sceneCache.set(scene.filePath, scene);
         return result;
     }
 
@@ -112,6 +121,8 @@ export class LinkScanner {
             if (!this.cache.has(scene.filePath)) {
                 this.cache.set(scene.filePath, this.performScan(scene));
             }
+            // Always refresh the scene reference so codexLinks stays current
+            this.sceneCache.set(scene.filePath, scene);
         }
         return this.cache;
     }
@@ -128,6 +139,7 @@ export class LinkScanner {
      */
     invalidate(filePath: string): void {
         this.cache.delete(filePath);
+        this.sceneCache.delete(filePath);
     }
 
     /**
@@ -135,6 +147,7 @@ export class LinkScanner {
      */
     invalidateAll(): void {
         this.cache.clear();
+        this.sceneCache.clear();
     }
 
     /**
@@ -525,6 +538,26 @@ export class LinkScanner {
                 const refs = index.get(key)!;
                 if (!refs.some(r => r.filePath === filePath)) {
                     refs.push({ name: sceneName, type: 'scene', filePath });
+                }
+            }
+
+            // Also honour explicit Codex links tagged via the Inspector
+            // (scene.codexLinks). Previously these were stored in frontmatter
+            // but never surfaced in the Referenced By panel because the
+            // reverse-lookup only scanned scene body text. (Issue #213)
+            const scene = this.sceneCache.get(filePath);
+            if (scene?.codexLinks) {
+                for (const [_catId, names] of Object.entries(scene.codexLinks)) {
+                    if (!Array.isArray(names)) continue;
+                    for (const name of names) {
+                        if (!name) continue;
+                        const key = name.toLowerCase();
+                        if (!index.has(key)) index.set(key, []);
+                        const refs = index.get(key)!;
+                        if (!refs.some(r => r.filePath === filePath)) {
+                            refs.push({ name: sceneName, type: 'scene', filePath });
+                        }
+                    }
                 }
             }
         }
