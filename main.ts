@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { LABELS, PLUGIN_NAME } from './terminology';
 import { App, ButtonComponent, DropdownComponent, FuzzySuggestModal, ItemView, Modal, Notice, Platform, Plugin, Setting, TFile, TextComponent, ToggleComponent, WorkspaceLeaf, normalizePath, parseYaml, setIcon } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { asRecord, asString, asNumber, asBool, isRecord } from './utils/narrow';
@@ -25,8 +26,10 @@ import {
     NOTES_VIEW_TYPE,
     SYNOPSIS_VIEW_TYPE,
     DETAILS_VIEW_TYPE,
+    ANCHOR_VIEW_TYPE,
 } from './constants';
-import { PlotgridView } from './views/PlotgridView';
+import { AnchorView } from './views/AnchorView';
+import { AnchorManager } from './services/AnchorManager';
 import type { PlotGridData } from './models/PlotGridData';
 import type { SeriesMetadata, StoryLineProject } from './models/StoryLineProject';
 import { BoardView } from './views/BoardView';
@@ -85,6 +88,7 @@ export default class SceneCardsPlugin extends Plugin {
     fieldTemplates!: FieldTemplateService;
     seriesManager!: SeriesManager;
     researchManager!: ResearchManager;
+    anchorManager!: AnchorManager;
     /** The leaf currently hosting a StoryLine view */
     storyLeaf: WorkspaceLeaf | null = null;
     /** Removes native browser tooltips (`title`) inside StoryLine UI */
@@ -137,6 +141,7 @@ export default class SceneCardsPlugin extends Plugin {
         });
         this.seriesManager = new SeriesManager(this.app, this);
         this.researchManager = new ResearchManager(this.app, this);
+        this.anchorManager = new AnchorManager(this.app);
 
         // Wire up undo/redo to refresh views + re-index
         this.sceneManager.undoManager.onAfterUndoRedo = async () => {
@@ -224,6 +229,9 @@ export default class SceneCardsPlugin extends Plugin {
         this.registerView(RESEARCH_VIEW_TYPE, (leaf) =>
             new ResearchView(leaf, this, this.researchManager)
         );
+        this.registerView(ANCHOR_VIEW_TYPE, (leaf) =>
+            new AnchorView(leaf, this, this.sceneManager, this.anchorManager)
+        );
 
 
         // Wait for the workspace layout to be ready, then bootstrap projects
@@ -279,7 +287,7 @@ export default class SceneCardsPlugin extends Plugin {
         });
 
         // Ribbon icons — open project chooser (load/create) so users can switch projects
-        this.addRibbonIcon('layout-grid', 'StoryLine projects', () => {
+        this.addRibbonIcon('layout-grid', `${PLUGIN_NAME} projects`, () => {
             const modal = new ProjectSelectModal(this.app, this);
             modal.open();
         });
@@ -291,18 +299,24 @@ export default class SceneCardsPlugin extends Plugin {
         });
 
         this.addCommand({
+            id: 'open-anchor-view',
+            name: `Open ${LABELS.anchor.toLowerCase()} view`,
+            callback: () => this.activateView(ANCHOR_VIEW_TYPE),
+        });
+
+        this.addCommand({
             id: 'open-timeline-view',
-            name: 'Open timeline view',            callback: () => this.activateView(TIMELINE_VIEW_TYPE),
+            name: `Open ${LABELS.timeline.toLowerCase()} view`,            callback: () => this.activateView(TIMELINE_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-plotgrid-view',
-            name: 'Open plotgrid view',            callback: () => this.activateView(PLOTGRID_VIEW_TYPE),
+            name: `Open ${LABELS.plotgrid.toLowerCase()} view`,            callback: () => this.activateView(PLOTGRID_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'open-plotlines-view',
-            name: 'Open plotlines view',
+            name: `Open ${LABELS.plotlines.toLowerCase()} view`,
             callback: () => this.activateView(STORYLINE_VIEW_TYPE),
         });
 
@@ -323,12 +337,12 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'open-codex-view',
-            name: 'Open codex',            callback: () => this.activateView(CODEX_VIEW_TYPE),
+            name: `Open ${LABELS.codex.toLowerCase()}`,            callback: () => this.activateView(CODEX_VIEW_TYPE),
         });
 
         this.addCommand({
             id: 'create-new-scene',
-            name: 'Create new scene',            callback: () => this.openQuickAdd(),
+            name: `Create new ${LABELS.scene.toLowerCase()}`,            callback: () => this.openQuickAdd(),
         });
 
         this.addCommand({
@@ -369,7 +383,7 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'undo',
-            name: 'Undo last scene change',
+            name: `Undo last ${LABELS.scene.toLowerCase()} change`,
             callback: async () => {
                 await this.sceneManager.undoManager.undo();
             },
@@ -377,7 +391,7 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'redo',
-            name: 'Redo last scene change',
+            name: `Redo last ${LABELS.scene.toLowerCase()} change`,
             callback: async () => {
                 await this.sceneManager.undoManager.redo();
             },
@@ -411,7 +425,7 @@ export default class SceneCardsPlugin extends Plugin {
                 LOCATION_VIEW_TYPE, CODEX_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE,
                 NOTES_VIEW_TYPE, SYNOPSIS_VIEW_TYPE, DETAILS_VIEW_TYPE,
                 MANUSCRIPT_VIEW_TYPE, RESEARCH_VIEW_TYPE, HELP_VIEW_TYPE,
-                NAVIGATOR_VIEW_TYPE,
+                NAVIGATOR_VIEW_TYPE, ANCHOR_VIEW_TYPE,
             ];
             if (!slViewTypes.includes(viewType)) return;
 
@@ -445,13 +459,13 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'open-scene-inspector',
-            name: 'Open scene details sidebar',
+            name: `Open ${LABELS.scene.toLowerCase()} details sidebar`,
             callback: () => this.openSceneInspector(),
         });
 
         this.addCommand({
             id: 'open-scene-notes',
-            name: 'Open scene notes sidebar',
+            name: `Open ${LABELS.scene.toLowerCase()} notes sidebar`,
             callback: () => this.openNotesView(),
         });
 
@@ -470,19 +484,19 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'open-scene-synopsis',
-            name: 'Open scene synopsis sidebar',
+            name: `Open ${LABELS.scene.toLowerCase()} synopsis sidebar`,
             callback: () => this.openSynopsisView(),
         });
 
         this.addCommand({
             id: 'open-scene-details-view',
-            name: 'Open scene details in own pane',
+            name: `Open ${LABELS.scene.toLowerCase()} details in own pane`,
             callback: () => this.openSceneDetailsLeaf(),
         });
 
         this.addCommand({
             id: 'open-research',
-            name: 'Open research sidebar',
+            name: `Open ${LABELS.researchSidebar.toLowerCase()} sidebar`,
             callback: () => this.openResearch(),
         });
 
@@ -669,7 +683,7 @@ export default class SceneCardsPlugin extends Plugin {
                 if (!(file instanceof TFile)) return;
                 if (!this.resolveEntityType(file.path)) return;
                 menu.addItem((item) => {
-                    item.setTitle('Show in StoryLine')
+                    item.setTitle(`Show in ${PLUGIN_NAME}`)
                         .setIcon('book-open')
                         .onClick(() => this.showEntityDetails(file.path));
                 });
@@ -682,7 +696,7 @@ export default class SceneCardsPlugin extends Plugin {
                 if (!file) return;
                 if (!this.resolveEntityType(file.path)) return;
                 menu.addItem((item) => {
-                    item.setTitle('Show in StoryLine')
+                    item.setTitle(`Show in ${PLUGIN_NAME}`)
                         .setIcon('book-open')
                         .onClick(() => this.showEntityDetails(file.path));
                 });
@@ -1326,7 +1340,7 @@ export default class SceneCardsPlugin extends Plugin {
             }
         }
         if (touched > 0) {
-            new Notice(`StoryLine: synced custom-field YAML in ${touched} file${touched === 1 ? '' : 's'}.`);
+            new Notice(`${PLUGIN_NAME}: synced custom-field YAML in ${touched} file${touched === 1 ? '' : 's'}.`);
         }
     }
 
@@ -1530,7 +1544,7 @@ export default class SceneCardsPlugin extends Plugin {
 
             await adapter.write(filePath, contents);
         } catch (e) {
-            new Notice('StoryLine: failed to save PlotGrid to vault: ' + String(e));
+            new Notice(`${PLUGIN_NAME}: failed to save ${LABELS.plotgrid} to vault: ` + String(e));
         }
     }
 
@@ -2111,6 +2125,7 @@ export default class SceneCardsPlugin extends Plugin {
             NAVIGATOR_VIEW_TYPE,
             MANUSCRIPT_VIEW_TYPE,
             RESEARCH_VIEW_TYPE,
+            ANCHOR_VIEW_TYPE,
         ];
 
         for (const viewType of viewTypes) {
@@ -2470,8 +2485,8 @@ export default class SceneCardsPlugin extends Plugin {
             // ("StoryLine: Create new project") once everything has loaded.
             if (Platform.isMobile) {
                 new Notice(
-                    'StoryLine: no projects found yet. If sync is still running, give it a moment. ' +
-                    'Otherwise use the command palette → "StoryLine: Create new project".',
+                    `${PLUGIN_NAME}: no projects found yet. If sync is still running, give it a moment. ` +
+                    `Otherwise use the command palette → "${PLUGIN_NAME}: Create new project".`,
                     8000,
                 );
                 return;
@@ -2494,7 +2509,7 @@ export default class SceneCardsPlugin extends Plugin {
     async openNewProjectModal(): Promise<StoryLineProject | null> {
         return new Promise<StoryLineProject | null>((resolve) => {
             const modal = new Modal(this.app);
-            modal.titleEl.setText('New StoryLine Project');
+            modal.titleEl.setText(`New ${LABELS.project}`);
             let title = '';
             let customFolder = '';
             let createAsSeries = false;
@@ -2865,7 +2880,7 @@ class ProjectSelectModal extends Modal {
     constructor(app: App, plugin: SceneCardsPlugin) {
         super(app);
         this.plugin = plugin;
-        this.titleEl.setText('Open StoryLine Project');
+        this.titleEl.setText(`Open ${LABELS.project}`);
     }
     onOpen() {
         const { contentEl } = this;
@@ -2946,7 +2961,7 @@ class ProjectSelectModal extends Modal {
         browseBtn.addEventListener('click', async () => {
             // Build a list of all .md files in the vault for the user to pick from
             const browseModal = new Modal(this.app);
-            browseModal.titleEl.setText('Select a StoryLine project file');
+            browseModal.titleEl.setText(`Select a ${LABELS.project.toLowerCase()} file`);
             const container = browseModal.contentEl.createDiv({ cls: 'project-browse-list' });
             const fileList = container.createDiv();
             fileList.setCssStyles({
@@ -2998,7 +3013,7 @@ class ProjectSelectModal extends Modal {
             // Render the project list
             fileList.empty();
             if (projectFiles.length === 0) {
-                fileList.createDiv({ text: 'No StoryLine projects found.' });
+                fileList.createDiv({ text: `No ${LABELS.project.toLowerCase()}s found.` });
             }
             for (const pf of projectFiles) {
                 const row = fileList.createDiv({ cls: 'project-browse-row' });
@@ -3036,7 +3051,7 @@ class ProjectSelectModal extends Modal {
                             browseModal.close();
                             this.close();
                         } else {
-                            new Notice('Could not parse file as a StoryLine project');
+                            new Notice(`Could not parse file as a ${LABELS.project.toLowerCase()}`);
                         }
                     } catch (err) {
                         new Notice('Failed to open project: ' + String(err));

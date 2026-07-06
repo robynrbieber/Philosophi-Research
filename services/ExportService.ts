@@ -10,6 +10,7 @@ import { App, Notice, TFile } from 'obsidian';
 import { Scene, resolveStatusCfg } from '../models/Scene';
 import { getRoleDisplay, relationDisplayLabel } from '../models/Character';
 import { StoryLocation } from '../models/Location';
+import { LABELS } from '../terminology';
 
 export type ExportFormat = 'md' | 'json' | 'html' | 'csv' | 'docx' | 'pdf';
 export type ExportScope = 'manuscript' | 'outline';
@@ -171,7 +172,9 @@ export class ExportService {
             this.buildOutlineMd(lines, scenes);
         }
 
-        const filename = `${project.title} - ${scope === 'manuscript' ? 'Manuscript' : 'Outline'} (${this.timestamp()}).md`;
+        const draftLabel = LABELS.manuscript;
+        const outlineLabel = LABELS.timeline;
+        const filename = `${project.title} - ${scope === 'manuscript' ? draftLabel : outlineLabel} (${this.timestamp()}).md`;
         const filePath = await this.writeExportFile(project, filename, lines.join('\n'));
         new Notice(`Exported to ${filename}`);
         return filePath;

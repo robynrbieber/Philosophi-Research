@@ -1,3 +1,11 @@
+# Philosophi — Academic Writing Plugin for Obsidian
+
+A fork of [StoryLine](https://github.com/PixeroJan/obsidian-storyline) reframed for scholarly research writing: anchors, claims, evidence clusters, outlines, snippets, questions, sources, and draft assembly inside Obsidian.
+
+**Upstream:** Track `upstream` remote (`PixeroJan/obsidian-storyline`) for bugfixes; merge selectively during early phases.
+
+---
+
 # StoryLine — Obsidian Plugin for Writers
 
  By Jan Sandström

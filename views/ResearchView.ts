@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { LABELS } from '../terminology';
 import { ItemView, WorkspaceLeaf, TFile, Notice, Modal, Setting, FuzzySuggestModal } from 'obsidian';
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
@@ -44,7 +45,7 @@ export class ResearchView extends ItemView {
     }
 
     getViewType(): string { return RESEARCH_VIEW_TYPE; }
-    getDisplayText(): string { return 'Research'; }
+    getDisplayText(): string { return LABELS.researchSidebar; }
     getIcon(): string { return 'library-big'; }
 
     async onOpen(): Promise<void> {

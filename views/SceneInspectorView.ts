@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { LABELS } from '../terminology';
 import { EventRef, ItemView, WorkspaceLeaf, TFile, MarkdownView, Menu, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
@@ -24,7 +25,7 @@ const TAB_DEFS: { id: InspectorTab; label: string; icon: string; popOutType?: st
     { id: 'details',  label: 'Details',  icon: 'list',         popOutType: DETAILS_VIEW_TYPE },
     { id: 'synopsis', label: 'Synopsis', icon: 'scroll-text',  popOutType: SYNOPSIS_VIEW_TYPE },
     { id: 'notes',    label: 'Notes',    icon: 'sticky-note',  popOutType: NOTES_VIEW_TYPE },
-    { id: 'research', label: 'Research', icon: 'library-big',  popOutType: RESEARCH_VIEW_TYPE },
+    { id: 'research', label: LABELS.researchSidebar, icon: 'library-big',  popOutType: RESEARCH_VIEW_TYPE },
     { id: 'help',     label: 'Help',     icon: 'help-circle',  popOutType: HELP_VIEW_TYPE },
 ];
 
@@ -72,7 +73,7 @@ export class SceneInspectorView extends ItemView {
     }
 
     getDisplayText(): string {
-        return 'Scene Details';
+        return `${LABELS.scene} details`;
     }
 
     getIcon(): string {

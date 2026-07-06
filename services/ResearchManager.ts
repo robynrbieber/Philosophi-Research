@@ -46,6 +46,41 @@ export class ResearchManager {
                 if (post) this.posts.set(post.filePath, post);
             }
         }
+
+        // Philosophi: index snippet codex entries in the Snippets sidebar
+        await this.scanSnippetCodexEntries();
+    }
+
+    /** Load type:snippet notes from Research/Codex Snippets folder into the sidebar index. */
+    private async scanSnippetCodexEntries(): Promise<void> {
+        if (!this.plugin.settings.codexEnabledCategories?.includes('snippet')) return;
+        const codexFolder = this.plugin.sceneManager?.getCodexFolder();
+        if (!codexFolder) return;
+        const snippetsFolder = normalizePath(`${codexFolder}/Snippets`);
+        const folder = this.app.vault.getAbstractFileByPath(snippetsFolder);
+        if (!(folder instanceof TFolder)) return;
+        for (const child of folder.children) {
+            if (!(child instanceof TFile) || child.extension !== 'md') continue;
+            const content = await this.app.vault.read(child);
+            const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+            if (!fmMatch) continue;
+            try {
+                const fm = parseYaml(fmMatch[1]);
+                if (fm?.type !== 'snippet') continue;
+                const body = content.substring(fmMatch[0].length).trim();
+                const now = new Date(child.stat.mtime).toISOString();
+                const post: ResearchPost = {
+                    filePath: child.path,
+                    title: fm.name || child.basename,
+                    researchType: 'note',
+                    tags: Array.isArray(fm.tags) ? fm.tags : [],
+                    body,
+                    created: fm.created || now,
+                    modified: fm.modified || now,
+                };
+                this.posts.set(post.filePath, post);
+            } catch { /* skip */ }
+        }
     }
 
     /** Recursively scan a folder for research posts. */
@@ -188,6 +223,34 @@ export class ResearchManager {
 
     /** Create a new research post. Returns the created post. */
     async createPost(title: string, researchType: ResearchType, body = '', tags: string[] = [], sourceUrl?: string): Promise<ResearchPost> {
+        // Philosophi: quick-capture snippets write to Codex/Snippets as type:snippet
+        if (researchType === 'note' && this.plugin.settings.codexEnabledCategories?.includes('snippet')) {
+            const codexFolder = this.plugin.sceneManager?.getCodexFolder();
+            if (codexFolder) {
+                try {
+                    const entry = await this.plugin.codexManager.createEntry(codexFolder, 'snippet', title);
+                    if (body.trim()) {
+                        await this.app.vault.modify(
+                            this.app.vault.getAbstractFileByPath(entry.filePath) as TFile,
+                            `---\ntype: snippet\nname: ${title}\ntags: ${JSON.stringify(tags)}\n---\n\n${body}\n`,
+                        );
+                    }
+                    const now = new Date().toISOString();
+                    const post: ResearchPost = {
+                        filePath: entry.filePath,
+                        title,
+                        researchType: 'note',
+                        tags,
+                        body,
+                        created: now,
+                        modified: now,
+                    };
+                    this.posts.set(post.filePath, post);
+                    return post;
+                } catch { /* fall through to legacy Research/ folder */ }
+            }
+        }
+
         const folder = this.getResearchFolder();
         if (!folder) throw new Error('No active project');
 

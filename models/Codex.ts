@@ -391,6 +391,141 @@ export const BUILTIN_CODEX_CATEGORIES: CodexCategoryDef[] = [
     },
 ];
 
+// ── Academic categories (Philosophi) ─────────────────
+
+function academicOverview(namePlaceholder: string, descPlaceholder: string): CodexFieldCategory[] {
+    return [{
+        title: 'Overview',
+        icon: 'file-text',
+        fields: [
+            { key: 'name', label: 'Name', placeholder: namePlaceholder },
+            { key: 'description', label: 'Description', placeholder: descPlaceholder, multiline: true },
+        ],
+    }];
+}
+
+export const ACADEMIC_CODEX_CATEGORIES: CodexCategoryDef[] = [
+    {
+        id: 'source',
+        label: 'Sources',
+        icon: 'book-marked',
+        folder: 'Sources',
+        categories: [
+            {
+                title: 'Bibliography',
+                icon: 'book-marked',
+                fields: [
+                    { key: 'name', label: 'Title', placeholder: 'Source title' },
+                    { key: 'author', label: 'Author', placeholder: 'Author or creator' },
+                    { key: 'year', label: 'Year', placeholder: 'Publication year' },
+                    { key: 'url', label: 'URL', placeholder: 'Link or DOI' },
+                    { key: 'description', label: 'Notes', placeholder: 'Summary or relevance', multiline: true },
+                ],
+            },
+        ],
+        fieldKeys: ['name', 'author', 'year', 'url', 'description', 'image', 'gallery'],
+        builtIn: true,
+        showInSidebar: false,
+    },
+    {
+        id: 'claim',
+        label: 'Claims',
+        icon: 'message-square-quote',
+        folder: 'Claims',
+        categories: [
+            {
+                title: 'Argument',
+                icon: 'message-square-quote',
+                fields: [
+                    { key: 'name', label: 'Claim', placeholder: 'One argument move' },
+                    { key: 'assertion', label: 'Assertion', placeholder: 'What you are arguing', multiline: true },
+                    { key: 'status', label: 'Status', placeholder: 'draft, supported, contested…' },
+                    { key: 'sections', label: 'Sections', placeholder: '[[Section links]]' },
+                    { key: 'evidence', label: 'Evidence', placeholder: '[[Evidence cluster links]]' },
+                ],
+            },
+        ],
+        fieldKeys: ['name', 'assertion', 'status', 'sections', 'evidence', 'description'],
+        builtIn: true,
+        showInSidebar: false,
+    },
+    {
+        id: 'evidence-cluster',
+        label: 'Evidence',
+        icon: 'layers',
+        folder: 'Evidence',
+        categories: [
+            {
+                title: 'Materials',
+                icon: 'layers',
+                fields: [
+                    { key: 'name', label: 'Cluster name', placeholder: 'Evidence group label' },
+                    { key: 'sources', label: 'Sources', placeholder: '[[Source links]]' },
+                    { key: 'claims', label: 'Claims', placeholder: '[[Claim links]]' },
+                    { key: 'description', label: 'Summary', placeholder: 'How this evidence supports the argument', multiline: true },
+                ],
+            },
+        ],
+        fieldKeys: ['name', 'sources', 'claims', 'description'],
+        builtIn: true,
+        showInSidebar: false,
+    },
+    {
+        id: 'question',
+        label: 'Questions',
+        icon: 'help-circle',
+        folder: 'Questions',
+        categories: [
+            {
+                title: 'Inquiry',
+                icon: 'help-circle',
+                fields: [
+                    { key: 'name', label: 'Question', placeholder: 'Unresolved thinking problem' },
+                    { key: 'status', label: 'Status', placeholder: 'open, researching, resolved' },
+                    { key: 'description', label: 'Context', placeholder: 'Why this question matters', multiline: true },
+                ],
+            },
+        ],
+        fieldKeys: ['name', 'status', 'description'],
+        builtIn: true,
+        showInSidebar: false,
+    },
+    {
+        id: 'snippet',
+        label: 'Snippets',
+        icon: 'quote',
+        folder: 'Snippets',
+        categories: academicOverview('Snippet label', 'Phrase, sentence, or compost text'),
+        fieldKeys: ['name', 'description', 'tags'],
+        builtIn: true,
+        showInSidebar: true,
+    },
+    {
+        id: 'outline',
+        label: 'Outlines',
+        icon: 'list-tree',
+        folder: 'Outlines',
+        categories: [
+            {
+                title: 'Structure',
+                icon: 'list-tree',
+                fields: [
+                    { key: 'name', label: 'Outline name', placeholder: 'Whole-piece structure' },
+                    { key: 'sections', label: 'Sections', placeholder: 'Ordered [[section]] links' },
+                    { key: 'description', label: 'Flow notes', placeholder: 'How the piece moves', multiline: true },
+                ],
+            },
+        ],
+        fieldKeys: ['name', 'sections', 'description'],
+        builtIn: true,
+        showInSidebar: false,
+    },
+];
+
+export function getAcademicCodexCategory(id: string): CodexCategoryDef | undefined {
+    return ACADEMIC_CODEX_CATEGORIES.find(c => c.id === id);
+}
+
 /**
  * Look up a built-in category definition by its id.
  */

@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-storyline",
+  "name": "obsidian-philosophi",
   "version": "1.10.38",
-  "description": "Transform your vault into a powerful book planning and writingtool with StoryLine",
+  "description": "Academic research writing in Obsidian with Philosophi",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

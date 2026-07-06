@@ -2,16 +2,54 @@
    Scene Cards Plugin - Main Styles
    ============================================ */
 
+/* ─── Philosophi brand tokens (scoped to plugin UI) ─────────── */
+.philosophi-root,
+[class*="story-line-"] {
+    --ph-isabelline: #F4F3EC;
+    --ph-bone:       #DCD9CA;
+    --ph-grullo:     #B5A486;
+    --ph-vandyke:    #5E4330;
+    --ph-raisin:     #2C211B;
+    --ph-error:      #A83A2C;
+
+    --ph-surface:        var(--ph-isabelline);
+    --ph-surface-raised: var(--ph-bone);
+    --ph-border:         var(--ph-bone);
+    --ph-accent:         var(--ph-vandyke);
+    --ph-accent-soft:    var(--ph-grullo);
+    --ph-text:           var(--ph-raisin);
+    --ph-text-muted:     var(--ph-vandyke);
+
+    --ph-status-seed:     var(--ph-bone);
+    --ph-status-framed:   var(--ph-grullo);
+    --ph-status-drafting: #8A7358;
+    --ph-status-written:  var(--ph-vandyke);
+    --ph-status-revised:  #453225;
+    --ph-status-ready:    var(--ph-raisin);
+}
+
+body.theme-dark .philosophi-root,
+body.theme-dark [class*="story-line-"] {
+    --ph-error: #D98873;
+    --ph-surface:        var(--ph-raisin);
+    --ph-surface-raised: var(--ph-vandyke);
+    --ph-border:         var(--ph-vandyke);
+    --ph-accent:         var(--ph-grullo);
+    --ph-accent-soft:    var(--ph-vandyke);
+    --ph-text:           var(--ph-isabelline);
+    --ph-text-muted:     var(--ph-bone);
+}
+
 /* ─── Theme-aware color tokens ──────────────────────────────── */
 /* Light theme (default) */
 body {
-    /* Status colors */
-    --sl-status-idea:       #9E9E9E;
-    --sl-status-outlined:   #2196F3;
-    --sl-status-draft:      #FF9800;
-    --sl-status-written:    #4CAF50;
-    --sl-status-revised:    #9C27B0;
-    --sl-status-final:      #F44336;
+    /* Status colors — Philosophi monochrome ramp */
+    --sl-status-idea:       var(--ph-status-seed, #DCD9CA);
+    --sl-status-outlined:   var(--ph-status-framed, #B5A486);
+    --sl-status-draft:      var(--ph-status-drafting, #8A7358);
+    --sl-status-written:    var(--ph-status-written, #5E4330);
+    --sl-status-revised:    var(--ph-status-revised, #453225);
+    --sl-status-final:      var(--ph-status-ready, #2C211B);
 
     /* Emotion colors */
     --sl-emotion-tense:       #E53935;
@@ -51,12 +89,12 @@ body {
     --sl-role-supporting:     #6b7280;
     --sl-role-minor:          #9ca3af;
 
-    /* Semantic / UI */
-    --sl-warning:    #FF9800;
-    --sl-error:      #E53935;
-    --sl-success:    #4CAF50;
-    --sl-info:       #2196F3;
-    --sl-badge-text: #ffffff;
+    /* Semantic / UI — Philosophi brand + warm red error */
+    --sl-warning:    var(--ph-grullo, #B5A486);
+    --sl-error:      var(--ph-error, #A83A2C);
+    --sl-success:    var(--ph-vandyke, #5E4330);
+    --sl-info:       var(--ph-grullo, #B5A486);
+    --sl-badge-text: var(--ph-isabelline, #F4F3EC);
 
     /* Shadows & subtle overlays — use semi-transparent black on light */
     --sl-shadow-sm:      0 2px 8px rgba(0,0,0,0.12);
@@ -184,23 +222,27 @@ body.theme-dark {
 .story-line-character-container,
 .story-line-location-container,
 .story-line-codex-container,
-.story-line-stats-container {
-    --sc-card-bg: var(--background-secondary);
-    --sc-card-hover: var(--background-modifier-hover);
-    --sc-card-border: var(--background-modifier-border);
-    --sc-column-bg: var(--background-primary-alt);
-    --sc-text: var(--text-normal);
-    --sc-text-muted: var(--text-muted);
-    --sc-text-faint: var(--text-faint);
-    --sc-accent: var(--interactive-accent);
+.story-line-stats-container,
+.story-line-plotgrid-container,
+.story-line-manuscript-container,
+.story-line-anchor-container {
+    --sc-card-bg: var(--ph-surface-raised, var(--background-secondary));
+    --sc-card-hover: var(--ph-bone, var(--background-modifier-hover));
+    --sc-card-border: var(--ph-border, var(--background-modifier-border));
+    --sc-column-bg: var(--ph-surface, var(--background-primary-alt));
+    --sc-text: var(--ph-text, var(--text-normal));
+    --sc-text-muted: var(--ph-text-muted, var(--text-muted));
+    --sc-text-faint: var(--ph-text-muted, var(--text-faint));
+    --sc-accent: var(--ph-accent, var(--interactive-accent));
     --sc-radius: 8px;
     --sc-gap: 10px;
 
     height: 100%;
     overflow: auto;
     padding: 0;
-    /* reserve space on the right for the inspector panel so it doesn't overlap Obsidian's right sidebar */
     padding-right: 320px;
+    background: var(--ph-surface, var(--background-primary));
+    color: var(--ph-text, var(--text-normal));
 }
 
 /* --- Toolbar --- */
@@ -208,8 +250,8 @@ body.theme-dark {
     display: flex;
     align-items: center;
     padding: 8px 16px;
-    border-bottom: 1px solid var(--sc-card-border);
-    background: var(--background-primary);
+    border-bottom: 1px solid var(--ph-border, var(--sc-card-border));
+    background: var(--ph-surface-raised, var(--background-primary));
     position: sticky;
     top: 0;
     z-index: 10;
@@ -12131,4 +12173,89 @@ body.sl-focus-active-global .titlebar {
 /* ─── Series modal: delete-book button ──────────────────────── */
 .sl-series-delete:hover {
     color: var(--text-error);
+}
+
+/* ─── Philosophi Anchor view ───────────────────────────────── */
+.story-line-anchor-container {
+    padding-right: 0 !important;
+}
+
+.anchor-scroll {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 720px;
+}
+
+.anchor-header {
+    padding: 8px 16px;
+    color: var(--ph-text-muted, var(--text-muted));
+    font-size: 0.9em;
+}
+
+.anchor-card {
+    background: var(--ph-surface-raised, var(--background-secondary));
+    border: 1px solid var(--ph-border, var(--background-modifier-border));
+    border-radius: var(--sc-radius, 8px);
+    padding: 12px 16px;
+}
+
+.anchor-card-title {
+    margin: 0 0 12px 0;
+    color: var(--ph-accent, var(--text-normal));
+    font-size: 0.95em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.anchor-field {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.anchor-field-label {
+    font-size: 0.85em;
+    color: var(--ph-text-muted, var(--text-muted));
+    font-weight: 500;
+}
+
+.anchor-field-input {
+    background: var(--ph-surface, var(--background-primary));
+    border: 1px solid var(--ph-border, var(--background-modifier-border));
+    border-radius: 4px;
+    padding: 6px 10px;
+    color: var(--ph-text, var(--text-normal));
+    font-family: inherit;
+    font-size: 0.95em;
+}
+
+.anchor-field-input:focus {
+    outline: 2px solid var(--ph-accent-soft, var(--interactive-accent));
+    border-color: var(--ph-accent, var(--interactive-accent));
+}
+
+.anchor-field-input::placeholder {
+    color: var(--ph-text-muted, var(--text-faint));
+    opacity: 0.7;
+}
+
+.anchor-field-textarea {
+    min-height: 72px;
+    resize: vertical;
+}
+
+.anchor-empty-state {
+    padding: 32px 16px;
+    color: var(--ph-text-muted, var(--text-muted));
+    text-align: center;
+}
+
+.anchor-save-check {
+    color: var(--ph-vandyke, var(--text-success));
+    font-size: 0.85em;
+    margin-left: 6px;
 }

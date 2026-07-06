@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { hydrateUniversalFieldsFromTopLevel, mirrorUniversalFieldsToTopLevel } from './FieldTemplateService';
 import { App, TFile, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
-import { CodexCategoryDef, CodexEntry, getBuiltinCodexCategory } from '../models/Codex';
+import { CodexCategoryDef, CodexEntry, getBuiltinCodexCategory, getAcademicCodexCategory } from '../models/Codex';
 
 /**
  * Manages generic Codex entries — loading, saving, creating, and deleting
@@ -39,6 +39,11 @@ export class CodexManager {
     ): void {
         this.categoryDefs.clear();
         for (const id of enabledIds) {
+            const academic = getAcademicCodexCategory(id);
+            if (academic) {
+                this.categoryDefs.set(id, academic);
+                continue;
+            }
             const builtin = getBuiltinCodexCategory(id);
             if (builtin) {
                 this.categoryDefs.set(id, builtin);

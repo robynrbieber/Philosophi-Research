@@ -90,7 +90,7 @@ export class MetadataParser {
      */
     static parseContent(content: string, filePath: string): Scene | null {
         const fmRaw = this.extractFrontmatter(content);
-        if (!fmRaw || fmRaw.type !== 'scene') {
+        if (!fmRaw || (fmRaw.type !== 'scene' && fmRaw.type !== 'section')) {
             return null;
         }
         const frontmatter = fmRaw as Partial<Scene> & Record<string, unknown>;

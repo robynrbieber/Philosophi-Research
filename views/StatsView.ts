@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { SceneManager } from '../services/SceneManager';
+import { LABELS, PLUGIN_NAME, viewTitle } from '../terminology';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
@@ -50,7 +51,7 @@ export class StatsView extends ItemView {
 
     getDisplayText(): string {
         const title = this.plugin?.sceneManager?.activeProject?.title;
-        return title ? `StoryLine - ${title}` : 'StoryLine';
+        return viewTitle(title);
     }
 
     getIcon(): string {
@@ -83,7 +84,7 @@ export class StatsView extends ItemView {
         // Toolbar
         const toolbar = container.createDiv('story-line-toolbar');
         const titleRow = toolbar.createDiv('story-line-title-row');
-        titleRow.createEl('h3', { cls: 'story-line-view-title', text: 'StoryLine' });
+        titleRow.createEl('h3', { cls: 'story-line-view-title', text: PLUGIN_NAME });
 
         renderViewSwitcher(toolbar, STATS_VIEW_TYPE, this.plugin, this.leaf);
 
@@ -1576,7 +1577,18 @@ export class StatsView extends ItemView {
 
     private renderWarnings(parent: HTMLElement, allScenes: Scene[]): void {
         if (this.plugin.settings.enablePlotHoleDetection && allScenes.length > 0) {
-            const warnings = Validator.validate(allScenes);
+            const fictionWarnings = Validator.validate(allScenes);
+            const codexEntries = this.plugin.codexManager.getCategories().flatMap(cat => {
+                const entries = this.plugin.codexManager.getEntries(cat.id) ?? [];
+                return entries.map(e => ({ ...e, type: cat.id }));
+            });
+            const anchor = this.plugin.anchorManager?.getAnchor();
+            const academicWarnings = Validator.validateAcademic(
+                allScenes,
+                codexEntries as Array<{ type: string; filePath: string; name: string }>,
+                anchor?.claims ?? [],
+            );
+            const warnings = [...fictionWarnings, ...academicWarnings];
             if (warnings.length === 0) {
                 const ok = parent.createDiv('stats-ok');
                 const ic = ok.createSpan();

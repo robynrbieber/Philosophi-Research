@@ -556,5 +556,75 @@ export class Validator {
         if (!isNaN(parsed)) return new Date(parsed);
         return null;
     }
+
+    /**
+     * Academic workflow diagnostics for Philosophi.
+     */
+    static validateAcademic(
+        scenes: Scene[],
+        codexEntries: Array<{ type: string; filePath: string; name: string; claims?: string; evidence?: string; sections?: string }>,
+        anchorClaims: string[] = [],
+    ): PlotWarning[] {
+        const warnings: PlotWarning[] = [];
+        const claims = codexEntries.filter(e => e.type === 'claim');
+        const evidence = codexEntries.filter(e => e.type === 'evidence-cluster');
+        const questions = codexEntries.filter(e => e.type === 'question');
+        const claimPaths = new Set(claims.map(c => c.filePath));
+        const evidencePaths = new Set(evidence.map(e => e.filePath));
+
+        for (const claim of claims) {
+            const linkedEvidence = String(claim.evidence ?? '');
+            const hasSupport = linkedEvidence.trim().length > 0
+                || evidence.some(e => String(e.claims ?? '').includes(claim.name));
+            if (!hasSupport) {
+                warnings.push({
+                    severity: 'warning',
+                    category: 'Claims',
+                    message: `Claim "${claim.name}" has no linked evidence`,
+                    scenePaths: [claim.filePath],
+                });
+            }
+        }
+
+        for (const ev of evidence) {
+            const linkedClaims = String(ev.claims ?? '');
+            const hasClaim = linkedClaims.trim().length > 0
+                || claims.some(c => String(c.evidence ?? '').includes(ev.name));
+            if (!hasClaim) {
+                warnings.push({
+                    severity: 'info',
+                    category: 'Evidence',
+                    message: `Evidence cluster "${ev.name}" is not linked to a claim`,
+                    scenePaths: [ev.filePath],
+                });
+            }
+        }
+
+        for (const q of questions) {
+            warnings.push({
+                severity: 'info',
+                category: 'Questions',
+                message: `Unresolved question: "${q.name}"`,
+                scenePaths: [q.filePath],
+            });
+        }
+
+        if (anchorClaims.length > 0) {
+            const unlinkedSections = scenes.filter(s => {
+                const title = s.title ?? '';
+                return !anchorClaims.some(l => l.includes(title));
+            });
+            if (unlinkedSections.length > scenes.length * 0.5 && scenes.length > 2) {
+                warnings.push({
+                    severity: 'info',
+                    category: 'Anchor',
+                    message: `${unlinkedSections.length} sections may not be linked from the anchor`,
+                    scenePaths: unlinkedSections.map(s => s.filePath),
+                });
+            }
+        }
+
+        return warnings;
+    }
 }
 /* eslint-enable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- end of file-wide suppression block opened at line 1 */

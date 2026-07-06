@@ -14,6 +14,8 @@ import { SUPPORTED_STORYLINE_LOCALES, normalizeStoryLineLocale } from './utils/l
 // ═══════════════════════════════════════════════════════
 
 export type ColorScheme =
+    // Philosophi brand
+    | 'philosophi'
     // Catppuccin
     | 'latte' | 'frappe' | 'macchiato' | 'mocha'
     // Mood-based
@@ -24,6 +26,7 @@ export type ColorScheme =
     | 'custom';
 
 export const COLOR_SCHEME_LABELS: Record<ColorScheme, string> = {
+    philosophi: 'Philosophi',
     // Catppuccin
     latte:     'Latte',
     frappe:    'Frappé',
@@ -48,6 +51,7 @@ export const COLOR_SCHEME_LABELS: Record<ColorScheme, string> = {
 
 /** Short mood descriptions for the settings UI */
 export const COLOR_SCHEME_HINTS: Record<ColorScheme, string> = {
+    philosophi: 'Warm scholarly monochrome',
     latte:     'Pastel on light',
     frappe:    'Soft on mid-dark',
     macchiato: 'Muted on dark',
@@ -69,6 +73,11 @@ export const COLOR_SCHEME_HINTS: Record<ColorScheme, string> = {
 
 /** 14 accent colors per palette, ordered for maximum visual distinction */
 const COLOR_PALETTES: Record<Exclude<ColorScheme, 'custom'>, string[]> = {
+    philosophi: [
+        '#5E4330', '#B5A486', '#2C211B', '#DCD9CA', '#8A7358',
+        '#453225', '#A83A2C', '#F4F3EC', '#7A6348', '#3D2E22',
+        '#9A8268', '#6B4F38', '#C4B89E', '#4A3528',
+    ],
     // ── Catppuccin ──────────────────────────────────
     latte: [
         '#8839ef', '#fe640b', '#1e66f5', '#40a02b', '#e64553',
@@ -738,8 +747,10 @@ export interface SceneCardsSettings {
     useProjectColors: boolean;
 
     // ── Codex settings ─────────────────────────────────
-    /** IDs of enabled codex categories (e.g. ['items', 'creatures']) */
+    /** IDs of enabled codex categories (e.g. ['claim', 'source']) */
     codexEnabledCategories: string[];
+    /** Show Characters and Locations in the Research dropdown (fiction mode) */
+    showFictionCodexTabs: boolean;
     /** User-created custom codex category definitions */
     codexCustomCategories: Array<{ id: string; label: string; icon: string; showInSidebar?: boolean }>;
 
@@ -934,7 +945,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     sceneTemplates: [],
 
-    colorScheme: 'mocha' as ColorScheme,
+    colorScheme: 'philosophi' as ColorScheme,
 
     tagColors: {},
 
@@ -968,14 +979,15 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     useProjectColors: false,
 
-    codexEnabledCategories: ['items'],
+    codexEnabledCategories: ['source', 'claim', 'evidence-cluster', 'question', 'snippet', 'outline'],
+    showFictionCodexTabs: false,
     codexCustomCategories: [],
     codexCategoryFieldTemplates: {},
     codexCategoryCustomSections: {},
     characterCustomSections: [],
     locationCustomSections: [],
     /** Which codex category IDs should appear in the Scene Inspector sidebar */
-    codexSidebarCategories: [] as string[],
+    codexSidebarCategories: ['snippet'] as string[],
     series: '',
     sharedCodex: '',
     extraFolders: [],

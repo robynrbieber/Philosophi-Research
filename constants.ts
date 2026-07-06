@@ -18,6 +18,7 @@ export const CODEX_VIEW_TYPE = 'story-line-codex';
 export const SCENE_INSPECTOR_VIEW_TYPE = 'story-line-scene-inspector';
 export const MANUSCRIPT_VIEW_TYPE = 'story-line-manuscript';
 export const RESEARCH_VIEW_TYPE = 'story-line-research';
+export const ANCHOR_VIEW_TYPE = 'story-line-anchor';
 export const NOTES_VIEW_TYPE = 'story-line-notes';
 export const SYNOPSIS_VIEW_TYPE = 'story-line-synopsis';
 export const DETAILS_VIEW_TYPE = 'story-line-scene-details';

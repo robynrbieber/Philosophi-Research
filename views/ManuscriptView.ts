@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
+import { LABELS, PLUGIN_NAME, viewTitle } from '../terminology';
 import { ItemView, WorkspaceLeaf, WorkspaceSplit, MarkdownRenderer, TFile, setIcon, Notice } from 'obsidian';
 import { EditorView, Decoration } from '@codemirror/view';
 import { RangeSetBuilder, StateEffect, Compartment, EditorSelection } from '@codemirror/state';
@@ -129,7 +130,7 @@ export class ManuscriptView extends ItemView {
 
     getDisplayText(): string {
         const title = this.plugin?.sceneManager?.activeProject?.title;
-        return title ? `Manuscript - ${title}` : 'Manuscript';
+        return title ? `${LABELS.manuscript} — ${title}` : LABELS.manuscript;
     }
 
     getIcon(): string {
