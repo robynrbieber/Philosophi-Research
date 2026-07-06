@@ -1,16 +1,86 @@
 # Philosophi — Academic Writing Plugin for Obsidian
 
-A fork of [StoryLine](https://github.com/PixeroJan/obsidian-storyline) reframed for scholarly research writing: anchors, claims, evidence clusters, outlines, snippets, questions, sources, and draft assembly inside Obsidian.
+Philosophi is a fork of [StoryLine](https://github.com/PixeroJan/obsidian-storyline) reframed for scholarly research writing. It supports anchors, claims, evidence clusters, outlines, snippets, questions, sources, and draft assembly — all stored as Markdown in your vault.
 
-**Upstream:** Track `upstream` remote (`PixeroJan/obsidian-storyline`) for bugfixes; merge selectively during early phases.
+Fork of StoryLine by Jan Sandström. Upstream: `PixeroJan/obsidian-storyline`.
 
 ---
 
-# StoryLine — Obsidian Plugin for Writers
+## Install (manual)
 
- By Jan Sandström
+### Option A — install script
 
-StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
+From this repo, point at your vault:
+
+```bash
+npm install
+chmod +x scripts/install-plugin.sh
+./scripts/install-plugin.sh /path/to/your/vault
+```
+
+### Option B — copy files yourself
+
+```bash
+npm install
+npm run build
+```
+
+Copy these three files into `<Vault>/.obsidian/plugins/philosophi/`:
+
+- `manifest.json`
+- `main.js`
+- `styles.css`
+
+### Enable in Obsidian
+
+1. **Settings → Community plugins** → turn on community plugins (if needed).
+2. **Reload** community plugins or restart Obsidian.
+3. Enable **Philosophi**.
+4. Click the **grid** ribbon icon (left sidebar) → create a **writing project**.
+
+Philosophi can run beside StoryLine (`id: storyline`) — they do not conflict.
+
+---
+
+## Quick workflow
+
+1. Create a **writing project**.
+2. Open **Anchor** (second tab) — set question, thesis, stakes, scope.
+3. In **Research**, add **Claims**, **Evidence**, **Sources**, **Questions**, **Snippets**, **Outlines**.
+4. Draft in **Board** / **Draft** views using **sections**.
+5. Check **Stats** for academic diagnostics (unsupported claims, orphan evidence, etc.).
+
+### Nav labels
+
+| Tab | Role |
+|-----|------|
+| Board | Sections corkboard / kanban |
+| Anchor | Project command center |
+| Claimgrid | Claim / evidence grid |
+| Structure | Section flow (timeline) |
+| Arguments | Claim throughlines |
+| Draft | Manuscript assembly |
+| Research | Sources, claims, evidence, etc. |
+| Stats | Progress and diagnostics |
+
+Stored `type:` values match the vault Writing System: `anchor`, `claim`, `evidence-cluster`, `section`, `outline`, `snippet`, `question`, `source`.
+
+---
+
+## Develop
+
+```bash
+npm install
+npm run dev    # watch build
+npm run build  # production bundle
+```
+
+---
+
+## StoryLine reference (upstream)
+
+The sections below describe the underlying StoryLine architecture. Philosophi renames and retunes these for academic work.
+
 
 ---
 

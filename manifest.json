@@ -4,8 +4,7 @@
   "version": "1.10.38",
   "minAppVersion": "1.12.7",
   "description": "Academic research writing in Obsidian. Anchors, claims, evidence, outlines, and draft assembly for scholarly work.",
-  "author": "Jan Sandström",
-  "authorUrl": "https://github.com/PixeroJan",
-  "fundingUrl": "https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A",
+  "author": "Robyn Bieber",
+  "authorUrl": "https://github.com/robynrbieber/Philosophi-Research",
   "isDesktopOnly": false
 }
