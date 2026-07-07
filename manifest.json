@@ -1,7 +1,7 @@
 {
   "id": "philosophi",
   "name": "Philosophi",
-  "version": "1.10.38",
+  "version": "1.0.0",
   "minAppVersion": "1.12.7",
   "description": "Academic research writing in Obsidian. Anchors, claims, evidence, outlines, and draft assembly for scholarly work.",
   "author": "Robyn Bieber",

@@ -1,6 +1,6 @@
 {
   "name": "obsidian-philosophi",
-  "version": "1.10.38",
+  "version": "1.0.0",
   "description": "Academic research writing in Obsidian with Philosophi",
   "main": "main.js",
   "scripts": {
