@@ -4,7 +4,7 @@ import { EventRef, ItemView, MarkdownView, TFile, WorkspaceLeaf, WorkspaceSplit,
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { ManuscriptView } from './ManuscriptView';
-import { MANUSCRIPT_VIEW_TYPE, NOTES_VIEW_TYPE } from '../constants';
+import { MANUSCRIPT_VIEW_TYPE, NOTES_VIEW_TYPE, WORKSPACE_SCENE_FOCUS, WORKSPACE_MANUSCRIPT_FOCUS } from '../constants';
 
 /**
  * Standalone Notes sidebar view (#116).
@@ -45,7 +45,7 @@ export class NotesView extends ItemView {
     async onOpen(): Promise<void> {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
-        viewContent.addClass('sl-notes-view-host');
+        viewContent.addClass('sl-notes-view-host', 'philosophi-root');
 
         const container = viewContent.createDiv('sl-notes-view');
 
@@ -94,7 +94,7 @@ export class NotesView extends ItemView {
         // Listen for scene-focus events from other StoryLine views.
         this.registerEvent(
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(
-                'storyline:scene-focus',
+                WORKSPACE_SCENE_FOCUS,
                 (filePath: string) => {
                     this.showScene(filePath);
                 },
@@ -102,7 +102,7 @@ export class NotesView extends ItemView {
         );
         this.registerEvent(
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(
-                'storyline:manuscript-focus',
+                WORKSPACE_MANUSCRIPT_FOCUS,
                 (filePath: string) => {
                     this.showScene(filePath);
                 },

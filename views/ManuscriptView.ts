@@ -12,7 +12,7 @@ import { applyMobileClass, isMobile, isPhone, isTablet } from '../components/Mob
 import { buildFormattingToolbar } from '../components/FormattingToolbar';
 import { compareActChapter, getActDisplayLabel } from '../utils/actChapter';
 import SceneCardsPlugin from '../main';
-import { MANUSCRIPT_VIEW_TYPE } from '../constants';
+import { MANUSCRIPT_VIEW_TYPE, WORKSPACE_MANUSCRIPT_FOCUS } from '../constants';
 
 /**
  * Discussion #183 — module-level cursor/scroll snapshot.
@@ -141,7 +141,7 @@ export class ManuscriptView extends ItemView {
         this.plugin.storyLeaf = this.leaf;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-manuscript-container');
+        container.addClass('story-line-manuscript-container', 'philosophi-root');
         applyMobileClass(container);
         this.rootContainer = container;
 
@@ -207,7 +207,7 @@ export class ManuscriptView extends ItemView {
         // Toolbar
         const toolbar = container.createDiv('story-line-toolbar');
         const titleRow = toolbar.createDiv('story-line-title-row');
-        titleRow.createEl('h3', { cls: 'story-line-view-title', text: 'StoryLine' });
+        titleRow.createEl('h3', { cls: 'story-line-view-title', text: PLUGIN_NAME });
 
         // View switcher tabs
         renderViewSwitcher(toolbar, MANUSCRIPT_VIEW_TYPE, this.plugin, this.leaf);
@@ -1236,7 +1236,7 @@ export class ManuscriptView extends ItemView {
                 if (best && best !== this.focusedScenePath) {
                     this.focusedScenePath = best;
                     // Notify Inspector sidebar
-                    this.app.workspace.trigger('storyline:manuscript-focus', best);
+                    this.app.workspace.trigger(WORKSPACE_MANUSCRIPT_FOCUS, best);
                 }
             },
             {

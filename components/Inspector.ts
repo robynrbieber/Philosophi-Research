@@ -12,6 +12,14 @@ import { AddFieldModal } from './AddFieldModal';
 import { UniversalFieldTemplate } from '../services/FieldTemplateService';
 import { parseActChapterInput, actChapterHasIllegalPathChars, isPrologueAct, isEpilogueAct, PROLOGUE_ACT, EPILOGUE_ACT } from '../utils/actChapter';
 import { Scene, SceneStatus, TIMELINE_MODES, TIMELINE_MODE_LABELS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
+import {
+    LABELS,
+    sectionDetailsTitle,
+    sectionDraftLabel,
+    editSectionAction,
+    splitSectionAction,
+    deleteSectionAction,
+} from '../terminology';
 
 /**
  * Scene inspector sidebar component
@@ -112,7 +120,7 @@ export class InspectorComponent {
 
         // Header
         const header = this.container.createDiv('inspector-header');
-        header.createEl('h3', { text: 'Scene Details' });
+        header.createEl('h3', { text: sectionDetailsTitle() });
         const closeBtn = header.createEl('button', {
             cls: 'clickable-icon inspector-close',
             text: '×'
@@ -152,7 +160,7 @@ export class InspectorComponent {
         const titleSection = this.container.createDiv('inspector-title-section');
         const titleInput = titleSection.createEl('input', {
             cls: 'inspector-title-input',
-            attr: { type: 'text', placeholder: 'Scene title…' },
+            attr: { type: 'text', placeholder: `${LABELS.scene} title…` },
         });
         titleInput.value = scene.title || '';
         titleInput.setCssStyles({
@@ -553,7 +561,7 @@ export class InspectorComponent {
 
         // ── Tags / Plotlines (autocomplete tag-pill input) ──
         const tagSection = this.container.createDiv('inspector-section');
-        tagSection.createSpan({ cls: 'inspector-label', text: 'Plotlines / Tags:' });
+        tagSection.createSpan({ cls: 'inspector-label', text: `${LABELS.plotlines} / Tags:` });
         const tagPillContainer = tagSection.createDiv('inspector-chip-list');
         tagPillContainer.setCssStyles({
             marginTop: '4px',
@@ -571,7 +579,7 @@ export class InspectorComponent {
                 await this.sceneManager.updateScene(scene.filePath, { tags: values });
                 scene.tags = values;
             },
-            placeholder: 'Add plotline…',
+            placeholder: `Add ${LABELS.plotlines.toLowerCase().replace(/s$/, '')}…`,
         });
 
         // ── Synopsis (editable) ──
@@ -602,7 +610,7 @@ export class InspectorComponent {
         // ── Scene Draft (body text — editable) ──
         {
             const descSection = this.container.createDiv('inspector-section');
-            descSection.createSpan({ cls: 'inspector-label', text: 'Scene Draft:' });
+            descSection.createSpan({ cls: 'inspector-label', text: `${sectionDraftLabel()}:` });
             const descInput = descSection.createEl('textarea', {
                 cls: 'inspector-description-input',
                 attr: { placeholder: 'Write your scene draft here…', rows: '12' },
@@ -707,12 +715,12 @@ export class InspectorComponent {
 
         const editBtn = actions.createEl('button', {
             cls: 'mod-cta',
-            text: 'Edit Scene'
+            text: editSectionAction()
         });
         editBtn.addEventListener('click', () => this.onEdit(scene));
 
         const splitBtn = actions.createEl('button', {
-            text: 'Split Scene'
+            text: splitSectionAction()
         });
         splitBtn.addEventListener('click', () => {
             new SplitSceneModal(this.plugin, scene, () => {
@@ -728,7 +736,7 @@ export class InspectorComponent {
         });
         deleteBtn.addEventListener('click', () => {
             openConfirmModal(this.plugin.app, {
-                title: 'Delete Scene',
+                title: deleteSectionAction(),
                 message: `Delete scene "${scene.title || 'Untitled'}"?`,
                 confirmLabel: 'Delete',
                 onConfirm: () => {
@@ -760,7 +768,7 @@ export class InspectorComponent {
         addBtn.addEventListener('click', () => {
             const modal = new AddFieldModal(
                 this.plugin.app,
-                'Scene',
+                LABELS.scene,
                 null,
                 async (template) => {
                     template.category = 'scene';
@@ -769,7 +777,7 @@ export class InspectorComponent {
                     if (fresh) this.show(fresh);
                 },
                 undefined,
-                ['Scene'],
+                [LABELS.scene],
             );
             modal.open();
         });
@@ -817,7 +825,7 @@ export class InspectorComponent {
                     const fresh = this.sceneManager.getAllScenes().find(s => s.filePath === scene.filePath);
                     if (fresh) this.show(fresh);
                 },
-                ['Scene'],
+                [LABELS.scene],
             );
             modal.open();
         });

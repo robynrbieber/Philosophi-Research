@@ -47,3 +47,56 @@ export function statusLabel(status: string): string {
 export function viewTitle(projectTitle?: string | null): string {
     return projectTitle ? `${PLUGIN_NAME} — ${projectTitle}` : PLUGIN_NAME;
 }
+
+/** Singular or plural section label. */
+export function sectionLabel(count?: number): string {
+    if (count === 1) return LABELS.scene;
+    if (count !== undefined) return LABELS.scenes;
+    return LABELS.scene;
+}
+
+export function newSectionAction(): string {
+    return `+ New ${LABELS.scene}`;
+}
+
+export function addSectionAction(): string {
+    return `+ Add ${LABELS.scene}`;
+}
+
+export function createSectionTitle(): string {
+    return `Create New ${LABELS.scene}`;
+}
+
+export function sectionDetailsTitle(): string {
+    return `${LABELS.scene} Details`;
+}
+
+export function sectionDraftLabel(): string {
+    return `${LABELS.scene} Draft`;
+}
+
+export function editSectionAction(): string {
+    return `Edit ${LABELS.scene}`;
+}
+
+export function splitSectionAction(): string {
+    return `Split ${LABELS.scene}`;
+}
+
+export function deleteSectionAction(): string {
+    return `Delete ${LABELS.scene}`;
+}
+
+export function deleteSectionsAction(): string {
+    return `Delete ${LABELS.scenes}`;
+}
+
+export function createNewSectionAction(): string {
+    return `Create New ${LABELS.scene}…`;
+}
+
+export const RESERVED_KEYS_NOTICE = `Reserved ${PLUGIN_NAME} keys are not allowed.`;
+
+export function reservedKeyNotice(key: string): string {
+    return `"${key}" is reserved by ${PLUGIN_NAME}. Choose a different key.`;
+}

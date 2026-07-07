@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { App, ItemView, WorkspaceLeaf, Menu, Modal, TFile, Notice, MarkdownRenderer, Component } from 'obsidian';
-import { LABELS, PLUGIN_NAME, viewTitle } from '../terminology';
+import { LABELS, PLUGIN_NAME, viewTitle, deleteSectionAction, createNewSectionAction } from '../terminology';
 import * as obsidian from 'obsidian';
 import { CellData, ColumnMeta, RowMeta, PlotGridData } from '../models/PlotGridData';
 import { LocationManager } from '../services/LocationManager';
@@ -16,7 +16,7 @@ import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { FiltersComponent } from '../components/Filters';
 import { enableDragToPan } from '../components/DragToPan';
 import { isMobile } from '../components/MobileAdapter';
-import { PLOTGRID_VIEW_TYPE } from '../constants';
+import { PLOTGRID_VIEW_TYPE, WORKSPACE_SCENE_FOCUS } from '../constants';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors, contrastTextColor } from '../settings';
 import { compareActChapter, getActDisplayLabel } from '../utils/actChapter';
 import { attachTooltip } from '../components/Tooltip';
@@ -75,7 +75,7 @@ export class PlotgridView extends ItemView {
         // Render into the same inner container used by other views so styles match
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-board-container');
+        container.addClass('story-line-board-container', 'philosophi-root');
 
         // PlotGrid is desktop-only — show friendly message on mobile
         if (isMobile) {
@@ -328,7 +328,7 @@ export class PlotgridView extends ItemView {
         const titleRow = toolbar.createDiv('story-line-title-row');
         titleRow.createEl('h3', {
             cls: 'story-line-view-title',
-            text: 'StoryLine'
+            text: PLUGIN_NAME
         });
         // Show active project title next to the main label (no dropdown / new button here)
         // project name shown in top-center only; no inline project selector here
@@ -1555,7 +1555,7 @@ export class PlotgridView extends ItemView {
                         menu.addItem((it) => it.setTitle('Show in Inspector').setIcon('info').onClick(() => {
                             if (this.plugin?.isSceneInspectorOpen()) {
                                 this.inspectorComponent?.hide();
-                                this.app.workspace.trigger('storyline:scene-focus', linkedScene.filePath);
+                                this.app.workspace.trigger(WORKSPACE_SCENE_FOCUS, linkedScene.filePath);
                             } else {
                                 this.inspectorComponent?.show(linkedScene);
                             }
@@ -1580,9 +1580,9 @@ export class PlotgridView extends ItemView {
                         menu.addItem((it) => it.setTitle('Unlink Scene').setIcon('unlink').onClick(() => {
                             const c = this.data.cells[key]; if (c) c.linkedSceneId = undefined; this.scheduleSave(); this.renderGrid();
                         }));
-                        menu.addItem((it) => it.setTitle('Delete Scene').setIcon('trash').onClick(async () => {
+                        menu.addItem((it) => it.setTitle(deleteSectionAction()).setIcon('trash').onClick(async () => {
                             openConfirmModal(this.app, {
-                                title: 'Delete Scene',
+                                title: deleteSectionAction(),
                                 message: `Delete scene "${linkedScene.title || 'Untitled'}"?`,
                                 confirmLabel: 'Delete',
                                 onConfirm: async () => {
@@ -1597,7 +1597,7 @@ export class PlotgridView extends ItemView {
                         menu.addItem((it) => it.setTitle('Edit Cell').onClick(() => this.enterEditMode(cellEl, cell, contentEl)));
                         menu.addSeparator();
                         if (scMgr) {
-                            menu.addItem((it) => it.setTitle('Create New Scene…').setIcon('plus').onClick(() => {
+                            menu.addItem((it) => it.setTitle(createNewSectionAction()).setIcon('plus').onClick(() => {
                                 this.openQuickAddForCell(key);
                             }));
                         }

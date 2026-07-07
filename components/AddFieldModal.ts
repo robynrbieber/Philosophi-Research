@@ -2,6 +2,7 @@
 import { App, Modal, Notice, Setting } from 'obsidian';
 import { UniversalFieldTemplate, UniversalFieldType, generateId, suggestTopLevelKey, isReservedTopLevelKey } from '../services/FieldTemplateService';
 import { CHARACTER_CATEGORIES } from '../models/Character';
+import { LABELS, PLUGIN_NAME, RESERVED_KEYS_NOTICE, reservedKeyNotice } from '../terminology';
 
 // ═══════════════════════════════════════════════════════
 //  Add / Edit Universal Field Modal
@@ -219,7 +220,7 @@ export class AddFieldModal extends Modal {
         // ── Top-level YAML key (issue #71) ──
         new Setting(contentEl)
             .setName('Top-level YAML key (optional)')
-            .setDesc('When set, this field\'s value is also written as a top-level YAML key so it appears in Obsidian Properties / Bases / Dataview. Leave blank to keep it inside `universalFields:` only. Reserved StoryLine keys are not allowed.')
+            .setDesc(`When set, this field's value is also written as a top-level YAML key so it appears in Obsidian Properties / Bases / Dataview. Leave blank to keep it inside \`universalFields:\` only. ${RESERVED_KEYS_NOTICE}`)
             .addText(text => {
                 text.setPlaceholder(suggestTopLevelKey(this.label || 'field'))
                     .setValue(this.topLevelKey)
@@ -308,7 +309,7 @@ export class AddFieldModal extends Modal {
                     return;
                 }
                 if (isReservedTopLevelKey(tlk)) {
-                    new Notice(`"${tlk}" is reserved by StoryLine. Choose a different key.`);
+                    new Notice(reservedKeyNotice(tlk));
                     return;
                 }
             }

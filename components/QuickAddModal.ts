@@ -5,6 +5,7 @@ import type SceneCardsPlugin from '../main';
 import { renderAutocompleteInput, renderTagPillInput } from './InlineSuggest';
 import { isPureNumericActChapter, nextNumericActChapter, getActDisplayLabel } from '../utils/actChapter';
 import { App, Modal, Notice, Setting } from 'obsidian';
+import { LABELS, createSectionTitle, sectionDraftLabel } from '../terminology';
 
 /**
  * Modal for quickly creating new scenes
@@ -39,7 +40,7 @@ export class QuickAddModal extends Modal {
         const { contentEl } = this;
         contentEl.addClass('story-line-quick-add');
 
-        contentEl.createEl('h2', { text: 'Create New Scene' });
+        contentEl.createEl('h2', { text: createSectionTitle() });
 
         // Template selector
         const allTemplates = [...BUILTIN_SCENE_TEMPLATES, ...this.plugin.settings.sceneTemplates];
@@ -62,7 +63,7 @@ export class QuickAddModal extends Modal {
         new Setting(contentEl)
             .setName('Title')
             .addText(text => {
-                text.setPlaceholder('Scene title...')
+                text.setPlaceholder(`${LABELS.scene} title…`)
                     .onChange(value => this.result.title = value);
                 text.inputEl.addClass('story-line-title-input');
                 // Auto-focus
@@ -201,11 +202,11 @@ export class QuickAddModal extends Modal {
             placeholder: 'Add character…',
         });
 
-        // Scene Draft (becomes body text)
+        // Section Draft (becomes body text)
         new Setting(contentEl)
-            .setName('Scene Draft')
+            .setName(sectionDraftLabel())
             .addTextArea(area => {
-                area.setPlaceholder('Write your scene draft here…')
+                area.setPlaceholder(`Write your ${LABELS.scene.toLowerCase()} draft here…`)
                     .onChange(value => this.result.description = value || undefined);
                 area.inputEl.rows = 3;
                 area.inputEl.addClass('story-line-wide-input');
@@ -235,14 +236,14 @@ export class QuickAddModal extends Modal {
         });
 
         // Tags / Plotlines (autocomplete tag-pill input)
-        const tagSetting = new Setting(contentEl).setName('Tags / Plotlines');
+        const tagSetting = new Setting(contentEl).setName(`Tags / ${LABELS.plotlines}`);
         const tagContainer = tagSetting.controlEl.createDiv('sl-quickadd-tagpill');
         renderTagPillInput({
             container: tagContainer,
             values: this.result.tags || [],
             getSuggestions: () => this.sceneManager.queryService.getAllTags().sort(),
             onChange: (values) => { this.result.tags = values.length > 0 ? values : undefined; },
-            placeholder: 'Add plotline…',
+            placeholder: `Add ${LABELS.plotlines.toLowerCase().replace(/s$/, '')}…`,
         });
 
         // Status
@@ -268,7 +269,7 @@ export class QuickAddModal extends Modal {
         });
         createEditBtn.addEventListener('click', () => {
             if (!this.result.title) {
-                new Notice('Please enter a scene title');
+                new Notice(`Please enter a ${LABELS.scene.toLowerCase()} title`);
                 return;
             }
             this.prepareResult();
@@ -279,7 +280,7 @@ export class QuickAddModal extends Modal {
         const createBtn = buttonRow.createEl('button', { text: 'Create' });
         createBtn.addEventListener('click', () => {
             if (!this.result.title) {
-                new Notice('Please enter a scene title');
+                new Notice(`Please enter a ${LABELS.scene.toLowerCase()} title`);
                 return;
             }
             this.prepareResult();

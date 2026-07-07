@@ -3,6 +3,8 @@ import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { pickImage } from './ImagePicker';
 import { attachTooltip } from './Tooltip';
+import { pluginCommand } from '../constants';
+import { PLUGIN_NAME } from '../terminology';
 
 /**
  * Renders a project selector dropdown into a toolbar container.
@@ -100,13 +102,13 @@ export function renderProjectSelector(
     // "New project" button
     const newBtn = wrapper.createEl('button', {
         cls: 'clickable-icon project-selector-new',
-        attr: { 'aria-label': 'New StoryLine project', title: 'New project' },
+        attr: { 'aria-label': `New ${PLUGIN_NAME} project`, title: 'New project' },
     });
     obsidian.setIcon(newBtn, 'plus');
 
     newBtn.addEventListener('click', () => {
         // Trigger via command palette
-        (plugin.app as unknown as { commands: { executeCommandById: (id: string) => void } }).commands.executeCommandById('storyline:create-new-project');
+        (plugin.app as unknown as { commands: { executeCommandById: (id: string) => void } }).commands.executeCommandById(pluginCommand('create-new-project'));
     });
 
     return wrapper;

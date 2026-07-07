@@ -6,6 +6,7 @@ import type SceneCardsPlugin from '../main';
 import type { SceneFilter, SortConfig, SortField, FilterPreset } from '../models/Scene';
 import { getStatusOrder } from '../models/Scene';
 import { getActDisplayLabel } from '../utils/actChapter';
+import { LABELS } from '../terminology';
 
 type FocusModeCallback = (active: boolean) => void;
 
@@ -54,7 +55,7 @@ export class FiltersComponent {
             cls: 'story-line-search',
             attr: {
                 type: 'text',
-                placeholder: 'Search scenes...',
+                placeholder: `Search ${LABELS.scenes.toLowerCase()}...`,
             }
         });
         searchInput.addEventListener('input', () => {
@@ -103,7 +104,7 @@ export class FiltersComponent {
         const arcFilterContainer = topBar.createDiv('story-line-arc-filter');
         const arcModes: { value: 'all' | 'scenes' | 'arcPoints'; label: string }[] = [
             { value: 'all', label: 'All' },
-            { value: 'scenes', label: 'Scenes' },
+            { value: 'scenes', label: LABELS.scenes },
             { value: 'arcPoints', label: 'Arc Points' },
         ];
         for (const mode of arcModes) {

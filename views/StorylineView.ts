@@ -74,7 +74,7 @@ export class StorylineView extends ItemView {
         this.plugin.storyLeaf = this.leaf;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-storyline-container');
+        container.addClass('story-line-storyline-container', 'philosophi-root');
         applyMobileClass(container);
         this.rootContainer = container;
 
@@ -106,7 +106,7 @@ export class StorylineView extends ItemView {
         // Toolbar
         const toolbar = container.createDiv('story-line-toolbar');
         const titleRow = toolbar.createDiv('story-line-title-row');
-        titleRow.createEl('h3', { cls: 'story-line-view-title', text: 'StoryLine' });
+        titleRow.createEl('h3', { cls: 'story-line-view-title', text: PLUGIN_NAME });
         // project name shown in top-center only; no inline project selector here
 
         // View switcher tabs

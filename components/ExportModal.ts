@@ -2,6 +2,7 @@
 import { Modal, Setting, Notice, DropdownComponent, ToggleComponent } from 'obsidian';
 import { ExportService, ExportFormat, ExportScope } from '../services/ExportService';
 import type SceneCardsPlugin from '../main';
+import { LABELS } from '../terminology';
 
 /**
  * Modal that lets the user pick format (MD / JSON / HTML) and scope
@@ -66,7 +67,7 @@ export class ExportModal extends Modal {
             .addDropdown(dd => {
                 scopeDropdown = dd;
                 dd.addOption('outline', 'Outline (metadata, stats, table)');
-                dd.addOption('manuscript', 'Manuscript (scene text in order)');
+                dd.addOption('manuscript', `${LABELS.manuscript} (${LABELS.scene.toLowerCase()} text in order)`);
                 dd.setValue(this.exportScope);
                 dd.onChange(v => {
                     this.exportScope = v as ExportScope;
@@ -107,8 +108,8 @@ export class ExportModal extends Modal {
             manuscriptOptions.empty();
 
             new Setting(manuscriptOptions)
-                .setName('Include inactive scenes')
-                .setDesc('Include parked scenes marked inactive. Off by default.')
+                .setName(`Include inactive ${LABELS.scenes.toLowerCase()}`)
+                .setDesc(`Include parked ${LABELS.scenes.toLowerCase()} marked inactive. Off by default.`)
                 .addToggle(t => {
                     t.setValue(this.includeInactiveScenes);
                     t.onChange(v => { this.includeInactiveScenes = v; });
@@ -120,8 +121,8 @@ export class ExportModal extends Modal {
             let numberToggle: ToggleComponent | undefined;
 
             new Setting(manuscriptOptions)
-                .setName('Include scene titles')
-                .setDesc('Show "#### Scene Title" before each scene. Disable for a clean reader copy.')
+                .setName(`Include ${LABELS.scene.toLowerCase()} titles`)
+                .setDesc(`Show "#### ${LABELS.scene} Title" before each ${LABELS.scene.toLowerCase()}. Disable for a clean reader copy.`)
                 .addToggle(t => {
                     titlesToggle = t;
                     t.setValue(this.includeSceneTitles && !this.numberScenesOnExport);
@@ -135,8 +136,8 @@ export class ExportModal extends Modal {
                 });
 
             new Setting(manuscriptOptions)
-                .setName('Number scenes (1, 2, 3\u2026)')
-                .setDesc('Replace scene titles with sequential numbers in the export.')
+                .setName(`Number ${LABELS.scenes.toLowerCase()} (1, 2, 3…)`)
+                .setDesc(`Replace ${LABELS.scene.toLowerCase()} titles with sequential numbers in the export.`)
                 .addToggle(t => {
                     numberToggle = t;
                     t.setValue(this.numberScenesOnExport);
@@ -158,8 +159,8 @@ export class ExportModal extends Modal {
                 });
 
             new Setting(manuscriptOptions)
-                .setName('Scene separator')
-                .setDesc('Separator used between scenes in manuscript exports.')
+                .setName(`${LABELS.scene} separator`)
+                .setDesc(`Separator used between ${LABELS.scenes.toLowerCase()} in ${LABELS.manuscript.toLowerCase()} exports.`)
                 .addDropdown(dd => dd
                     .addOptions({
                         'blank': 'Blank Line',
@@ -177,7 +178,7 @@ export class ExportModal extends Modal {
             if (this.sceneSeparatorType === 'custom') {
                 new Setting(manuscriptOptions)
                     .setName('Custom separator')
-                    .setDesc('Enter any UTF-8 character or text to use as a scene separator.')
+                    .setDesc(`Enter any UTF-8 character or text to use as a ${LABELS.scene.toLowerCase()} separator.`)
                     .addText(text => text
                         .setPlaceholder('e.g. ~ ~ ~')
                         .setValue(this.sceneSeparatorCustom)

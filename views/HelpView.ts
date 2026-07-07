@@ -48,7 +48,7 @@ export class HelpView extends ItemView {
      */
     async mountInto(host: HTMLElement): Promise<void> {
         this.renderComponent.load();
-        host.addClass('storyline-help-container');
+        host.addClass('storyline-help-container', 'philosophi-root');
         await this.renderHelp(host);
     }
 

@@ -81,7 +81,7 @@ export class SLMarkdownToPdfConverter {
 
         // Set document metadata
         doc.setTitle(safeTitle);
-        doc.setCreator('StoryLine for Obsidian');
+        doc.setCreator('Philosophi for Obsidian');
         doc.setProducer('pdf-lib');
 
         // Load fonts based on the chosen family

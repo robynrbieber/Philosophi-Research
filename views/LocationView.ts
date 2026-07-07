@@ -97,7 +97,7 @@ export class LocationView extends ItemView {
         this.plugin.storyLeaf = this.leaf;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-location-container');
+        container.addClass('story-line-location-container', 'philosophi-root');
         applyMobileClass(container);
         this.rootContainer = container;
 
@@ -122,7 +122,7 @@ export class LocationView extends ItemView {
 
         const toolbar = container.createDiv('story-line-toolbar');
         const titleRow = toolbar.createDiv('story-line-title-row');
-        titleRow.createEl('h3', { cls: 'story-line-view-title', text: 'StoryLine' });
+        titleRow.createEl('h3', { cls: 'story-line-view-title', text: PLUGIN_NAME });
 
         renderViewSwitcher(toolbar, LOCATION_VIEW_TYPE, this.plugin, this.leaf);
 

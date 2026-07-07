@@ -3,6 +3,7 @@ import { Modal, Setting, Notice } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { tokenizeWords, DEFAULT_STORYLINE_LOCALE } from '../utils/locale';
 import { BUILTIN_STATUS_CONFIG, Scene, SceneStatus, getStatusOrder } from '../models/Scene';
+import { LABELS, splitSectionAction } from '../terminology';
 
 // ────────────────────────────────────────────────────────
 //  Split Scene Modal
@@ -34,12 +35,12 @@ export class SplitSceneModal extends Modal {
 
     onOpen(): void {
         const { contentEl } = this;
-        this.titleEl.setText('Split Scene');
+        this.titleEl.setText(splitSectionAction());
         contentEl.addClass('storyline-split-modal');
 
         const body = this.scene.body || '';
         if (!body.trim()) {
-            contentEl.createEl('p', { text: 'This scene has no body text to split.' });
+            contentEl.createEl('p', { text: `This ${LABELS.scene.toLowerCase()} has no body text to split.` });
             new Setting(contentEl).addButton(btn =>
                 btn.setButtonText('Close').onClick(() => this.close())
             );
@@ -48,19 +49,19 @@ export class SplitSceneModal extends Modal {
 
         // Info
         contentEl.createEl('p', {
-            text: 'Click in the text below to place the split point. Everything above the marker becomes Scene A, everything below becomes Scene B.',
+            text: `Click in the text below to place the split point. Everything above the marker becomes ${LABELS.scene} A, everything below becomes ${LABELS.scene} B.`,
             cls: 'setting-item-description',
         });
 
         // Titles
         new Setting(contentEl)
-            .setName('Scene A title')
+            .setName(`${LABELS.scene} A title`)
             .addText(text => {
                 text.setValue(this.titleA);
                 text.onChange(v => (this.titleA = v));
             });
         new Setting(contentEl)
-            .setName('Scene B title')
+            .setName(`${LABELS.scene} B title`)
             .addText(text => {
                 text.setValue(this.titleB);
                 text.onChange(v => (this.titleB = v));
@@ -140,7 +141,7 @@ export class SplitSceneModal extends Modal {
         const wordCountB = partB ? tokenizeWords(partB, splitLocale).length : 0;
 
         this.previewEl.createEl('div', {
-            text: `Scene A: ~${wordCountA} words  |  Scene B: ~${wordCountB} words`,
+            text: `${LABELS.scene} A: ~${wordCountA} words  |  ${LABELS.scene} B: ~${wordCountB} words`,
             cls: 'setting-item-description',
         });
 
@@ -175,16 +176,16 @@ export class MergeSceneModal extends Modal {
         this.plugin = plugin;
         this.scenes = scenes;
         this.onDone = onDone;
-        this.mergedTitle = scenes[0]?.title || 'Merged Scene';
+        this.mergedTitle = scenes[0]?.title || `Merged ${LABELS.scene}`;
     }
 
     onOpen(): void {
         const { contentEl } = this;
-        this.titleEl.setText('Merge Scenes');
+        this.titleEl.setText(`Merge ${LABELS.scenes}`);
         contentEl.addClass('storyline-merge-modal');
 
         if (this.scenes.length < 2) {
-            contentEl.createEl('p', { text: 'Select at least 2 scenes to merge.' });
+            contentEl.createEl('p', { text: `Select at least 2 ${LABELS.scenes.toLowerCase()} to merge.` });
             new Setting(contentEl).addButton(btn =>
                 btn.setButtonText('Close').onClick(() => this.close())
             );
@@ -193,7 +194,7 @@ export class MergeSceneModal extends Modal {
 
         // List scenes being merged
         contentEl.createEl('p', {
-            text: `Merging ${this.scenes.length} scenes (in sequence order). The first scene's file will be kept.`,
+            text: `Merging ${this.scenes.length} ${LABELS.scenes.toLowerCase()} (in sequence order). The first ${LABELS.scene.toLowerCase()}'s file will be kept.`,
             cls: 'setting-item-description',
         });
 
@@ -206,7 +207,7 @@ export class MergeSceneModal extends Modal {
 
         // Title
         new Setting(contentEl)
-            .setName('Merged scene title')
+            .setName(`Merged ${LABELS.scene.toLowerCase()} title`)
             .addText(text => {
                 text.setValue(this.mergedTitle);
                 text.onChange(v => (this.mergedTitle = v));

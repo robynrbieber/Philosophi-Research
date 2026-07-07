@@ -17,6 +17,8 @@ import {
     SYNOPSIS_VIEW_TYPE,
     DETAILS_VIEW_TYPE,
     NOTES_VIEW_TYPE,
+    WORKSPACE_SCENE_FOCUS,
+    WORKSPACE_MANUSCRIPT_FOCUS,
 } from '../constants';
 
 type InspectorTab = 'synopsis' | 'notes' | 'details' | 'research' | 'help';
@@ -83,7 +85,7 @@ export class SceneInspectorView extends ItemView {
     async onOpen(): Promise<void> {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
-        viewContent.addClass('sl-scene-inspector-host');
+        viewContent.addClass('sl-scene-inspector-host', 'philosophi-root');
         this.containerEl.closest('.workspace-leaf')?.classList.add('sl-scene-inspector-leaf');
 
         // Research and Help are embedded as tabs here, so any standalone
@@ -205,7 +207,7 @@ export class SceneInspectorView extends ItemView {
 
         // Listen for Manuscript focused-scene changes.
         this.registerEvent(
-            (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on('storyline:manuscript-focus', (filePath: string) => {
+            (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(WORKSPACE_MANUSCRIPT_FOCUS, (filePath: string) => {
                 if (Date.now() - this.lastEditTime < 2000) return;
                 this.showScene(filePath);
             })
@@ -213,7 +215,7 @@ export class SceneInspectorView extends ItemView {
 
         // Listen for scene-focus from any StoryLine view.
         this.registerEvent(
-            (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on('storyline:scene-focus', (filePath: string) => {
+            (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(WORKSPACE_SCENE_FOCUS, (filePath: string) => {
                 if (Date.now() - this.lastEditTime < 2000) return;
                 this.showScene(filePath);
             })

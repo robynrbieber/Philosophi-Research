@@ -63,7 +63,7 @@ export class ResearchView extends ItemView {
      */
     async mountInto(host: HTMLElement): Promise<void> {
         await this.manager.scan();
-        host.addClass('sl-research-panel');
+        host.addClass('sl-research-panel', 'philosophi-root');
         this.rootEl = host;
         this.render();
     }

@@ -5,7 +5,7 @@ import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { InspectorComponent } from '../components/Inspector';
 import { ManuscriptView } from './ManuscriptView';
-import { MANUSCRIPT_VIEW_TYPE, DETAILS_VIEW_TYPE } from '../constants';
+import { MANUSCRIPT_VIEW_TYPE, DETAILS_VIEW_TYPE, WORKSPACE_SCENE_FOCUS, WORKSPACE_MANUSCRIPT_FOCUS } from '../constants';
 
 /**
  * Standalone Scene Details view — hosts the full InspectorComponent
@@ -43,7 +43,7 @@ export class DetailsView extends ItemView {
     async onOpen(): Promise<void> {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
-        viewContent.addClass('sl-scene-inspector-host');
+        viewContent.addClass('sl-scene-inspector-host', 'philosophi-root');
         this.containerEl.closest('.workspace-leaf')?.classList.add('sl-scene-inspector-leaf');
 
         const container = viewContent.createDiv('sl-scene-inspector-sidebar');
@@ -103,7 +103,7 @@ export class DetailsView extends ItemView {
 
         this.registerEvent(
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(
-                'storyline:scene-focus',
+                WORKSPACE_SCENE_FOCUS,
                 (filePath: string) => {
                     if (Date.now() - this.lastEditTime < 2000) return;
                     this.showScene(filePath);
@@ -112,7 +112,7 @@ export class DetailsView extends ItemView {
         );
         this.registerEvent(
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(
-                'storyline:manuscript-focus',
+                WORKSPACE_MANUSCRIPT_FOCUS,
                 (filePath: string) => {
                     if (Date.now() - this.lastEditTime < 2000) return;
                     this.showScene(filePath);

@@ -81,7 +81,7 @@ export class CodexView extends ItemView {
         this.plugin.storyLeaf = this.leaf;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-codex-container');
+        container.addClass('story-line-codex-container', 'philosophi-root');
         applyMobileClass(container);
         this.rootContainer = container;
 
@@ -168,7 +168,7 @@ export class CodexView extends ItemView {
         // ── Toolbar ────────────────────────────────────
         const toolbar = container.createDiv('story-line-toolbar');
         const titleRow = toolbar.createDiv('story-line-title-row');
-        titleRow.createEl('h3', { cls: 'story-line-view-title', text: 'StoryLine' });
+        titleRow.createEl('h3', { cls: 'story-line-view-title', text: PLUGIN_NAME });
         renderViewSwitcher(toolbar, CODEX_VIEW_TYPE, this.plugin, this.leaf);
 
         // ── Controls row ───────────────────────────────

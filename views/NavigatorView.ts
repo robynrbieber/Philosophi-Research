@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
-import { PLUGIN_NAME } from '../terminology';
+import { PLUGIN_NAME, sectionDetailsTitle } from '../terminology';
 import { ItemView, WorkspaceLeaf, Menu, TFile, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { ManuscriptView } from './ManuscriptView';
@@ -86,14 +86,14 @@ export class NavigatorView extends ItemView {
     async onOpen(): Promise<void> {
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('sl-navigator');
+        container.addClass('sl-navigator', 'philosophi-root');
 
         // ── Scene Details button (right-aligned above sort) ──
         const detailsRow = container.createDiv('sl-nav-details-row');
 
         const detailsBtn = detailsRow.createDiv('sl-nav-details-btn');
         setIcon(detailsBtn, 'panel-right');
-        attachTooltip(detailsBtn, 'Scene Details');
+        attachTooltip(detailsBtn, sectionDetailsTitle());
         detailsBtn.addEventListener('click', () => {
             this.plugin.openSceneInspector();
         });

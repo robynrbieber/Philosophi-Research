@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { ItemView, WorkspaceLeaf, Menu, Notice, TFile, Modal, Setting, MarkdownRenderer } from 'obsidian';
-import { LABELS, PLUGIN_NAME, viewTitle } from '../terminology';
+import { LABELS, PLUGIN_NAME, viewTitle, newSectionAction, addSectionAction, editSectionAction, splitSectionAction, deleteSectionAction, deleteSectionsAction, createNewSectionAction } from '../terminology';
 import * as obsidian from 'obsidian';
 import { Scene, SceneFilter, SortConfig, BoardGroupBy, SceneStatus, SceneTemplate, BUILTIN_BEAT_SHEETS, getStatusOrder, getStatusConfig, resolveStatusCfg } from '../models/Scene';
 import { openConfirmModal } from '../components/ConfirmModal';
@@ -14,7 +14,7 @@ import { VirtualScroller } from '../components/VirtualScroller';
 import { enableDragToPan } from '../components/DragToPan';
 import { SplitSceneModal, MergeSceneModal } from '../components/SplitMergeModals';
 import { isMobile, applyMobileClass, enableTouchDrag } from '../components/MobileAdapter';
-import { BOARD_VIEW_TYPE } from '../constants';
+import { BOARD_VIEW_TYPE, WORKSPACE_SCENE_FOCUS } from '../constants';
 import { openManageSnapshotsModal } from '../components/ViewSnapshotModal';
 import { resolveStickyNoteColors, resolveStickyNoteFontColor } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
@@ -103,7 +103,7 @@ export class BoardView extends ItemView {
         this.plugin.storyLeaf = this.leaf;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-board-container');
+        container.addClass('story-line-board-container', 'philosophi-root');
         applyMobileClass(container);
         this.rootContainer = container;
 
@@ -235,7 +235,7 @@ export class BoardView extends ItemView {
         const titleRow = toolbar.createDiv('story-line-title-row');
         titleRow.createEl('h3', {
             cls: 'story-line-view-title',
-            text: 'StoryLine'
+            text: PLUGIN_NAME
         });
         // project name shown in top-center only; no inline project selector here
 
@@ -272,7 +272,7 @@ export class BoardView extends ItemView {
 
         if (this.boardMode === 'corkboard') {
             const toggleWrap = controls.createEl('label', { cls: 'sl-toggle-wrap' });
-            toggleWrap.createSpan({ cls: 'sl-toggle-label', text: 'Scenes' });
+            toggleWrap.createSpan({ cls: 'sl-toggle-label', text: LABELS.scenes });
             const cb = toggleWrap.createEl('input', { type: 'checkbox' });
             cb.checked = this.plugin.settings.showScenesInCorkboard;
             toggleWrap.createSpan({ cls: 'sl-toggle-track' });
@@ -301,7 +301,7 @@ export class BoardView extends ItemView {
         const isCorkboardMode = this.boardMode === 'corkboard';
         const addBtn = controls.createEl('button', {
             cls: 'mod-cta story-line-add-btn',
-            text: isCorkboardMode ? '+ New Note' : '+ New Scene'
+            text: isCorkboardMode ? '+ New Note' : newSectionAction()
         });
         addBtn.addEventListener('click', () => {
             if (isCorkboardMode) {
@@ -402,7 +402,7 @@ export class BoardView extends ItemView {
             cls: 'clickable-icon',
         });
         obsidian.setIcon(archiveBtn, 'archive');
-        attachTooltip(archiveBtn, 'Archived Scenes');
+        attachTooltip(archiveBtn, `Archived ${LABELS.scenes}`);
         archiveBtn.addEventListener('click', () => this.openArchiveModal());
 
         // ── View Snapshots ──
@@ -471,7 +471,7 @@ export class BoardView extends ItemView {
         if (sortedKeys.length === 0) {
             const empty = this.boardEl.createDiv('story-line-empty');
             empty.createEl('p', { text: 'No scenes found.' });
-            empty.createEl('p', { text: 'Click "+ New Scene" to create your first scene, or check your Scene folder setting.' });
+            empty.createEl('p', { text: `Click "${newSectionAction()}" to create your first ${LABELS.scene.toLowerCase()}, or check your ${LABELS.scene} folder setting.` });
             return;
         }
 
@@ -521,7 +521,7 @@ export class BoardView extends ItemView {
         if (scenes.length === 0) {
             const empty = this.boardEl.createDiv('story-line-empty');
             empty.createEl('p', { text: 'No scenes found.' });
-            empty.createEl('p', { text: 'Click "+ New Scene" to create your first scene, or adjust your filters.' });
+            empty.createEl('p', { text: `Click "${newSectionAction()}" to create your first ${LABELS.scene.toLowerCase()}, or adjust your filters.` });
             return;
         }
 
@@ -1519,7 +1519,7 @@ export class BoardView extends ItemView {
         if (!scene.corkboardNoteImage) {
             menu.addSeparator();
             menu.addItem(item => item
-                .setTitle('Convert to Scene')
+                .setTitle(`Convert to ${LABELS.scene}`)
                 .setIcon('clapperboard')
                 .onClick(() => { void this.convertCorkboardNoteToScene(scene); }));
         }
@@ -1857,7 +1857,7 @@ export class BoardView extends ItemView {
         // Add scene button at bottom
         const addBtn = column.createEl('button', {
             cls: 'story-line-column-add',
-            text: '+ Add Scene'
+            text: addSectionAction()
         });
         addBtn.addEventListener('click', () => this.openQuickAdd(title));
     }
@@ -2054,7 +2054,7 @@ export class BoardView extends ItemView {
         // Show inspector for last clicked scene
         if (this.plugin.isSceneInspectorOpen()) {
             this.inspectorComponent?.hide();
-            this.app.workspace.trigger('storyline:scene-focus', scene.filePath);
+            this.app.workspace.trigger(WORKSPACE_SCENE_FOCUS, scene.filePath);
         } else {
             this.inspectorComponent?.show(scene);
         }
@@ -2244,7 +2244,7 @@ export class BoardView extends ItemView {
         obsidian.setIcon(deleteIcon, 'trash');
         deleteBtn.addEventListener('click', async () => {
             openConfirmModal(this.app, {
-                title: 'Delete Scenes',
+                title: deleteSectionsAction(),
                 message: `Delete ${count} scene(s)? This cannot be undone.`,
                 confirmLabel: 'Delete',
                 onConfirm: async () => {
@@ -2351,13 +2351,13 @@ export class BoardView extends ItemView {
         }
 
         menu.addItem(item => {
-            item.setTitle('Edit Scene')
+            item.setTitle(editSectionAction())
                 .setIcon('pencil')
                 .onClick(() => this.openScene(scene));
         });
 
         menu.addItem(item => {
-            item.setTitle('Duplicate Scene')
+            item.setTitle(`Duplicate ${LABELS.scene}`)
                 .setIcon('copy')
                 .onClick(async () => {
                     await this.sceneManager.duplicateScene(scene.filePath);
@@ -2366,7 +2366,7 @@ export class BoardView extends ItemView {
         });
 
         menu.addItem(item => {
-            item.setTitle('Split Scene')
+            item.setTitle(splitSectionAction())
                 .setIcon('scissors')
                 .onClick(() => {
                     new SplitSceneModal(this.plugin, scene, () => this.refreshBoard()).open();
@@ -2462,7 +2462,7 @@ export class BoardView extends ItemView {
                     };
                     this.plugin.settings.sceneTemplates.push(tpl);
                     this.plugin.saveSettings();
-                    new Notice(`Scene template "${tpl.name}" saved`);
+                    new Notice(`${LABELS.scene} template "${tpl.name}" saved`);
                 });
         });
 
@@ -2480,7 +2480,7 @@ export class BoardView extends ItemView {
         menu.addSeparator();
 
         menu.addItem(item => {
-            item.setTitle('Archive Scene')
+            item.setTitle(`Archive ${LABELS.scene}`)
                 .setIcon('archive')
                 .onClick(async () => {
                     await this.sceneManager.archiveScene(scene.filePath);
@@ -2489,11 +2489,11 @@ export class BoardView extends ItemView {
         });
 
         menu.addItem(item => {
-            item.setTitle('Delete Scene')
+            item.setTitle(deleteSectionAction())
                 .setIcon('trash')
                 .onClick(async () => {
                     openConfirmModal(this.app, {
-                        title: 'Delete Scene',
+                        title: deleteSectionAction(),
                         message: `Delete scene "${scene.title || 'Untitled'}"?`,
                         confirmLabel: 'Delete',
                         onConfirm: () => this.deleteScene(scene),
@@ -2509,7 +2509,7 @@ export class BoardView extends ItemView {
      */
     private async openArchiveModal(): Promise<void> {
         const modal = new Modal(this.app);
-        modal.titleEl.setText('Archived Scenes');
+        modal.titleEl.setText(`Archived ${LABELS.scenes}`);
 
         const archived = await this.sceneManager.getArchivedScenes();
         if (archived.length === 0) {
@@ -2540,7 +2540,7 @@ export class BoardView extends ItemView {
                         modal.contentEl.empty();
                         modal.contentEl.createEl('p', { text: 'No archived scenes.', cls: 'setting-item-description' });
                     }
-                    new Notice('Scene restored');
+                    new Notice(`${LABELS.scene} restored`);
                 });
             }
         }

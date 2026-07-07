@@ -5,7 +5,7 @@ import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { InfoPanelComponent } from '../components/InfoPanel';
 import { ManuscriptView } from './ManuscriptView';
-import { MANUSCRIPT_VIEW_TYPE, SYNOPSIS_VIEW_TYPE } from '../constants';
+import { MANUSCRIPT_VIEW_TYPE, SYNOPSIS_VIEW_TYPE, WORKSPACE_SCENE_FOCUS, WORKSPACE_MANUSCRIPT_FOCUS } from '../constants';
 
 /**
  * Standalone Synopsis view — mirrors the focused scene's `synopsis`
@@ -41,7 +41,7 @@ export class SynopsisView extends ItemView {
     async onOpen(): Promise<void> {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
-        viewContent.addClass('sl-notes-view-host');
+        viewContent.addClass('sl-notes-view-host', 'philosophi-root');
 
         const container = viewContent.createDiv('sl-notes-view');
 
@@ -70,7 +70,7 @@ export class SynopsisView extends ItemView {
 
         this.registerEvent(
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(
-                'storyline:scene-focus',
+                WORKSPACE_SCENE_FOCUS,
                 (filePath: string) => {
                     if (Date.now() - this.lastEditTime < 2000) return;
                     this.showScene(filePath);
@@ -79,7 +79,7 @@ export class SynopsisView extends ItemView {
         );
         this.registerEvent(
             (this.app.workspace as unknown as { on: (ev: string, cb: (filePath: string) => void) => EventRef }).on(
-                'storyline:manuscript-focus',
+                WORKSPACE_MANUSCRIPT_FOCUS,
                 (filePath: string) => {
                     if (Date.now() - this.lastEditTime < 2000) return;
                     this.showScene(filePath);

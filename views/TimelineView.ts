@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-floating-promises, @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/no-redundant-type-constituents, @typescript-eslint/no-unused-vars, no-unused-vars, no-useless-escape, no-control-regex, no-empty -- Obsidian's API surface and several untyped third-party libraries force dynamic dispatch; floating promises are intentional in DOM/event handlers; matching enable at end of file */
 import { openConfirmModal } from '../components/ConfirmModal';
-import { LABELS, PLUGIN_NAME, viewTitle } from '../terminology';
+import { LABELS, PLUGIN_NAME, viewTitle, newSectionAction, editSectionAction, deleteSectionAction } from '../terminology';
 import { SceneManager } from '../services/SceneManager';
 import { SceneCardComponent } from '../components/SceneCard';
 import { InspectorComponent } from '../components/Inspector';
@@ -9,7 +9,7 @@ import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { enableDragToPan } from '../components/DragToPan';
 import type SceneCardsPlugin from '../main';
 
-import { TIMELINE_VIEW_TYPE } from '../constants';
+import { TIMELINE_VIEW_TYPE, WORKSPACE_SCENE_FOCUS } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
 import { attachTooltip } from '../components/Tooltip';
 import { ButtonComponent, DropdownComponent, ItemView, Menu, Modal, Notice, Setting, TFile, TextComponent, WorkspaceLeaf } from 'obsidian';
@@ -76,7 +76,7 @@ export class TimelineView extends ItemView {
         this.timelineOrder = this.plugin.settings.timelineOrder === 'chronological' ? 'chronological' : 'reading';
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-timeline-container');
+        container.addClass('story-line-timeline-container', 'philosophi-root');
         applyMobileClass(container);
         this.rootContainer = container;
 
@@ -101,7 +101,7 @@ export class TimelineView extends ItemView {
         // Toolbar
         const toolbar = container.createDiv('story-line-toolbar');
         const titleRow = toolbar.createDiv('story-line-title-row');
-        titleRow.createEl('h3', { cls: 'story-line-view-title', text: 'StoryLine' });
+        titleRow.createEl('h3', { cls: 'story-line-view-title', text: PLUGIN_NAME });
         // project name shown in top-center only; no inline project selector here
 
         // View switcher tabs
@@ -112,7 +112,7 @@ export class TimelineView extends ItemView {
         // Add scene button
         const addBtn = controls.createEl('button', {
             cls: 'mod-cta story-line-add-btn',
-            text: '+ New Scene'
+            text: newSectionAction()
         });
         addBtn.addEventListener('click', () => this.openQuickAdd());
 
@@ -320,7 +320,7 @@ export class TimelineView extends ItemView {
         if (scenes.length === 0 && definedActs.length === 0) {
             const empty = timelineEl.createDiv('story-line-empty');
             empty.createEl('p', { text: 'No scenes found.' });
-            empty.createEl('p', { text: 'Click "+ New Scene" to create your first scene, or use the structure button to set up acts and chapters.' });
+            empty.createEl('p', { text: `Click "${newSectionAction()}" to create your first ${LABELS.scene.toLowerCase()}, or use the structure button to set up acts and chapters.` });
             return;
         }
 
@@ -576,7 +576,7 @@ export class TimelineView extends ItemView {
         if (scenes.length === 0) {
             const empty = timelineEl.createDiv('story-line-empty');
             empty.createEl('p', { text: 'No scenes found.' });
-            empty.createEl('p', { text: 'Click "+ New Scene" to create your first scene.' });
+            empty.createEl('p', { text: `Click "${newSectionAction()}" to create your first ${LABELS.scene.toLowerCase()}.` });
             return;
         }
 
@@ -1093,7 +1093,7 @@ export class TimelineView extends ItemView {
         // Show inspector
         if (this.plugin.isSceneInspectorOpen()) {
             this.inspectorComponent?.hide();
-            this.app.workspace.trigger('storyline:scene-focus', scene.filePath);
+            this.app.workspace.trigger(WORKSPACE_SCENE_FOCUS, scene.filePath);
         } else {
             this.inspectorComponent?.show(scene);
         }
@@ -1106,7 +1106,7 @@ export class TimelineView extends ItemView {
         const menu = new Menu();
 
         menu.addItem(item => {
-            item.setTitle('Edit Scene')
+            item.setTitle(editSectionAction())
                 .setIcon('pencil')
                 .onClick(() => this.openScene(scene));
         });
@@ -1153,11 +1153,11 @@ export class TimelineView extends ItemView {
         menu.addSeparator();
 
         menu.addItem(item => {
-            item.setTitle('Delete Scene')
+            item.setTitle(deleteSectionAction())
                 .setIcon('trash')
                 .onClick(async () => {
                     openConfirmModal(this.app, {
-                        title: 'Delete Scene',
+                        title: deleteSectionAction(),
                         message: `Delete scene "${scene.title || 'Untitled'}"?`,
                         confirmLabel: 'Delete',
                         onConfirm: () => this.deleteScene(scene),

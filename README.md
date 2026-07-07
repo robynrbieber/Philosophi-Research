@@ -79,6 +79,9 @@ npm run build  # production bundle
 
 ## StoryLine reference (upstream)
 
+> **Note:** The sections below describe upstream StoryLine features and use StoryLine terminology (scenes, plotlines, manuscript). In Philosophi, see the [Terminology](#terminology) table in the intro above for the academic labels used in the UI.
+
+
 The sections below describe the underlying StoryLine architecture. Philosophi renames and retunes these for academic work.
 
 

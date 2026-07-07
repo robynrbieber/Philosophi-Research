@@ -471,7 +471,7 @@ export default class SceneCardsPlugin extends Plugin {
 
         this.addCommand({
             id: 'open-scene-notes-file',
-            name: 'Open scene notes as file',
+            name: `Open ${LABELS.scene.toLowerCase()} notes as file`,
             checkCallback: (checking: boolean) => {
                 const scene = this.sceneManager.getScene(this.app.workspace.getActiveFile()?.path ?? '');
                 if (!scene) return false;
@@ -591,7 +591,7 @@ export default class SceneCardsPlugin extends Plugin {
         // Issue #83 \u2014 turn an arbitrary markdown note into a scene.
         this.addCommand({
             id: 'convert-note-to-scene',
-            name: 'Convert note to scene',
+            name: `Convert note to ${LABELS.scene.toLowerCase()}`,
             checkCallback: (checking: boolean) => {
                 const file = this.app.workspace.getActiveFile();
                 if (!file || file.extension !== 'md') return false;
@@ -613,7 +613,7 @@ export default class SceneCardsPlugin extends Plugin {
                 const existing = this.sceneManager.getScene(file.path);
                 if (existing && existing.type === 'scene' && !existing.corkboardNote) return;
                 menu.addItem(item => {
-                    item.setTitle('Convert to scene')
+                    item.setTitle(`Convert to ${LABELS.scene.toLowerCase()}`)
                         .setIcon('clapperboard')
                         .onClick(async () => {
                             const newPath = await this.sceneManager.convertFileToScene(file.path);
@@ -2539,7 +2539,7 @@ export default class SceneCardsPlugin extends Plugin {
             // Book title
             new Setting(modal.contentEl)
                 .setName('Book title')
-                .setDesc('The title of this book. Each book gets its own scenes folder.')
+                .setDesc(`The title of this book. Each book gets its own ${LABELS.scenes.toLowerCase()} folder.`)
                 .addText((text: TextComponent) => {
                     text.setPlaceholder('My Novel');
                     text.onChange((v: string) => (title = v));
