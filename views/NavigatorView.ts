@@ -86,7 +86,7 @@ export class NavigatorView extends ItemView {
     async onOpen(): Promise<void> {
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('sl-navigator', 'philosophi-root');
+        container.addClass('sl-navigator');
 
         // ── Scene Details button (right-aligned above sort) ──
         const detailsRow = container.createDiv('sl-nav-details-row');

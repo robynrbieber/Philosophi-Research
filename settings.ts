@@ -947,7 +947,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     sceneTemplates: [],
 
-    colorScheme: 'philosophi' as ColorScheme,
+    colorScheme: 'mocha' as ColorScheme,
 
     tagColors: {},
 

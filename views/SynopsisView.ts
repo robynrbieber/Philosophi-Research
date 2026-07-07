@@ -41,7 +41,7 @@ export class SynopsisView extends ItemView {
     async onOpen(): Promise<void> {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
-        viewContent.addClass('sl-notes-view-host', 'philosophi-root');
+        viewContent.addClass('sl-notes-view-host');
 
         const container = viewContent.createDiv('sl-notes-view');
 

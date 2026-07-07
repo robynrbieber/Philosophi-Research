@@ -81,7 +81,7 @@ export class CodexView extends ItemView {
         this.plugin.storyLeaf = this.leaf;
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-codex-container', 'philosophi-root');
+        container.addClass('story-line-codex-container');
         applyMobileClass(container);
         this.rootContainer = container;
 

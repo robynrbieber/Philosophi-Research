@@ -85,7 +85,7 @@ export class SceneInspectorView extends ItemView {
     async onOpen(): Promise<void> {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
-        viewContent.addClass('sl-scene-inspector-host', 'philosophi-root');
+        viewContent.addClass('sl-scene-inspector-host');
         this.containerEl.closest('.workspace-leaf')?.classList.add('sl-scene-inspector-leaf');
 
         // Research and Help are embedded as tabs here, so any standalone

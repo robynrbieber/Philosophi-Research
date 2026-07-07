@@ -43,7 +43,7 @@ export class DetailsView extends ItemView {
     async onOpen(): Promise<void> {
         const viewContent = this.containerEl.children[1] as HTMLElement;
         viewContent.empty();
-        viewContent.addClass('sl-scene-inspector-host', 'philosophi-root');
+        viewContent.addClass('sl-scene-inspector-host');
         this.containerEl.closest('.workspace-leaf')?.classList.add('sl-scene-inspector-leaf');
 
         const container = viewContent.createDiv('sl-scene-inspector-sidebar');

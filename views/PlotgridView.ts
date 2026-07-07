@@ -75,7 +75,7 @@ export class PlotgridView extends ItemView {
         // Render into the same inner container used by other views so styles match
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
-        container.addClass('story-line-board-container', 'philosophi-root');
+        container.addClass('story-line-board-container');
 
         // PlotGrid is desktop-only — show friendly message on mobile
         if (isMobile) {
