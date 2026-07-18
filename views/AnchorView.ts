@@ -2,6 +2,7 @@
 import { ItemView, WorkspaceLeaf, Notice } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
+import { deriveProjectFoldersFromFilePath } from '../models/StoryLineProject';
 import { AnchorManager } from '../services/AnchorManager';
 import { ANCHOR_VIEW_TYPE } from '../constants';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
@@ -61,7 +62,7 @@ export class AnchorView extends ItemView {
     private async ensureAnchor(): Promise<void> {
         const project = this.sceneManager.activeProject;
         if (!project) return;
-        const folder = project.folderPath;
+        const folder = deriveProjectFoldersFromFilePath(project.filePath).baseFolder;
         const path = this.anchorManager.anchorPathForProject(folder);
         const adapter = this.app.vault.adapter;
         if (!await adapter.exists(path)) {
@@ -146,7 +147,7 @@ export class AnchorView extends ItemView {
     private renderListField(parent: HTMLElement, anchor: AnchorData, key: string, label: string): void {
         const row = parent.createDiv('anchor-field');
         row.createSpan({ cls: 'anchor-field-label', text: label });
-        const values = (anchor as Record<string, string[]>)[key] ?? [];
+        const values = ((anchor as Record<string, unknown>)[key] as string[]) ?? [];
         const input = row.createEl('input', { type: 'text', cls: 'anchor-field-input' });
         input.value = values.join(', ');
         input.placeholder = '[[wikilinks]] comma-separated';
