@@ -46,6 +46,7 @@ import { NotesView } from './views/NotesView';
 import { SynopsisView } from './views/SynopsisView';
 import { DetailsView } from './views/DetailsView';
 import { ManuscriptView } from './views/ManuscriptView';
+import { PlotgridView } from './views/PlotgridView';
 import { ResearchView } from './views/ResearchView';
 import { ResearchManager } from './services/ResearchManager';
 import { LocationManager } from './services/LocationManager';

@@ -5,6 +5,8 @@
 export type AnchorConfidence = 'low' | 'medium' | 'high' | '';
 
 export interface AnchorData {
+    /** Allows dynamic access by field key (frontmatter and body sections). */
+    [key: string]: unknown;
     filePath: string;
     project?: string;
     question: string;
